@@ -1,0 +1,26 @@
+# Publica artigos diários chamando o endpoint do site.
+# Requer os secrets APP_URL e CRON_SECRET configurados no repositório
+# (Settings → Secrets and variables → Actions).
+#
+# Com OPENAI_API_KEY configurada no Railway, o próprio servidor gera os
+# artigos. Sem ela, este workflow não publica nada (o endpoint exige
+# artigos pré-escritos no body) — deixe o workflow desativado ou envie
+# artigos manualmente via curl.
+
+name: Daily TCG Articles
+
+on:
+  schedule:
+    - cron: "0 12 * * *" # todo dia às 12:00 UTC (9h em Brasília)
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar endpoint de artigos
+        run: |
+          curl -sf -X POST "${{ secrets.APP_URL }}/api/scheduled/tcg-news" \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -d '{}'

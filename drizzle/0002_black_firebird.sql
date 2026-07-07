@@ -1,0 +1,1 @@
+ALTER TABLE `binder_cards` ADD `priceUsd` decimal(10,2);

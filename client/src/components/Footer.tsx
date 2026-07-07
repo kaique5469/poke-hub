@@ -1,0 +1,83 @@
+import { Link } from "wouter";
+
+export default function Footer() {
+  return (
+    <footer className="footer">
+      <div className="container">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-8">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-1">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-black"
+                style={{ background: "linear-gradient(135deg, oklch(0.52 0.22 255), oklch(0.42 0.22 270))" }}>
+                ⚡
+              </div>
+              <span className="font-black text-lg text-white" style={{ fontFamily: "Nunito, sans-serif" }}>PokéHub USA</span>
+            </div>
+            <p className="text-xs leading-relaxed mb-4" style={{ color: "oklch(0.62 0.01 240)" }}>
+              The #1 Pokémon TCG platform for collectors and competitive players in the USA.
+            </p>
+            <div className="flex gap-2">
+              {["𝕏", "📘", "📸", "▶"].map((icon, i) => (
+                <button key={i} className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-colors"
+                  style={{ background: "oklch(0.25 0.02 240)", color: "oklch(0.65 0.01 240)" }}>
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cards */}
+          <div>
+            <p className="footer-title">Cards</p>
+            <Link href="/cards" className="footer-link">Card Database</Link>
+            <Link href="/sets" className="footer-link">TCG Sets</Link>
+            <Link href="/cards?sort=price-desc" className="footer-link">Hot Cards</Link>
+            <Link href="/cards?sort=newest" className="footer-link">New Releases</Link>
+          </div>
+
+          {/* Pokédex */}
+          <div>
+            <p className="footer-title">Pokédex</p>
+            <Link href="/pokedex" className="footer-link">All Pokémon</Link>
+            <Link href="/pokedex?gen=1" className="footer-link">Generation I</Link>
+            <Link href="/pokedex?legendary=true" className="footer-link">Legendaries</Link>
+            <Link href="/pokedex?type=dragon" className="footer-link">Dragon Types</Link>
+          </div>
+
+          {/* Marketplace */}
+          <div>
+            <p className="footer-title">Marketplace</p>
+            <Link href="/shop?cat=booster-box" className="footer-link">Booster Boxes</Link>
+            <Link href="/shop?cat=etb" className="footer-link">Elite Trainer Boxes</Link>
+            <Link href="/shop?cat=singles" className="footer-link">Singles</Link>
+            <Link href="/shop?cat=accessories" className="footer-link">Accessories</Link>
+          </div>
+
+          {/* Community */}
+          <div>
+            <p className="footer-title">Community</p>
+            <Link href="/metagame" className="footer-link">Metagame</Link>
+            <Link href="/deck-builder" className="footer-link">Deck Builder</Link>
+            <Link href="/tournaments" className="footer-link">Tournaments</Link>
+            <Link href="/community" className="footer-link">Community Feed</Link>
+            <Link href="/drops" className="footer-link">Drop Alerts</Link>
+          </div>
+        </div>
+
+        <div className="border-t pt-6" style={{ borderColor: "oklch(0.28 0.02 240)" }}>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-center md:text-left" style={{ color: "oklch(0.52 0.015 240)" }}>
+              © 2025 PokéHub USA. Pokémon and all related names are trademarks of Nintendo, Game Freak & Creatures Inc. This site is not affiliated with or endorsed by The Pokémon Company.
+            </p>
+            <div className="flex gap-4 text-xs" style={{ color: "oklch(0.52 0.015 240)" }}>
+              <a href="#" className="hover:text-white transition-colors">Privacy</a>
+              <a href="#" className="hover:text-white transition-colors">Terms</a>
+              <a href="#" className="hover:text-white transition-colors">Contact</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}

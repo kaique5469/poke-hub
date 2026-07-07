@@ -1,0 +1,802 @@
+import { useState, useEffect, useMemo } from "react";
+import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
+import {
+  ChevronRight, ChevronLeft, TrendingUp, Zap, Package,
+  Trophy, Star, ArrowRight, Clock, Eye, ShoppingCart,
+  BarChart2, Users, BookOpen, Newspaper, Sparkles, Flame,
+  CalendarDays, ExternalLink, Tag
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor(diff / 60000);
+  if (d > 0) return `${d}d ago`;
+  if (h > 0) return `${h}h ago`;
+  return `${m}m ago`;
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
+
+// ─── Quick Links ──────────────────────────────────────────────────────────────
+const quickLinks = [
+  { icon: <ShoppingCart size={20} />, label: "Marketplace", href: "/marketplace", color: "#4f8ef7", bg: "#eff6ff" },
+  { icon: <Zap size={20} />, label: "Auctions", href: "/auctions", color: "#f59e0b", bg: "#fffbeb" },
+  { icon: <BarChart2 size={20} />, label: "Metagame", href: "/metagame", color: "#10b981", bg: "#f0fdf4" },
+  { icon: <Trophy size={20} />, label: "Tournaments", href: "/tournaments", color: "#8b5cf6", bg: "#f5f3ff" },
+  { icon: <Users size={20} />, label: "Bazaar", href: "/bazaar", color: "#ec4899", bg: "#fdf2f8" },
+  { icon: <BookOpen size={20} />, label: "Articles", href: "/articles", color: "#f97316", bg: "#fff7ed" },
+];
+
+// ─── Static TCG News (curated, updated periodically) ─────────────────────────
+const tcgNews = [
+  {
+    id: "n1",
+    title: "Scarlet & Violet — Stellar Crown Now Available",
+    excerpt: "The latest expansion introduces new Stellar Tera Pokémon ex and powerful Supporter cards that are already shaking up the Standard format.",
+    category: "New Release",
+    categoryColor: "#e94560",
+    date: "2024-09-13",
+    image: "https://images.pokemontcg.io/sv7/logo.png",
+    href: "/cards?set=sv7",
+    pokemonArt: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/151.png",
+  },
+  {
+    id: "n2",
+    title: "NAIC 2026 Decklists Released — Dragapult ex Dominates",
+    excerpt: "North America International Championship results are in. Dragapult ex took 49% of the top 32 slots, with Raging Bolt and Regidrago close behind.",
+    category: "Tournament",
+    categoryColor: "#8b5cf6",
+    date: "2026-06-28",
+    image: null,
+    href: "/metagame",
+    pokemonArt: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/887.png",
+  },
+  {
+    id: "n3",
+    title: "Prismatic Evolutions — Eevee Tera Illustration Rares Hit $400+",
+    excerpt: "The Eevee Tera Special Illustration Rare from Prismatic Evolutions continues to climb, now averaging $420 on TCGPlayer with no signs of slowing.",
+    category: "Market Watch",
+    categoryColor: "#10b981",
+    date: "2026-07-01",
+    image: null,
+    href: "/cards?set=sv8pt5",
+    pokemonArt: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/133.png",
+  },
+  {
+    id: "n4",
+    title: "Worlds 2026 — Honolulu, Hawaii Announced",
+    excerpt: "The Pokémon Company confirmed the 2026 World Championships will be held in Honolulu, Hawaii from August 15–17. Registration opens July 10.",
+    category: "Event",
+    categoryColor: "#f59e0b",
+    date: "2026-06-15",
+    image: null,
+    href: "/tournaments",
+    pokemonArt: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/249.png",
+  },
+];
+
+// ─── Hero: rotating banner with art — new sets, hot cards & fresh articles ────
+interface HeroSlide {
+  title: string;
+  subtitle: string;
+  badge: string;
+  badgeColor: string;
+  bg: string;
+  cta: string;
+  href: string;
+  logo: string | null;
+  /** Large art rendered on the right side of the banner */
+  art?: string | null;
+  artStyle?: "card" | "square";
+}
+
+function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; articles?: any[]; hotCard?: any }) {
+  const [current, setCurrent] = useState(0);
+
+  const slides = useMemo(() => {
+    const base: HeroSlide[] = [
+      {
+        title: newestSet ? `New Set: ${newestSet.name}` : "Pokémon TCG Hub USA",
+        subtitle: newestSet
+          ? `Released ${formatDate(newestSet.releaseDate)} · ${newestSet.total} cards · ${newestSet.series}`
+          : "The #1 platform for collectors and competitive players in the USA.",
+        badge: newestSet ? "New Release" : "Welcome",
+        badgeColor: "#e94560",
+        bg: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
+        cta: "Browse Cards",
+        href: newestSet ? `/cards?set=${newestSet.id}` : "/cards",
+        logo: newestSet?.images?.logo ?? null,
+        art: null,
+      },
+    ];
+
+    // Hot card slide (Special Illustration Rare art)
+    if (hotCard) {
+      base.push({
+        title: hotCard.name,
+        subtitle: `${hotCard.set ?? "Chase card"} · trending at $${Number(hotCard.price ?? 0).toFixed(2)} — track it, trade it, or grab it now.`,
+        badge: "Hot Card",
+        badgeColor: "#e94560",
+        bg: "linear-gradient(135deg, #1a0505 0%, #451a24 55%, #7a1f3d 100%)",
+        cta: "View Card",
+        href: `/cards/${hotCard.id}`,
+        logo: null,
+        art: hotCard.image ?? null,
+        artStyle: "card",
+      });
+    }
+
+    // Featured articles only — major news earns the hero banner (tag "featured")
+    const featuredArticles = (articles ?? []).filter(
+      (a) => Array.isArray(a.tags) && a.tags.includes("featured"),
+    );
+    for (const a of featuredArticles.slice(0, 2)) {
+      base.push({
+        title: a.title,
+        subtitle: a.subtitle ?? "Fresh from the PokéHub newsroom — strategy, market watch and set reviews.",
+        badge: "Breaking News",
+        badgeColor: "#8b5cf6",
+        bg: "linear-gradient(135deg, #150a2e 0%, #2b1a55 55%, #4c2a8a 100%)",
+        cta: "Read Article",
+        href: `/articles/${a.slug}`,
+        logo: null,
+        art: a.coverImageUrl ?? null,
+        artStyle: "square",
+      });
+    }
+
+    base.push(
+      {
+        title: "Live Card Auctions",
+        subtitle: "Bid on rare holos, PSA graded cards, and sealed vintage products every day.",
+        badge: "Live Now",
+        badgeColor: "#f59e0b",
+        bg: "linear-gradient(135deg, #1a0a00 0%, #3d1a00 50%, #7a3500 100%)",
+        cta: "View Auctions",
+        href: "/auctions",
+        logo: null,
+        art: null,
+      },
+      {
+        title: "Build Your Championship Deck",
+        subtitle: "Use our Deck Builder with live TCGPlayer prices to craft the perfect 60-card list.",
+        badge: "Free Tool",
+        badgeColor: "#4f8ef7",
+        bg: "linear-gradient(135deg, #0d1117 0%, #1a2744 50%, #2d4a8a 100%)",
+        cta: "Build Now",
+        href: "/deck-builder",
+        logo: null,
+        art: null,
+      },
+    );
+    return base;
+  }, [newestSet, articles, hotCard]);
+
+  useEffect(() => {
+    const id = setInterval(() => setCurrent(c => (c + 1) % slides.length), 6000);
+    return () => clearInterval(id);
+  }, [slides.length]);
+
+  const slide = slides[current];
+
+  return (
+    <div
+      className="relative rounded-2xl overflow-hidden"
+      style={{ background: slide.bg, minHeight: "260px" }}
+    >
+      {/* Right-side art */}
+      {slide.art && (
+        <img
+          src={slide.art}
+          alt=""
+          loading="lazy"
+          className={
+            slide.artStyle === "card"
+              ? "absolute right-6 md:right-12 top-1/2 -translate-y-1/2 h-[220px] md:h-[240px] rounded-lg shadow-2xl rotate-3 z-0 hidden sm:block"
+              : "absolute right-0 top-0 h-full w-1/2 object-cover opacity-40 z-0 hidden sm:block [mask-image:linear-gradient(to_left,black,transparent)]"
+          }
+        />
+      )}
+      <div className="relative z-10 p-8 md:p-10 flex flex-col justify-center min-h-[260px]">
+        <Badge
+          className="w-fit mb-3 text-xs font-bold px-3 py-1"
+          style={{ background: slide.badgeColor, color: "white", border: "none" }}
+        >
+          {slide.badge}
+        </Badge>
+        {slide.logo ? (
+          <img src={slide.logo} alt={slide.title} className="h-12 object-contain mb-3 max-w-[220px]" />
+        ) : (
+          <h1
+            className="text-2xl md:text-4xl font-black text-white mb-3 max-w-lg leading-tight"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {slide.title}
+          </h1>
+        )}
+        <p className="text-white/70 text-sm md:text-base mb-5 max-w-md">{slide.subtitle}</p>
+        <Link href={slide.href}>
+          <Button
+            className="w-fit font-bold px-6 py-2.5 rounded-full text-white"
+            style={{ background: slide.badgeColor, border: "none" }}
+          >
+            {slide.cta} <ArrowRight size={16} className="ml-2" />
+          </Button>
+        </Link>
+      </div>
+
+      {/* Dots */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+        {slides.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrent(i)}
+            className={`h-2 rounded-full transition-all ${i === current ? "w-6 bg-white" : "w-2 bg-white/40"}`}
+          />
+        ))}
+      </div>
+
+      {/* Nav arrows */}
+      <button
+        onClick={() => setCurrent(c => (c - 1 + slides.length) % slides.length)}
+        className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white z-10 transition-colors"
+      >
+        <ChevronLeft size={18} />
+      </button>
+      <button
+        onClick={() => setCurrent(c => (c + 1) % slides.length)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white z-10 transition-colors"
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function Home() {
+  // ── Data fetching ──────────────────────────────────────────────────────────
+  const { data: recentSets, isLoading: loadingSets } = trpc.sets.recent.useQuery(
+    { limit: 8 },
+    { staleTime: 30 * 60 * 1000, retry: false }
+  );
+
+  const { data: highValueCards, isLoading: loadingHighValue } = trpc.cards.getHighValue.useQuery(
+    { page: 1 },
+    { staleTime: 15 * 60 * 1000, retry: false }
+  );
+
+  const { data: articles, isLoading: loadingArticles } = trpc.articles.list.useQuery(
+    { limit: 4 },
+    { staleTime: 5 * 60 * 1000, retry: false }
+  );
+
+  const { data: topDecks, isLoading: loadingDecks } = trpc.metagame.topDecks.useQuery(
+    {},
+    { staleTime: 10 * 60 * 1000, retry: false }
+  );
+
+  const { data: upcomingTournaments } = trpc.tournaments.upcoming.useQuery(
+    undefined,
+    { staleTime: 10 * 60 * 1000, retry: false }
+  );
+
+  const newestSet = recentSets?.[0] ?? null;
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="container py-6 space-y-8">
+
+        {/* ─── Hero + Quick Links ─────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <HeroSection
+              newestSet={newestSet}
+              articles={articles as any[] | undefined}
+              hotCard={(() => {
+                const c: any = (highValueCards as any)?.data?.[0];
+                if (!c) return null;
+                return {
+                  id: c.id,
+                  name: c.name,
+                  set: c.set?.name,
+                  image: c.images?.large ?? c.images?.small ?? null,
+                  price: c.tcgplayer?.prices
+                    ? Object.values(c.tcgplayer.prices as Record<string, any>)[0]?.market ?? 0
+                    : 0,
+                };
+              })()}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {quickLinks.map(link => (
+              <Link key={link.href} href={link.href}>
+                <div
+                  className="rounded-xl border border-gray-100 p-4 flex flex-col items-center gap-2 hover:shadow-md transition-all poke-card text-center"
+                  style={{ background: link.bg }}
+                >
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center"
+                    style={{ background: link.color + "25", color: link.color }}
+                  >
+                    {link.icon}
+                  </div>
+                  <span className="text-xs font-bold text-gray-700">{link.label}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* ─── New Sets ──────────────────────────────────────────────────── */}
+        <div>
+          <div className="section-header">
+            <h2 className="section-title">
+              <Package size={16} className="text-blue-600" />
+              New Sets
+            </h2>
+            <Link href="/sets" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+              All Sets <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          {loadingSets ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-52 rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {(recentSets ?? []).slice(0, 8).map((set: any, idx: number) => (
+                <Link key={set.id} href={`/cards?set=${set.id}`}>
+                  <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-blue-200 hover:shadow-md transition-all group">
+                    {/* Featured card art strip */}
+                    <div className="relative h-28 bg-gradient-to-br from-gray-900 to-gray-700 overflow-hidden">
+                      {set.featuredCards?.length > 0 ? (
+                        <div className="flex h-full items-end justify-center gap-1 px-2 pb-1">
+                          {set.featuredCards.slice(0, 3).map((fc: any, fi: number) => (
+                            <img
+                              key={fc.id}
+                              src={fc.image}
+                              alt={fc.name}
+                              className="h-24 object-contain drop-shadow-lg transition-transform group-hover:scale-105"
+                              style={{
+                                zIndex: fi + 1,
+                                marginLeft: fi > 0 ? "-20px" : "0",
+                                transform: fi === 1 ? "translateY(-4px)" : "none",
+                              }}
+                              loading="lazy"
+                            />
+                          ))}
+                          {/* Set logo overlay bottom-right */}
+                          {set.images?.logo && (
+                            <img
+                              src={set.images.logo}
+                              alt=""
+                              className="absolute bottom-1 right-2 h-5 object-contain opacity-70"
+                              loading="lazy"
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <img
+                            src={set.images?.logo}
+                            alt={set.name}
+                            className="max-h-16 max-w-[80%] object-contain opacity-60"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                      {idx === 0 && (
+                        <div className="absolute top-2 left-2 bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
+                          NEW
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Set info */}
+                    <div className="p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <img
+                          src={set.images?.symbol}
+                          alt=""
+                          className="w-4 h-4 object-contain"
+                          loading="lazy"
+                        />
+                        <span className="text-[10px] text-gray-400 font-medium truncate">{set.series}</span>
+                      </div>
+                      <div className="font-bold text-gray-800 text-xs leading-tight line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">
+                        {set.name}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                          <CalendarDays size={10} />
+                          {formatDate(set.releaseDate)}
+                        </span>
+                        <span className="text-[10px] font-bold text-blue-600">{set.total} cards</span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ─── TCG News + Featured Cards ─────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* TCG News Feed */}
+          <div className="lg:col-span-2">
+            <div className="section-header">
+              <h2 className="section-title">
+                <Newspaper size={16} className="text-blue-600" />
+                TCG News
+              </h2>
+              <Link href="/articles" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+                All News <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="space-y-3">
+              {/* Top story — large card */}
+              {(() => {
+                const top = tcgNews[0];
+                return (
+                  <Link href={top.href}>
+                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-blue-200 hover:shadow-md transition-all group">
+                      <div className="flex">
+                        {/* Pokémon art side */}
+                        <div className="w-28 shrink-0 bg-gradient-to-br from-blue-900 to-indigo-800 flex items-end justify-center overflow-hidden">
+                          <img
+                            src={top.pokemonArt}
+                            alt=""
+                            className="w-24 h-24 object-contain drop-shadow-xl group-hover:scale-110 transition-transform"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="flex-1 p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                              style={{ background: top.categoryColor }}
+                            >
+                              {top.category}
+                            </span>
+                            <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                              <Clock size={10} />
+                              {formatDate(top.date)}
+                            </span>
+                          </div>
+                          <h3 className="font-bold text-gray-800 text-sm mb-1 group-hover:text-blue-600 transition-colors line-clamp-2">
+                            {top.title}
+                          </h3>
+                          <p className="text-xs text-gray-500 line-clamp-2">{top.excerpt}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })()}
+
+              {/* Smaller news items */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {tcgNews.slice(1).map(news => (
+                  <Link key={news.id} href={news.href}>
+                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-blue-200 hover:shadow-md transition-all group h-full">
+                      {/* Pokémon art header */}
+                      <div className="h-20 bg-gradient-to-br from-gray-800 to-gray-700 flex items-end justify-center overflow-hidden">
+                        <img
+                          src={news.pokemonArt}
+                          alt=""
+                          className="h-16 object-contain drop-shadow-lg group-hover:scale-110 transition-transform"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                            style={{ background: news.categoryColor }}
+                          >
+                            {news.category}
+                          </span>
+                          <span className="text-[9px] text-gray-400">{formatDate(news.date)}</span>
+                        </div>
+                        <h3 className="font-bold text-gray-800 text-xs leading-tight group-hover:text-blue-600 transition-colors line-clamp-3">
+                          {news.title}
+                        </h3>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Featured High-Value Cards */}
+          <div>
+            <div className="section-header">
+              <h2 className="section-title">
+                <Sparkles size={16} className="text-yellow-500" />
+                Hot Cards
+              </h2>
+              <Link href="/cards?rarity=Special+Illustration+Rare" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+                View All <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              {loadingHighValue ? (
+                <div className="p-4 space-y-3">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Skeleton className="w-10 h-14 rounded" />
+                      <div className="flex-1 space-y-1.5">
+                        <Skeleton className="h-3 w-28" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                      <Skeleton className="h-5 w-14" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  {(highValueCards?.data ?? []).slice(0, 7).map((card: any, i: number) => {
+                    const price =
+                      card.tcgplayer?.prices?.holofoil?.market ??
+                      card.tcgplayer?.prices?.["1stEditionHolofoil"]?.market ??
+                      card.tcgplayer?.prices?.normal?.market;
+                    return (
+                      <Link key={card.id} href={`/cards/${card.id}`}>
+                        <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-yellow-50 transition-colors border-b border-gray-50 last:border-0 group">
+                          <span className="text-xs font-bold text-gray-300 w-4 text-center shrink-0">{i + 1}</span>
+                          <img
+                            src={card.images?.small}
+                            alt={card.name}
+                            className="w-9 h-12 object-contain rounded shrink-0"
+                            loading="lazy"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-bold text-gray-800 group-hover:text-blue-600 transition-colors truncate">
+                              {card.name}
+                            </div>
+                            <div className="text-[10px] text-gray-400 truncate">{card.set?.name}</div>
+                            {card.rarity && (
+                              <span className="text-[9px] font-bold text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded-full">
+                                {card.rarity}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            {price ? (
+                              <>
+                                <div className="text-sm font-black text-green-600">${price.toFixed(2)}</div>
+                                <div className="text-[10px] text-gray-400">market</div>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Latest Articles ───────────────────────────────────────────── */}
+        <div>
+          <div className="section-header">
+            <h2 className="section-title">
+              <BookOpen size={16} className="text-blue-600" />
+              Latest Articles
+            </h2>
+            <Link href="/articles" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+              All Articles <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          {loadingArticles ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-48 rounded-xl" />
+              ))}
+            </div>
+          ) : articles && articles.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {articles.map((article: any) => {
+                // Pick a Pokémon art based on article tags or category
+                const pokemonNum = article.tags?.includes("charizard") ? 6
+                  : article.tags?.includes("pikachu") ? 25
+                  : article.tags?.includes("mewtwo") ? 150
+                  : article.tags?.includes("eevee") ? 133
+                  : Math.floor(Math.random() * 150) + 1;
+                return (
+                  <Link key={article.id} href={`/articles/${article.slug}`}>
+                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-blue-200 hover:shadow-md transition-all group h-full">
+                      <div className="h-24 bg-gradient-to-br from-blue-900 to-indigo-700 flex items-end justify-center overflow-hidden">
+                        <img
+                          src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonNum}.png`}
+                          alt=""
+                          className="h-20 object-contain drop-shadow-lg group-hover:scale-110 transition-transform"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="p-3">
+                        {article.category && (
+                          <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                            {article.category}
+                          </span>
+                        )}
+                        <h3 className="font-bold text-gray-800 text-xs mt-1.5 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors leading-tight">
+                          {article.title}
+                        </h3>
+                        {article.subtitle && (
+                          <p className="text-[10px] text-gray-500 line-clamp-2 mb-1">{article.subtitle}</p>
+                        )}
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                            <Clock size={9} />
+                            {article.publishedAt ? timeAgo(article.publishedAt) : timeAgo(article.createdAt)}
+                          </span>
+                          {article.viewCount != null && (
+                            <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                              <Eye size={9} />
+                              {article.viewCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
+              <BookOpen size={32} className="text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">No articles yet. Be the first to publish!</p>
+              <Link href="/articles">
+                <Button variant="outline" className="mt-3 text-xs">Browse Articles</Button>
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* ─── Metagame + Tournaments ────────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Top Decks */}
+          <div>
+            <div className="section-header">
+              <h2 className="section-title">
+                <BarChart2 size={16} className="text-blue-600" />
+                Top Decks
+              </h2>
+              <Link href="/metagame" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+                Full Meta <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              {loadingDecks ? (
+                <div className="p-4 space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Skeleton className="w-8 h-8 rounded-full" />
+                      <div className="flex-1 space-y-1">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-2 w-16" />
+                      </div>
+                      <Skeleton className="h-4 w-10" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  {(topDecks ?? []).slice(0, 6).map((deck: any, i: number) => (
+                    <Link key={deck.name} href={`/metagame?deck=${encodeURIComponent(deck.name)}`}>
+                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0 group">
+                        <span className="text-xs font-black text-gray-300 w-5 text-center">{i + 1}</span>
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                          style={{ background: `hsl(${i * 40}, 65%, 50%)` }}
+                        >
+                          {deck.name?.[0]}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold text-gray-800 group-hover:text-blue-600 transition-colors truncate">{deck.name}</div>
+                          <div className="text-xs text-gray-400">{deck.format ?? "Standard"}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-bold text-green-600">{deck.sharePercent ?? deck.usage ?? "—"}%</div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Upcoming Tournaments */}
+          <div>
+            <div className="section-header">
+              <h2 className="section-title">
+                <Trophy size={16} className="text-blue-600" />
+                Upcoming Tournaments
+              </h2>
+              <Link href="/tournaments" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+                View All <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {(upcomingTournaments && upcomingTournaments.length > 0
+                ? upcomingTournaments.slice(0, 4)
+                : [
+                    { id: "1", name: "NAIC 2026 — Indianapolis, IN", format: "Standard", date: "2026-07-20", location: "Indianapolis, IN" },
+                    { id: "2", name: "Regional Championship — Dallas, TX", format: "Standard", date: "2026-08-15", location: "Dallas, TX" },
+                    { id: "3", name: "League Cup — Los Angeles, CA", format: "Expanded", date: "2026-07-12", location: "Los Angeles, CA" },
+                    { id: "4", name: "Worlds 2026 — Honolulu, HI", format: "Standard", date: "2026-08-15", location: "Honolulu, HI" },
+                  ]
+              ).map((t: any) => (
+                <Link key={t.id} href={`/tournaments`}>
+                  <div className="bg-white rounded-xl border border-gray-100 p-4 poke-card hover:border-blue-200 hover:shadow-sm transition-all">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-gray-800 text-sm mb-1 line-clamp-1">{t.name}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className="text-[10px] font-bold" style={{ background: "#4f8ef720", color: "#4f8ef7", border: "none" }}>
+                            {t.format ?? "Standard"}
+                          </Badge>
+                          <span className="text-xs text-gray-400">{t.location}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-gray-400 shrink-0">
+                        <Clock size={12} />
+                        {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Stats Banner ──────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            {[
+              { value: "15,000+", label: "Cards in Database", icon: <Star size={20} className="text-yellow-500" /> },
+              { value: "1,200+", label: "Active Sellers", icon: <Users size={20} className="text-blue-500" /> },
+              { value: "$2.4M+", label: "Cards Traded", icon: <TrendingUp size={20} className="text-green-500" /> },
+              { value: "500+", label: "Tournaments Tracked", icon: <Trophy size={20} className="text-purple-500" /> },
+            ].map(stat => (
+              <div key={stat.label} className="flex flex-col items-center gap-2">
+                {stat.icon}
+                <div className="text-2xl font-black text-gray-800" style={{ fontFamily: "var(--font-display)" }}>{stat.value}</div>
+                <div className="text-xs text-gray-400 font-medium">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

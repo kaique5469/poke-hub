@@ -1,0 +1,452 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Design Tokens ────────────────────────────────────────────────────────── */
+@theme inline {
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  /* Liga Pokémon-inspired white/blue palette */
+  --color-background: oklch(0.99 0.002 240);
+  --color-foreground: oklch(0.15 0.01 240);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.15 0.01 240);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.15 0.01 240);
+
+  /* Primary: Liga Pokémon blue */
+  --color-primary: oklch(0.52 0.22 255);
+  --color-primary-foreground: oklch(1 0 0);
+
+  /* Secondary: light gray */
+  --color-secondary: oklch(0.96 0.005 240);
+  --color-secondary-foreground: oklch(0.35 0.01 240);
+
+  /* Accent: Pokémon yellow */
+  --color-accent: oklch(0.93 0.00 0);
+  --color-accent-foreground: oklch(0.15 0.01 240);
+
+  --color-muted: oklch(0.96 0.005 240);
+  --color-muted-foreground: oklch(0.55 0.01 240);
+
+  --color-destructive: oklch(0.58 0.22 25);
+  --color-destructive-foreground: oklch(1 0 0);
+
+  --color-border: oklch(0.90 0.005 240);
+  --color-input: oklch(0.90 0.005 240);
+  --color-ring: oklch(0.52 0.22 255);
+
+  /* Sidebar */
+  --color-sidebar: oklch(0.98 0.003 240);
+  --color-sidebar-foreground: oklch(0.15 0.01 240);
+  --color-sidebar-primary: oklch(0.52 0.22 255);
+  --color-sidebar-primary-foreground: oklch(1 0 0);
+  --color-sidebar-accent: oklch(0.94 0.01 240);
+  --color-sidebar-accent-foreground: oklch(0.35 0.01 240);
+  --color-sidebar-border: oklch(0.90 0.005 240);
+  --color-sidebar-ring: oklch(0.52 0.22 255);
+
+  --font-sans: 'Inter', 'Nunito', system-ui, sans-serif;
+  --font-display: 'Nunito', 'Inter', system-ui, sans-serif;
+}
+
+/* ─── Base Styles ──────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1.25;
+    color: oklch(0.15 0.01 240);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: oklch(0.96 0.005 240); }
+  ::-webkit-scrollbar-thumb { background: oklch(0.75 0.01 240); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: oklch(0.52 0.22 255); }
+}
+
+/* ─── Container ────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .container {
+    width: 100%;
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .container { padding-left: 1.5rem; padding-right: 1.5rem; }
+  }
+
+  @media (min-width: 1024px) {
+    .container { padding-left: 2rem; padding-right: 2rem; }
+  }
+}
+
+/* ─── Flex defaults ────────────────────────────────────────────────────────── */
+@layer base {
+  .flex { min-width: 0; min-height: 0; }
+}
+
+/* ─── Pokémon Type Colors ──────────────────────────────────────────────────── */
+@layer utilities {
+  .type-normal    { background-color: #A8A878; color: white; }
+  .type-fire      { background-color: #F08030; color: white; }
+  .type-water     { background-color: #6890F0; color: white; }
+  .type-electric  { background-color: #F8D030; color: #333; }
+  .type-grass     { background-color: #78C850; color: white; }
+  .type-ice       { background-color: #98D8D8; color: #333; }
+  .type-fighting  { background-color: #C03028; color: white; }
+  .type-poison    { background-color: #A040A0; color: white; }
+  .type-ground    { background-color: #E0C068; color: #333; }
+  .type-flying    { background-color: #A890F0; color: white; }
+  .type-psychic   { background-color: #F85888; color: white; }
+  .type-bug       { background-color: #A8B820; color: white; }
+  .type-rock      { background-color: #B8A038; color: white; }
+  .type-ghost     { background-color: #705898; color: white; }
+  .type-dragon    { background-color: #7038F8; color: white; }
+  .type-dark      { background-color: #705848; color: white; }
+  .type-steel     { background-color: #B8B8D0; color: #333; }
+  .type-fairy     { background-color: #EE99AC; color: white; }
+  .type-colorless { background-color: #C8C8C8; color: #333; }
+  .type-lightning { background-color: #F8D030; color: #333; }
+  .type-metal     { background-color: #B8B8D0; color: #333; }
+  .type-darkness  { background-color: #705848; color: white; }
+}
+
+/* ─── Card Condition Badges ────────────────────────────────────────────────── */
+@layer utilities {
+  .condition-M  { background-color: #7C3AED; color: white; }
+  .condition-NM { background-color: #16A34A; color: white; }
+  .condition-SP { background-color: #2563EB; color: white; }
+  .condition-MP { background-color: #D97706; color: white; }
+  .condition-HP { background-color: #DC2626; color: white; }
+  .condition-D  { background-color: #6B7280; color: white; }
+}
+
+/* ─── Pokémon Card Hover Effect ────────────────────────────────────────────── */
+@layer utilities {
+  .poke-card {
+    transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+                box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1);
+    cursor: pointer;
+  }
+
+  .poke-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.15);
+  }
+
+  .poke-card:active {
+    transform: scale(0.97);
+    transition-duration: 100ms;
+  }
+}
+
+/* ─── Stat Bars ────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .stat-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: oklch(0.92 0.005 240);
+    overflow: hidden;
+  }
+
+  .stat-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 600ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+}
+
+/* ─── Auction Countdown ────────────────────────────────────────────────────── */
+@layer utilities {
+  .countdown-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 44px;
+    background: oklch(0.15 0.01 240);
+    color: white;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: var(--font-display);
+    font-weight: 800;
+  }
+
+  .countdown-unit .value {
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .countdown-unit .label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+  }
+}
+
+/* ─── Seller Table ─────────────────────────────────────────────────────────── */
+@layer utilities {
+  .seller-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid oklch(0.92 0.005 240);
+    transition: background 150ms ease;
+  }
+
+  .seller-row:hover {
+    background: oklch(0.97 0.003 240);
+  }
+}
+
+/* ─── Marquee Animation ────────────────────────────────────────────────────── */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 40s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* ─── Shimmer Skeleton ─────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    oklch(0.93 0.005 240) 25%,
+    oklch(0.97 0.003 240) 50%,
+    oklch(0.93 0.005 240) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+/* ─── Hero Carousel ────────────────────────────────────────────────────────── */
+@layer utilities {
+  .hero-slide {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+  }
+
+  .hero-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 600ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .hero-slide:hover img {
+    transform: scale(1.02);
+  }
+}
+
+/* ─── Tabs ─────────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .liga-tabs {
+    display: flex;
+    border-bottom: 2px solid oklch(0.90 0.005 240);
+    gap: 0;
+  }
+
+  .liga-tab {
+    padding: 0.625rem 1.25rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: oklch(0.55 0.01 240);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: color 150ms ease, border-color 150ms ease;
+    white-space: nowrap;
+  }
+
+  .liga-tab:hover {
+    color: oklch(0.52 0.22 255);
+  }
+
+  .liga-tab.active {
+    color: oklch(0.52 0.22 255);
+    border-bottom-color: oklch(0.52 0.22 255);
+  }
+}
+
+/* ─── Section Headers ──────────────────────────────────────────────────────── */
+@layer utilities {
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: oklch(0.15 0.01 240);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .section-title::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 1.25em;
+    background: oklch(0.52 0.22 255);
+    border-radius: 2px;
+  }
+}
+
+/* ─── Price Display ────────────────────────────────────────────────────────── */
+@layer utilities {
+  .price-tag {
+    font-family: var(--font-display);
+    font-weight: 800;
+    color: oklch(0.52 0.22 255);
+  }
+
+  .price-from {
+    font-size: 0.7rem;
+    color: oklch(0.55 0.01 240);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+  }
+}
+
+/* ─── Sidebar Filter ───────────────────────────────────────────────────────── */
+@layer utilities {
+  .filter-sidebar {
+    background: white;
+    border: 1px solid oklch(0.90 0.005 240);
+    border-radius: 12px;
+    padding: 1.25rem;
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+
+  .filter-section-title {
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: oklch(0.35 0.01 240);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+}
+
+/* ─── Animations ───────────────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 300ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 200ms ease both;
+}
+
+/* ─── Stagger children ─────────────────────────────────────────────────────── */
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 50ms; }
+.stagger > *:nth-child(3) { animation-delay: 100ms; }
+.stagger > *:nth-child(4) { animation-delay: 150ms; }
+.stagger > *:nth-child(5) { animation-delay: 200ms; }
+.stagger > *:nth-child(6) { animation-delay: 250ms; }
+
+/* ─── Responsive Grid ──────────────────────────────────────────────────────── */
+@layer utilities {
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+  }
+
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .poke-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+}
+
+/* ─── Reduced Motion ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
