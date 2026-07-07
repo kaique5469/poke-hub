@@ -1,17 +1,28 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
   ChevronRight, ChevronLeft, TrendingUp, Zap, Package,
-  Trophy, Star, ArrowRight, Clock, Eye, ShoppingCart,
-  BarChart2, Users, BookOpen, Newspaper, Sparkles, Flame,
-  CalendarDays, ExternalLink, Tag
+  Trophy, Star, ArrowRight, Clock, Eye,
+  BarChart2, Users, BookOpen, Newspaper, Sparkles,
+  CalendarDays
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+function SectionIcon({ from, to, children }: { from: string; to: string; children: React.ReactNode }) {
+  return (
+    <span
+      className="w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm shrink-0"
+      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+    >
+      {children}
+    </span>
+  );
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const d = Math.floor(diff / 86400000);
@@ -38,16 +49,6 @@ function formatDate(dateStr: string): string {
     month: "short", day: "numeric", year: "numeric",
   });
 }
-
-// ─── Quick Links ──────────────────────────────────────────────────────────────
-const quickLinks = [
-  { icon: <ShoppingCart size={20} />, label: "Marketplace", href: "/shop", color: "#7C3AED", bg: "#f5f3ff" },
-  { icon: <Zap size={20} />, label: "Auctions", href: "/auctions", color: "#f59e0b", bg: "#fffbeb" },
-  { icon: <BarChart2 size={20} />, label: "Metagame", href: "/metagame", color: "#10b981", bg: "#f0fdf4" },
-  { icon: <Trophy size={20} />, label: "Tournaments", href: "/tournaments", color: "#8b5cf6", bg: "#f5f3ff" },
-  { icon: <Users size={20} />, label: "Bazaar", href: "/bazaar", color: "#ec4899", bg: "#fdf2f8" },
-  { icon: <BookOpen size={20} />, label: "Articles", href: "/articles", color: "#f97316", bg: "#fff7ed" },
-];
 
 // ─── Static TCG News (curated, updated periodically) ─────────────────────────
 const tcgNews = [
@@ -109,7 +110,7 @@ interface HeroSlide {
   logo: string | null;
   /** Large art rendered on the right side of the banner */
   art?: string | null;
-  artStyle?: "card" | "square";
+  artStyle?: "card" | "square" | "pokemon";
 }
 
 function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; articles?: any[]; hotCard?: any }) {
@@ -128,7 +129,8 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         cta: "Browse Cards",
         href: newestSet ? `/cards?set=${newestSet.id}` : "/cards",
         logo: newestSet?.images?.logo ?? null,
-        art: null,
+        art: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png",
+        artStyle: "pokemon",
       },
     ];
 
@@ -136,7 +138,9 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
     if (hotCard) {
       base.push({
         title: hotCard.name,
-        subtitle: `${hotCard.set ?? "Chase card"} · trending at $${Number(hotCard.price ?? 0).toFixed(2)} — track it, trade it, or grab it now.`,
+        subtitle: Number(hotCard.price ?? 0) > 0
+          ? `${hotCard.set ?? "Chase card"} · trending at $${Number(hotCard.price).toFixed(2)} — track it, trade it, or grab it now.`
+          : `${hotCard.set ?? "Chase card"} · the chase card everyone wants — track it, trade it, or grab it now.`,
         badge: "Hot Card",
         badgeColor: "#e94560",
         bg: "linear-gradient(135deg, #0B1220 0%, #451a55 55%, #7C3AED 100%)",
@@ -177,7 +181,8 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         cta: "View Auctions",
         href: "/auctions",
         logo: null,
-        art: null,
+        art: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png",
+        artStyle: "pokemon",
       },
       {
         title: "Build Your Championship Deck",
@@ -188,7 +193,8 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         cta: "Build Now",
         href: "/deck-builder",
         logo: null,
-        art: null,
+        art: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png",
+        artStyle: "pokemon",
       },
     );
     return base;
@@ -204,7 +210,7 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
   return (
     <div
       className="relative rounded-2xl overflow-hidden"
-      style={{ background: slide.bg, minHeight: "260px" }}
+      style={{ background: slide.bg, minHeight: "300px" }}
     >
       {/* Right-side art */}
       {slide.art && (
@@ -215,11 +221,13 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
           className={
             slide.artStyle === "card"
               ? "absolute right-6 md:right-12 top-1/2 -translate-y-1/2 h-[220px] md:h-[240px] rounded-lg shadow-2xl rotate-3 z-0 hidden sm:block"
-              : "absolute right-0 top-0 h-full w-1/2 object-cover opacity-40 z-0 hidden sm:block [mask-image:linear-gradient(to_left,black,transparent)]"
+              : slide.artStyle === "pokemon"
+                ? "absolute right-4 md:right-14 bottom-0 h-[88%] object-contain drop-shadow-2xl z-0 hidden sm:block"
+                : "absolute right-0 top-0 h-full w-1/2 object-cover opacity-40 z-0 hidden sm:block [mask-image:linear-gradient(to_left,black,transparent)]"
           }
         />
       )}
-      <div className="relative z-10 p-8 md:p-10 flex flex-col justify-center min-h-[260px]">
+      <div className="relative z-10 p-8 md:p-10 flex flex-col justify-center min-h-[300px]">
         <Badge
           className="w-fit mb-3 text-xs font-bold px-3 py-1"
           style={{ background: slide.badgeColor, color: "white", border: "none" }}
@@ -314,52 +322,30 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       <div className="container py-6 space-y-8">
 
-        {/* ─── Hero + Quick Links ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <HeroSection
-              newestSet={newestSet}
-              articles={articles as any[] | undefined}
-              hotCard={(() => {
-                const c: any = (highValueCards as any)?.data?.[0];
-                if (!c) return null;
-                return {
-                  id: c.id,
-                  name: c.name,
-                  set: c.set?.name,
-                  image: c.images?.large ?? c.images?.small ?? null,
-                  price: c.tcgplayer?.prices
-                    ? Object.values(c.tcgplayer.prices as Record<string, any>)[0]?.market ?? 0
-                    : 0,
-                };
-              })()}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {quickLinks.map(link => (
-              <Link key={link.href} href={link.href}>
-                <div
-                  className="rounded-xl border border-gray-100 p-4 flex flex-col items-center gap-2 hover:shadow-md transition-all poke-card text-center"
-                  style={{ background: link.bg }}
-                >
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center"
-                    style={{ background: link.color + "25", color: link.color }}
-                  >
-                    {link.icon}
-                  </div>
-                  <span className="text-xs font-bold text-gray-700">{link.label}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
+        {/* ─── Hero ───────────────────────────────────────────────────────── */}
+        <HeroSection
+          newestSet={newestSet}
+          articles={articles as any[] | undefined}
+          hotCard={(() => {
+            const c: any = (highValueCards as any)?.data?.[0];
+            if (!c) return null;
+            return {
+              id: c.id,
+              name: c.name,
+              set: c.set?.name,
+              image: c.images?.large ?? c.images?.small ?? null,
+              price: c.tcgplayer?.prices
+                ? Object.values(c.tcgplayer.prices as Record<string, any>)[0]?.market ?? 0
+                : 0,
+            };
+          })()}
+        />
 
         {/* ─── New Sets ──────────────────────────────────────────────────── */}
         <div>
           <div className="section-header">
             <h2 className="section-title">
-              <Package size={16} className="text-primary" />
+              <SectionIcon from="#7C3AED" to="#5B21B6"><Package size={14} /></SectionIcon>
               New Sets
             </h2>
             <Link href="/sets" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
@@ -459,7 +445,7 @@ export default function Home() {
           <div className="lg:col-span-2">
             <div className="section-header">
               <h2 className="section-title">
-                <Newspaper size={16} className="text-primary" />
+                <SectionIcon from="#FF2E9A" to="#be185d"><Newspaper size={14} /></SectionIcon>
                 TCG News
               </h2>
               <Link href="/articles" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
@@ -547,7 +533,7 @@ export default function Home() {
           <div>
             <div className="section-header">
               <h2 className="section-title">
-                <Sparkles size={16} className="text-yellow-500" />
+                <SectionIcon from="#F5B301" to="#d97706"><Sparkles size={14} /></SectionIcon>
                 Hot Cards
               </h2>
               <Link href="/cards?rarity=Special+Illustration+Rare" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
@@ -621,7 +607,7 @@ export default function Home() {
           <div>
             <div className="section-header">
               <h2 className="section-title">
-                <Zap size={16} className="text-yellow-500" />
+                <SectionIcon from="#F5B301" to="#b45309"><Zap size={14} /></SectionIcon>
                 Live Auctions
               </h2>
               <Link href="/auctions" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
@@ -674,7 +660,7 @@ export default function Home() {
         <div>
           <div className="section-header">
             <h2 className="section-title">
-              <BookOpen size={16} className="text-primary" />
+              <SectionIcon from="#00E5FF" to="#0284c7"><BookOpen size={14} /></SectionIcon>
               Latest Articles
             </h2>
             <Link href="/articles" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
@@ -755,7 +741,7 @@ export default function Home() {
           <div>
             <div className="section-header">
               <h2 className="section-title">
-                <BarChart2 size={16} className="text-primary" />
+                <SectionIcon from="#10b981" to="#047857"><BarChart2 size={14} /></SectionIcon>
                 Top Decks
               </h2>
               <Link href="/metagame" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
@@ -807,7 +793,7 @@ export default function Home() {
           <div>
             <div className="section-header">
               <h2 className="section-title">
-                <Trophy size={16} className="text-primary" />
+                <SectionIcon from="#7C3AED" to="#FF2E9A"><Trophy size={14} /></SectionIcon>
                 Upcoming Tournaments
               </h2>
               <Link href="/tournaments" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
@@ -849,8 +835,12 @@ export default function Home() {
         </div>
 
         {/* ─── Stats Banner ──────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+        <div className="relative bg-white rounded-2xl border border-gray-100 p-6 overflow-hidden">
+          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png" alt="" loading="lazy"
+            className="absolute -left-6 -bottom-8 h-36 opacity-10 pointer-events-none select-none" />
+          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/150.png" alt="" loading="lazy"
+            className="absolute -right-6 -bottom-8 h-36 opacity-10 pointer-events-none select-none" />
+          <div className="relative grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {[
               { value: "15,000+", label: "Cards in Database", icon: <Star size={20} className="text-yellow-500" /> },
               { value: "1,200+", label: "Active Sellers", icon: <Users size={20} className="text-blue-500" /> },
