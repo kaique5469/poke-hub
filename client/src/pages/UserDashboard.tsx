@@ -78,7 +78,7 @@ export default function UserDashboard() {
           </div>
           <h2 className="text-xl font-black text-gray-800 mb-2">Sign In Required</h2>
           <p className="text-sm text-gray-500 mb-6">Access your dashboard, binder, decks, and orders by signing in.</p>
-          <a href={getLoginUrl()} className="inline-flex items-center gap-2 px-6 py-3 text-sm font-bold text-white rounded-xl" style={{ background: "oklch(0.52 0.22 255)" }}>
+          <a href={getLoginUrl()} className="inline-flex items-center gap-2 px-6 py-3 text-sm font-bold text-white rounded-xl" style={{ background: "oklch(0.54 0.25 293)" }}>
             Sign In to Continue
           </a>
         </div>
@@ -94,7 +94,7 @@ export default function UserDashboard() {
       <div className="bg-white border-b border-gray-100">
         <div className="container py-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-black shrink-0" style={{ background: "oklch(0.52 0.22 255)" }}>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-black shrink-0" style={{ background: "oklch(0.54 0.25 293)" }}>
               {user?.name?.[0]?.toUpperCase() ?? "U"}
             </div>
             <div className="flex-1">
@@ -114,7 +114,7 @@ export default function UserDashboard() {
                 </Button>
               </Link>
               <Link href={`/profile/${user?.name?.toLowerCase().replace(/\s+/g, "-") ?? "me"}`}>
-                <Button size="sm" className="gap-1.5 text-sm font-semibold text-white" style={{ background: "oklch(0.52 0.22 255)", border: "none" }}>
+                <Button size="sm" className="gap-1.5 text-sm font-semibold text-white" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
                   <Eye size={14} /> Public Profile
                 </Button>
               </Link>
@@ -137,7 +137,7 @@ export default function UserDashboard() {
                       ? "text-white"
                       : "text-gray-600 hover:bg-gray-50"
                   }`}
-                  style={activeTab === tab.id ? { background: "oklch(0.52 0.22 255)" } : {}}
+                  style={activeTab === tab.id ? { background: "oklch(0.54 0.25 293)" } : {}}
                 >
                   <tab.icon size={16} />
                   {tab.label}
@@ -223,7 +223,7 @@ export default function UserDashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-gray-800">My Binder ({binderCards?.length ?? 0} cards)</h3>
                   <Link href="/binder">
-                    <Button size="sm" className="text-white gap-1.5 text-xs font-bold" style={{ background: "oklch(0.52 0.22 255)", border: "none" }}>
+                    <Button size="sm" className="text-white gap-1.5 text-xs font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
                       <Eye size={12} /> Full Binder
                     </Button>
                   </Link>
@@ -256,7 +256,7 @@ export default function UserDashboard() {
                     <Heart size={32} className="mx-auto mb-3 opacity-30" />
                     <p className="text-sm font-medium">Your binder is empty</p>
                     <Link href="/cards">
-                      <Button size="sm" className="mt-3 text-white text-xs" style={{ background: "oklch(0.52 0.22 255)", border: "none" }}>
+                      <Button size="sm" className="mt-3 text-white text-xs" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
                         Browse Cards
                       </Button>
                     </Link>
@@ -271,7 +271,7 @@ export default function UserDashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-gray-800">My Decks ({decks?.length ?? 0})</h3>
                   <Link href="/decks/builder">
-                    <Button size="sm" className="text-white gap-1.5 text-xs font-bold" style={{ background: "oklch(0.52 0.22 255)", border: "none" }}>
+                    <Button size="sm" className="text-white gap-1.5 text-xs font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
                       <Plus size={12} /> New Deck
                     </Button>
                   </Link>
@@ -303,7 +303,7 @@ export default function UserDashboard() {
                     <BookOpen size={32} className="mx-auto mb-3 opacity-30" />
                     <p className="text-sm font-medium">No decks yet</p>
                     <Link href="/decks/builder">
-                      <Button size="sm" className="mt-3 text-white text-xs" style={{ background: "oklch(0.52 0.22 255)", border: "none" }}>
+                      <Button size="sm" className="mt-3 text-white text-xs" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
                         Build Your First Deck
                       </Button>
                     </Link>
@@ -346,7 +346,7 @@ export default function UserDashboard() {
                 <div className="bg-white rounded-xl border border-gray-100 p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-gray-800">My Listings</h3>
-                    <Button size="sm" className="text-white gap-1.5 text-xs font-bold" style={{ background: "oklch(0.52 0.22 255)", border: "none" }} onClick={() => toast.info("Listing creation coming soon!")}>
+                    <Button size="sm" className="text-white gap-1.5 text-xs font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }} onClick={() => toast.info("Listing creation coming soon!")}>
                       <Plus size={12} /> New Listing
                     </Button>
                   </div>
@@ -413,7 +413,7 @@ export default function UserDashboard() {
                     </div>
                   ))}
                   <div className="pt-2">
-                    <Button className="text-white font-bold" style={{ background: "oklch(0.52 0.22 255)", border: "none" }} onClick={() => toast.info("Settings saved!")}>
+                    <Button className="text-white font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }} onClick={() => toast.info("Settings saved!")}>
                       Save Changes
                     </Button>
                   </div>

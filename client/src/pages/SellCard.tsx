@@ -113,7 +113,7 @@ export default function SellCard() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center max-w-md w-full">
           <ShoppingBag className="w-14 h-14 text-blue-600 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Sign in to Sell</h1>
-          <p className="text-gray-500 mb-6">Create an account or sign in to list your Pokémon cards on PokéHub Marketplace.</p>
+          <p className="text-gray-500 mb-6">Create an account or sign in to list your Pokémon cards on TCG Arena Marketplace.</p>
           <a href={getLoginUrl()}>
             <Button className="w-full bg-blue-600 hover:bg-blue-700">Sign In / Register</Button>
           </a>
@@ -138,7 +138,7 @@ export default function SellCard() {
         {/* Page Title */}
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">Sell a Card</h1>
-          <p className="text-gray-500 text-sm mt-1">List your Pokémon TCG cards on the PokéHub Marketplace</p>
+          <p className="text-gray-500 text-sm mt-1">List your Pokémon TCG cards on the TCG Arena Marketplace</p>
         </div>
 
         {/* Step Indicator */}
@@ -422,7 +422,7 @@ export default function SellCard() {
             </div>
             <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Card Listed!</h2>
             <p className="text-gray-500 mb-2">
-              <strong>{selectedCard.name}</strong> has been listed on the PokéHub Marketplace.
+              <strong>{selectedCard.name}</strong> has been listed on the TCG Arena Marketplace.
             </p>
             <p className="text-sm text-gray-400 mb-8">
               Buyers can now find your listing when searching for this card.

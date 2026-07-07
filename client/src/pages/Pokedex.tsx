@@ -150,7 +150,7 @@ export default function Pokedex() {
           {/* Sidebar */}
           <aside className="w-60 shrink-0 space-y-4 hidden lg:block">
             <div className="filter-sidebar">
-              <div className="filter-section-title"><Search className="w-4 h-4" style={{ color: "oklch(0.52 0.22 255)" }} />Search</div>
+              <div className="filter-section-title"><Search className="w-4 h-4" style={{ color: "oklch(0.54 0.25 293)" }} />Search</div>
               <div className="search-bar">
                 <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "oklch(0.62 0.01 240)" }} />
                 <input value={search} onChange={e => resetAnd(() => setSearch(e.target.value))}
@@ -226,7 +226,7 @@ export default function Pokedex() {
               </p>
               {activeFilters.length > 0 && (
                 <button onClick={() => resetAnd(() => { setSearch(""); setType(null); setGeneration(null); })}
-                  className="text-xs font-bold" style={{ color: "oklch(0.52 0.22 255)" }}>Clear filters</button>
+                  className="text-xs font-bold" style={{ color: "oklch(0.54 0.25 293)" }}>Clear filters</button>
               )}
             </div>
 
@@ -245,7 +245,7 @@ export default function Pokedex() {
                   {entries.map(p => <PokemonCard key={p.id} p={p} />)}
                 </div>
                 <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-6">
-                  {isFetching && hasMore && <Loader2 className="w-5 h-5 animate-spin" style={{ color: "oklch(0.52 0.22 255)" }} />}
+                  {isFetching && hasMore && <Loader2 className="w-5 h-5 animate-spin" style={{ color: "oklch(0.54 0.25 293)" }} />}
                   {!hasMore && entries.length > 0 && (
                     <p className="text-xs font-bold" style={{ color: "oklch(0.62 0.01 240)" }}>
                       All {total.toLocaleString()} Pokémon loaded ✓

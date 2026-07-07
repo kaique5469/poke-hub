@@ -203,7 +203,7 @@ export default function ArticleDetail() {
   }
 
   // Author data from joined query
-  const authorName = (article as { authorName?: string | null }).authorName ?? "PokéHub Staff";
+  const authorName = (article as { authorName?: string | null }).authorName ?? "TCG Arena Staff";
   const authorUsername = (article as { authorUsername?: string | null }).authorUsername;
   const authorAvatarUrl = (article as { authorAvatarUrl?: string | null }).authorAvatarUrl;
 

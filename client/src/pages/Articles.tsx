@@ -114,7 +114,7 @@ export default function Articles() {
                 className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
                   category === cat ? "text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
-                style={category === cat ? { background: CATEGORY_COLORS[cat] ?? "oklch(0.52 0.22 255)" } : {}}
+                style={category === cat ? { background: CATEGORY_COLORS[cat] ?? "oklch(0.54 0.25 293)" } : {}}
               >
                 {cat}
               </button>

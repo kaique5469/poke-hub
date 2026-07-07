@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const SITE = "PokéHub";
+const SITE = "TCG Arena";
 const DEFAULT_DESC = "The complete Pokémon TCG platform for the USA — cards, prices, marketplace, decks, tournaments and more.";
 
 function setMeta(attr: "name" | "property", key: string, content: string) {

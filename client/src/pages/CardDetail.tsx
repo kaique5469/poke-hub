@@ -427,7 +427,7 @@ export default function CardDetail() {
     { enabled: !!id, retry: false, staleTime: 60 * 60 * 1000 }
   );
 
-  // PokéHub marketplace listings (real sellers)
+  // TCG Arena marketplace listings (real sellers)
   const { data: listingsData } = trpc.listings.getByCardWithSellers.useQuery(
     { cardId: id! },
     { enabled: !!id, retry: false }
@@ -477,7 +477,7 @@ export default function CardDetail() {
 
   usePageMeta(
     cardName ? `${cardName} · ${setName}` : undefined,
-    cardName ? `${cardName} from ${setName} — live prices, sellers, price history and other printings on PokéHub.` : undefined,
+    cardName ? `${cardName} from ${setName} — live prices, sellers, price history and other printings on TCG Arena.` : undefined,
     card?.images?.large ?? card?.images?.small,
   );
 
@@ -581,7 +581,7 @@ export default function CardDetail() {
               </Button>
               <Button
                 className="flex-1 gap-2 text-sm font-semibold text-white"
-                style={{ background: "oklch(0.52 0.22 255)", border: "none" }}
+                style={{ background: "oklch(0.54 0.25 293)", border: "none" }}
                 onClick={() => window.open(tcgplayerUrl, "_blank")}
               >
                 <ShoppingCart size={16} /> Buy
@@ -782,7 +782,7 @@ export default function CardDetail() {
                   <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
                     <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5" />
                     <p className="text-[11px] text-amber-700 leading-relaxed">
-                      CardMarket prices are live (EUR). TCGPlayer, eBay and other store prices may be estimates. Actual prices may vary. PokéHub may earn a small commission from affiliate links at no extra cost to you.
+                      CardMarket prices are live (EUR). TCGPlayer, eBay and other store prices may be estimates. Actual prices may vary. TCG Arena may earn a small commission from affiliate links at no extra cost to you.
                     </p>
                   </div>
                 </div>
@@ -981,7 +981,7 @@ export default function CardDetail() {
                               <td className="px-4 py-3 text-right font-black text-blue-600">${Number(l.priceUsd).toFixed(2)}</td>
                               <td className="px-4 py-3 text-right">
                                 <Button size="sm" className="text-xs h-7 px-3 text-white"
-                                  style={{ background: "oklch(0.52 0.22 255)", border: "none" }}
+                                  style={{ background: "oklch(0.54 0.25 293)", border: "none" }}
                                   disabled={addToCart.isPending}
                                   onClick={() => {
                                     if (!isAuthenticated) { toast.error("Sign in to add to cart"); return; }
@@ -998,10 +998,10 @@ export default function CardDetail() {
                   ) : (
                     <div className="p-8 text-center text-gray-400">
                       <ShoppingCart size={32} className="mx-auto mb-2 opacity-30" />
-                      <p className="text-sm font-medium">No PokéHub sellers listed yet</p>
-                      <p className="text-xs mt-1">Be the first to sell this card on PokéHub!</p>
+                      <p className="text-sm font-medium">No TCG Arena sellers listed yet</p>
+                      <p className="text-xs mt-1">Be the first to sell this card on TCG Arena!</p>
                       <Link href="/sell">
-                        <Button size="sm" className="mt-3 text-xs text-white" style={{ background: "oklch(0.52 0.22 255)", border: "none" }}>
+                        <Button size="sm" className="mt-3 text-xs text-white" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
                           List for Sale
                         </Button>
                       </Link>

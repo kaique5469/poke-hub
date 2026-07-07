@@ -114,7 +114,7 @@ export default function Binder() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {filtered.map((item: typeof cards[0]) => {
             const isSpecial = SPECIAL_RARITIES.has(item.rarity ?? "");
-            const tcgUrl = `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(item.cardName)}&utm_source=pokehub`;
+            const tcgUrl = `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(item.cardName)}&utm_source=tcgarena`;
             return (
               <div
                 key={item.id}

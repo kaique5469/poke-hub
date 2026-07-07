@@ -135,7 +135,7 @@ export default function Cart() {
                 <div key={g.seller?.id ?? gi} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                   <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2"
                     style={{ background: "oklch(0.985 0.003 240)" }}>
-                    <Package className="w-4 h-4" style={{ color: "oklch(0.52 0.22 255)" }} />
+                    <Package className="w-4 h-4" style={{ color: "oklch(0.54 0.25 293)" }} />
                     <Link href={g.seller?.username ? `/profile/${g.seller.username}` : "#"}
                       className="font-bold text-sm hover:underline" style={{ color: "oklch(0.18 0.02 240)" }}>
                       {g.seller?.name ?? "Seller"}

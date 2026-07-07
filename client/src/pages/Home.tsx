@@ -22,6 +22,17 @@ function timeAgo(dateStr: string): string {
   return `${m}m ago`;
 }
 
+function timeLeft(dateStr: string): string {
+  const diff = new Date(dateStr).getTime() - Date.now();
+  if (diff <= 0) return "Ended";
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor((diff % 86400000) / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  if (d > 0) return `${d}d ${h}h left`;
+  if (h > 0) return `${h}h ${m}m left`;
+  return `${m}m left`;
+}
+
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
@@ -30,7 +41,7 @@ function formatDate(dateStr: string): string {
 
 // ─── Quick Links ──────────────────────────────────────────────────────────────
 const quickLinks = [
-  { icon: <ShoppingCart size={20} />, label: "Marketplace", href: "/marketplace", color: "#4f8ef7", bg: "#eff6ff" },
+  { icon: <ShoppingCart size={20} />, label: "Marketplace", href: "/shop", color: "#7C3AED", bg: "#f5f3ff" },
   { icon: <Zap size={20} />, label: "Auctions", href: "/auctions", color: "#f59e0b", bg: "#fffbeb" },
   { icon: <BarChart2 size={20} />, label: "Metagame", href: "/metagame", color: "#10b981", bg: "#f0fdf4" },
   { icon: <Trophy size={20} />, label: "Tournaments", href: "/tournaments", color: "#8b5cf6", bg: "#f5f3ff" },
@@ -107,13 +118,13 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
   const slides = useMemo(() => {
     const base: HeroSlide[] = [
       {
-        title: newestSet ? `New Set: ${newestSet.name}` : "Pokémon TCG Hub USA",
+        title: newestSet ? `New Set: ${newestSet.name}` : "TCG Arena — Trade. Collect. Compete.",
         subtitle: newestSet
           ? `Released ${formatDate(newestSet.releaseDate)} · ${newestSet.total} cards · ${newestSet.series}`
-          : "The #1 platform for collectors and competitive players in the USA.",
-        badge: newestSet ? "New Release" : "Welcome",
-        badgeColor: "#e94560",
-        bg: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
+          : "The card game marketplace where collectors compete.",
+        badge: newestSet ? "New Release" : "Welcome to the Arena",
+        badgeColor: "#7C3AED",
+        bg: "linear-gradient(135deg, #0B1220 0%, #2b1a55 55%, #5B21B6 100%)",
         cta: "Browse Cards",
         href: newestSet ? `/cards?set=${newestSet.id}` : "/cards",
         logo: newestSet?.images?.logo ?? null,
@@ -128,7 +139,7 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         subtitle: `${hotCard.set ?? "Chase card"} · trending at $${Number(hotCard.price ?? 0).toFixed(2)} — track it, trade it, or grab it now.`,
         badge: "Hot Card",
         badgeColor: "#e94560",
-        bg: "linear-gradient(135deg, #1a0505 0%, #451a24 55%, #7a1f3d 100%)",
+        bg: "linear-gradient(135deg, #0B1220 0%, #451a55 55%, #7C3AED 100%)",
         cta: "View Card",
         href: `/cards/${hotCard.id}`,
         logo: null,
@@ -144,7 +155,7 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
     for (const a of featuredArticles.slice(0, 2)) {
       base.push({
         title: a.title,
-        subtitle: a.subtitle ?? "Fresh from the PokéHub newsroom — strategy, market watch and set reviews.",
+        subtitle: a.subtitle ?? "Fresh from the TCG Arena newsroom — strategy, market watch and set reviews.",
         badge: "Breaking News",
         badgeColor: "#8b5cf6",
         bg: "linear-gradient(135deg, #150a2e 0%, #2b1a55 55%, #4c2a8a 100%)",
@@ -172,7 +183,7 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         title: "Build Your Championship Deck",
         subtitle: "Use our Deck Builder with live TCGPlayer prices to craft the perfect 60-card list.",
         badge: "Free Tool",
-        badgeColor: "#4f8ef7",
+        badgeColor: "#7C3AED",
         bg: "linear-gradient(135deg, #0d1117 0%, #1a2744 50%, #2d4a8a 100%)",
         cta: "Build Now",
         href: "/deck-builder",
@@ -287,6 +298,11 @@ export default function Home() {
     { staleTime: 10 * 60 * 1000, retry: false }
   );
 
+  const { data: liveAuctions } = trpc.auctions.list.useQuery(
+    { sort: "ending_soon", limit: 4 },
+    { staleTime: 60 * 1000, retry: false }
+  );
+
   const { data: upcomingTournaments } = trpc.tournaments.upcoming.useQuery(
     undefined,
     { staleTime: 10 * 60 * 1000, retry: false }
@@ -343,10 +359,10 @@ export default function Home() {
         <div>
           <div className="section-header">
             <h2 className="section-title">
-              <Package size={16} className="text-blue-600" />
+              <Package size={16} className="text-primary" />
               New Sets
             </h2>
-            <Link href="/sets" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+            <Link href="/sets" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
               All Sets <ArrowRight size={14} />
             </Link>
           </div>
@@ -361,7 +377,7 @@ export default function Home() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {(recentSets ?? []).slice(0, 8).map((set: any, idx: number) => (
                 <Link key={set.id} href={`/cards?set=${set.id}`}>
-                  <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-blue-200 hover:shadow-md transition-all group">
+                  <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-violet-200 hover:shadow-md transition-all group">
                     {/* Featured card art strip */}
                     <div className="relative h-28 bg-gradient-to-br from-gray-900 to-gray-700 overflow-hidden">
                       {set.featuredCards?.length > 0 ? (
@@ -418,7 +434,7 @@ export default function Home() {
                         />
                         <span className="text-[10px] text-gray-400 font-medium truncate">{set.series}</span>
                       </div>
-                      <div className="font-bold text-gray-800 text-xs leading-tight line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">
+                      <div className="font-bold text-gray-800 text-xs leading-tight line-clamp-2 mb-1 group-hover:text-primary transition-colors">
                         {set.name}
                       </div>
                       <div className="flex items-center justify-between">
@@ -426,7 +442,7 @@ export default function Home() {
                           <CalendarDays size={10} />
                           {formatDate(set.releaseDate)}
                         </span>
-                        <span className="text-[10px] font-bold text-blue-600">{set.total} cards</span>
+                        <span className="text-[10px] font-bold text-primary">{set.total} cards</span>
                       </div>
                     </div>
                   </div>
@@ -443,10 +459,10 @@ export default function Home() {
           <div className="lg:col-span-2">
             <div className="section-header">
               <h2 className="section-title">
-                <Newspaper size={16} className="text-blue-600" />
+                <Newspaper size={16} className="text-primary" />
                 TCG News
               </h2>
-              <Link href="/articles" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+              <Link href="/articles" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
                 All News <ArrowRight size={14} />
               </Link>
             </div>
@@ -457,10 +473,10 @@ export default function Home() {
                 const top = tcgNews[0];
                 return (
                   <Link href={top.href}>
-                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-blue-200 hover:shadow-md transition-all group">
+                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-violet-200 hover:shadow-md transition-all group">
                       <div className="flex">
                         {/* Pokémon art side */}
-                        <div className="w-28 shrink-0 bg-gradient-to-br from-blue-900 to-indigo-800 flex items-end justify-center overflow-hidden">
+                        <div className="w-28 shrink-0 bg-gradient-to-br from-[#0B1220] to-[#3b2a6d] flex items-end justify-center overflow-hidden">
                           <img
                             src={top.pokemonArt}
                             alt=""
@@ -481,7 +497,7 @@ export default function Home() {
                               {formatDate(top.date)}
                             </span>
                           </div>
-                          <h3 className="font-bold text-gray-800 text-sm mb-1 group-hover:text-blue-600 transition-colors line-clamp-2">
+                          <h3 className="font-bold text-gray-800 text-sm mb-1 group-hover:text-primary transition-colors line-clamp-2">
                             {top.title}
                           </h3>
                           <p className="text-xs text-gray-500 line-clamp-2">{top.excerpt}</p>
@@ -496,7 +512,7 @@ export default function Home() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {tcgNews.slice(1).map(news => (
                   <Link key={news.id} href={news.href}>
-                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-blue-200 hover:shadow-md transition-all group h-full">
+                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-violet-200 hover:shadow-md transition-all group h-full">
                       {/* Pokémon art header */}
                       <div className="h-20 bg-gradient-to-br from-gray-800 to-gray-700 flex items-end justify-center overflow-hidden">
                         <img
@@ -516,7 +532,7 @@ export default function Home() {
                           </span>
                           <span className="text-[9px] text-gray-400">{formatDate(news.date)}</span>
                         </div>
-                        <h3 className="font-bold text-gray-800 text-xs leading-tight group-hover:text-blue-600 transition-colors line-clamp-3">
+                        <h3 className="font-bold text-gray-800 text-xs leading-tight group-hover:text-primary transition-colors line-clamp-3">
                           {news.title}
                         </h3>
                       </div>
@@ -534,7 +550,7 @@ export default function Home() {
                 <Sparkles size={16} className="text-yellow-500" />
                 Hot Cards
               </h2>
-              <Link href="/cards?rarity=Special+Illustration+Rare" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+              <Link href="/cards?rarity=Special+Illustration+Rare" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
                 View All <ArrowRight size={14} />
               </Link>
             </div>
@@ -570,7 +586,7 @@ export default function Home() {
                             loading="lazy"
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-bold text-gray-800 group-hover:text-blue-600 transition-colors truncate">
+                            <div className="text-xs font-bold text-gray-800 group-hover:text-primary transition-colors truncate">
                               {card.name}
                             </div>
                             <div className="text-[10px] text-gray-400 truncate">{card.set?.name}</div>
@@ -600,14 +616,68 @@ export default function Home() {
           </div>
         </div>
 
+        {/* ─── Live Auctions ─────────────────────────────────────────────── */}
+        {liveAuctions && liveAuctions.length > 0 && (
+          <div>
+            <div className="section-header">
+              <h2 className="section-title">
+                <Zap size={16} className="text-yellow-500" />
+                Live Auctions
+              </h2>
+              <Link href="/auctions" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
+                All Auctions <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {liveAuctions.slice(0, 4).map((a: any) => (
+                <Link key={a.id} href="/auctions">
+                  <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-violet-200 hover:shadow-md transition-all group h-full">
+                    <div className="relative h-36 bg-gradient-to-br from-[#0B1220] to-[#3b2a6d] flex items-center justify-center overflow-hidden p-3">
+                      {a.imageUrl ? (
+                        <img src={a.imageUrl} alt={a.title} className="h-full object-contain drop-shadow-xl group-hover:scale-105 transition-transform" loading="lazy" />
+                      ) : (
+                        <Zap size={32} className="text-white/30" />
+                      )}
+                      <div className="absolute top-2 right-2 bg-black/60 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Clock size={9} /> {timeLeft(a.endsAt)}
+                      </div>
+                      {a.isFoil && (
+                        <div className="absolute top-2 left-2 text-[9px] font-black px-2 py-0.5 rounded-full text-black" style={{ background: "#F5B301" }}>
+                          FOIL
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <div className="font-bold text-gray-800 text-xs leading-tight line-clamp-2 mb-1.5 group-hover:text-primary transition-colors">
+                        {a.title}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-black text-green-600">
+                            ${Number(a.currentBidUsd ?? a.startingBidUsd ?? 0).toFixed(2)}
+                          </div>
+                          <div className="text-[10px] text-gray-400">{a.bidCount ?? 0} bids</div>
+                        </div>
+                        <Badge className="text-[9px] font-bold" style={{ background: "#7C3AED20", color: "#7C3AED", border: "none" }}>
+                          {a.condition}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ─── Latest Articles ───────────────────────────────────────────── */}
         <div>
           <div className="section-header">
             <h2 className="section-title">
-              <BookOpen size={16} className="text-blue-600" />
+              <BookOpen size={16} className="text-primary" />
               Latest Articles
             </h2>
-            <Link href="/articles" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+            <Link href="/articles" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
               All Articles <ArrowRight size={14} />
             </Link>
           </div>
@@ -629,8 +699,8 @@ export default function Home() {
                   : Math.floor(Math.random() * 150) + 1;
                 return (
                   <Link key={article.id} href={`/articles/${article.slug}`}>
-                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-blue-200 hover:shadow-md transition-all group h-full">
-                      <div className="h-24 bg-gradient-to-br from-blue-900 to-indigo-700 flex items-end justify-center overflow-hidden">
+                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-violet-200 hover:shadow-md transition-all group h-full">
+                      <div className="h-24 bg-gradient-to-br from-[#0B1220] to-[#4c2a8a] flex items-end justify-center overflow-hidden">
                         <img
                           src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonNum}.png`}
                           alt=""
@@ -640,11 +710,11 @@ export default function Home() {
                       </div>
                       <div className="p-3">
                         {article.category && (
-                          <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                          <span className="text-[9px] font-bold text-primary bg-violet-50 px-1.5 py-0.5 rounded-full">
                             {article.category}
                           </span>
                         )}
-                        <h3 className="font-bold text-gray-800 text-xs mt-1.5 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors leading-tight">
+                        <h3 className="font-bold text-gray-800 text-xs mt-1.5 mb-1 line-clamp-2 group-hover:text-primary transition-colors leading-tight">
                           {article.title}
                         </h3>
                         {article.subtitle && (
@@ -685,10 +755,10 @@ export default function Home() {
           <div>
             <div className="section-header">
               <h2 className="section-title">
-                <BarChart2 size={16} className="text-blue-600" />
+                <BarChart2 size={16} className="text-primary" />
                 Top Decks
               </h2>
-              <Link href="/metagame" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+              <Link href="/metagame" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
                 Full Meta <ArrowRight size={14} />
               </Link>
             </div>
@@ -710,7 +780,7 @@ export default function Home() {
                 <div>
                   {(topDecks ?? []).slice(0, 6).map((deck: any, i: number) => (
                     <Link key={deck.name} href={`/metagame?deck=${encodeURIComponent(deck.name)}`}>
-                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0 group">
+                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition-colors border-b border-gray-50 last:border-0 group">
                         <span className="text-xs font-black text-gray-300 w-5 text-center">{i + 1}</span>
                         <div
                           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -719,7 +789,7 @@ export default function Home() {
                           {deck.name?.[0]}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-gray-800 group-hover:text-blue-600 transition-colors truncate">{deck.name}</div>
+                          <div className="text-sm font-bold text-gray-800 group-hover:text-primary transition-colors truncate">{deck.name}</div>
                           <div className="text-xs text-gray-400">{deck.format ?? "Standard"}</div>
                         </div>
                         <div className="text-right shrink-0">
@@ -737,10 +807,10 @@ export default function Home() {
           <div>
             <div className="section-header">
               <h2 className="section-title">
-                <Trophy size={16} className="text-blue-600" />
+                <Trophy size={16} className="text-primary" />
                 Upcoming Tournaments
               </h2>
-              <Link href="/tournaments" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
+              <Link href="/tournaments" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
                 View All <ArrowRight size={14} />
               </Link>
             </div>
@@ -755,12 +825,12 @@ export default function Home() {
                   ]
               ).map((t: any) => (
                 <Link key={t.id} href={`/tournaments`}>
-                  <div className="bg-white rounded-xl border border-gray-100 p-4 poke-card hover:border-blue-200 hover:shadow-sm transition-all">
+                  <div className="bg-white rounded-xl border border-gray-100 p-4 poke-card hover:border-violet-200 hover:shadow-sm transition-all">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-gray-800 text-sm mb-1 line-clamp-1">{t.name}</h3>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className="text-[10px] font-bold" style={{ background: "#4f8ef720", color: "#4f8ef7", border: "none" }}>
+                          <Badge className="text-[10px] font-bold" style={{ background: "#7C3AED20", color: "#7C3AED", border: "none" }}>
                             {t.format ?? "Standard"}
                           </Badge>
                           <span className="text-xs text-gray-400">{t.location}</span>

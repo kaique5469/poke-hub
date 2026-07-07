@@ -93,7 +93,7 @@ export default function ProfileEdit() {
               </div>
               {username && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Your profile URL: <span className="text-primary">pokehub.gg/players/{username}</span>
+                  Your profile URL: <span className="text-primary">tcgarena.gg/players/{username}</span>
                 </p>
               )}
             </div>

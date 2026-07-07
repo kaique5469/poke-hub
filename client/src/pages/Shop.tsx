@@ -148,7 +148,7 @@ export default function Shop() {
         <div className="flex gap-6">
           <aside className="w-56 shrink-0 space-y-4 hidden lg:block">
             <div className="filter-sidebar">
-              <div className="filter-section-title"><Search className="w-4 h-4" style={{ color: "oklch(0.52 0.22 255)" }} />Search</div>
+              <div className="filter-section-title"><Search className="w-4 h-4" style={{ color: "oklch(0.54 0.25 293)" }} />Search</div>
               <div className="search-bar">
                 <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "oklch(0.62 0.01 240)" }} />
                 <input value={search} onChange={e => resetAnd(() => setSearch(e.target.value))}

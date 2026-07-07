@@ -136,7 +136,7 @@ export default function ProductDetail() {
     <div className="min-h-screen" style={{ background: "oklch(0.97 0.005 240)" }}>
       <div className="container py-6">
         <Link href="/shop" className="inline-flex items-center gap-1.5 text-sm font-semibold mb-4"
-          style={{ color: "oklch(0.52 0.22 255)" }}>
+          style={{ color: "oklch(0.54 0.25 293)" }}>
           <ArrowLeft className="w-4 h-4" />Shop
         </Link>
 

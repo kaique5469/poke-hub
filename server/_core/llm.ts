@@ -11,7 +11,7 @@ export interface InvokeResult { choices: { message: { role: string; content: str
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (!ENV.openaiApiKey) {
-    throw new Error("OPENAI_API_KEY não configurada — geração automática de artigos desativada.");
+    throw new Error("OPENAI_API_KEY not configured — automatic article generation disabled.");
   }
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

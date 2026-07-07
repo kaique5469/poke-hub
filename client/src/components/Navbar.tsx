@@ -8,6 +8,7 @@ import {
   BookOpen, Layers, Package, Wrench, Users, Star, Trophy,
   TrendingUp, Zap, Shield, Heart, LogOut, Settings, BarChart2
 } from "lucide-react";
+import ArenaLogo from "@/components/ArenaLogo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -172,7 +173,7 @@ export default function Navbar() {
   return (
     <>
       {/* ─── Top Bar ─────────────────────────────────────────────────────────── */}
-      <div style={{ background: "oklch(0.52 0.22 255)" }} className="text-white text-xs py-1.5 hidden md:block">
+      <div style={{ background: "oklch(0.54 0.25 293)" }} className="text-white text-xs py-1.5 hidden md:block">
         <div className="container flex items-center justify-between">
           <span className="opacity-80">🇺🇸 The #1 Pokémon TCG Platform in the USA</span>
           <div className="flex items-center gap-4 opacity-80">
@@ -189,19 +190,11 @@ export default function Navbar() {
           <div className="flex items-center gap-4 h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 shrink-0">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "oklch(0.52 0.22 255)" }}>
-                <PokeballIcon size={22} className="text-white" />
-              </div>
-              <div className="hidden sm:block">
-                <div className="font-black text-lg leading-none" style={{ fontFamily: "var(--font-display)", color: "oklch(0.52 0.22 255)" }}>
-                  PokéHub
-                </div>
-                <div className="text-[10px] text-gray-400 leading-none font-medium tracking-wide uppercase">USA</div>
-              </div>
+              <ArenaLogo size={38} />
             </Link>
 
             {/* Marketplace pill */}
-            <Link href="/shop" className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold text-white shrink-0" style={{ background: "oklch(0.52 0.22 255)" }}>
+            <Link href="/shop" className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold text-white shrink-0" style={{ background: "oklch(0.54 0.25 293)" }}>
               <ShoppingCart size={14} />
               Marketplace
             </Link>
@@ -216,7 +209,7 @@ export default function Navbar() {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-full bg-gray-50 focus:outline-none focus:ring-2 focus:border-transparent transition-all"
-                  style={{ "--tw-ring-color": "oklch(0.52 0.22 255)" } as React.CSSProperties}
+                  style={{ "--tw-ring-color": "oklch(0.54 0.25 293)" } as React.CSSProperties}
                 />
               </div>
             </form>
@@ -273,7 +266,7 @@ export default function Navbar() {
                                 onClick={() => { if (!n.isRead) markRead.mutate({ ids: [n.id] }); }}
                               >
                                 <div className="flex items-start gap-2">
-                                  {!n.isRead && <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: "oklch(0.52 0.22 255)" }} />}
+                                  {!n.isRead && <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: "oklch(0.54 0.25 293)" }} />}
                                   <div className="min-w-0">
                                     <div className="text-sm font-semibold text-gray-900 line-clamp-1">{n.title}</div>
                                     <div className="text-xs text-gray-500 line-clamp-2 mt-0.5">{n.message}</div>
@@ -292,7 +285,7 @@ export default function Navbar() {
                   <Link href="/cart" className="relative p-2 rounded-full hover:bg-gray-100 transition-colors hidden sm:flex">
                     <ShoppingCart size={20} className="text-gray-600" />
                     {cartCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 text-[10px] font-bold text-white rounded-full flex items-center justify-center" style={{ background: "oklch(0.52 0.22 255)" }}>
+                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 text-[10px] font-bold text-white rounded-full flex items-center justify-center" style={{ background: "oklch(0.54 0.25 293)" }}>
                         {cartCount}
                       </span>
                     )}
@@ -304,7 +297,7 @@ export default function Navbar() {
                       onClick={() => setUserMenuOpen(!userMenuOpen)}
                       className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-gray-100 transition-colors"
                     >
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "oklch(0.52 0.22 255)" }}>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "oklch(0.54 0.25 293)" }}>
                         {user?.name?.[0]?.toUpperCase() ?? "U"}
                       </div>
                       <span className="text-sm font-medium text-gray-700 hidden sm:block max-w-[80px] truncate">
@@ -350,7 +343,7 @@ export default function Navbar() {
                   <a href={getLoginUrl()} className="text-sm font-semibold text-gray-700 hover:text-blue-600 transition-colors hidden sm:block px-3 py-1.5">
                     Sign In
                   </a>
-                  <a href={getLoginUrl()} className="text-sm font-bold px-4 py-2 rounded-full text-white transition-all hover:opacity-90 active:scale-95" style={{ background: "oklch(0.52 0.22 255)" }}>
+                  <a href={getLoginUrl()} className="text-sm font-bold px-4 py-2 rounded-full text-white transition-all hover:opacity-90 active:scale-95" style={{ background: "oklch(0.54 0.25 293)" }}>
                     Register
                   </a>
                 </div>
@@ -472,7 +465,7 @@ export default function Navbar() {
                 <a href={getLoginUrl()} className="flex-1 text-center py-2.5 text-sm font-semibold border border-gray-200 rounded-full text-gray-700 hover:bg-gray-50">
                   Sign In
                 </a>
-                <a href={getLoginUrl()} className="flex-1 text-center py-2.5 text-sm font-bold rounded-full text-white" style={{ background: "oklch(0.52 0.22 255)" }}>
+                <a href={getLoginUrl()} className="flex-1 text-center py-2.5 text-sm font-bold rounded-full text-white" style={{ background: "oklch(0.54 0.25 293)" }}>
                   Register
                 </a>
               </div>

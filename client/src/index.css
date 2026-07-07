@@ -11,7 +11,7 @@
   --radius-xl: 20px;
   --radius-2xl: 28px;
 
-  /* Liga Pokémon-inspired white/blue palette */
+  /* TCG Arena palette — violet primary, gold accent */
   --color-background: oklch(0.99 0.002 240);
   --color-foreground: oklch(0.15 0.01 240);
   --color-card: oklch(1 0 0);
@@ -19,17 +19,17 @@
   --color-popover: oklch(1 0 0);
   --color-popover-foreground: oklch(0.15 0.01 240);
 
-  /* Primary: Liga Pokémon blue */
-  --color-primary: oklch(0.52 0.22 255);
+  /* Primary: TCG Arena violet (#7C3AED) */
+  --color-primary: oklch(0.54 0.25 293);
   --color-primary-foreground: oklch(1 0 0);
 
   /* Secondary: light gray */
   --color-secondary: oklch(0.96 0.005 240);
   --color-secondary-foreground: oklch(0.35 0.01 240);
 
-  /* Accent: Pokémon yellow */
-  --color-accent: oklch(0.93 0.00 0);
-  --color-accent-foreground: oklch(0.15 0.01 240);
+  /* Accent: TCG Arena gold (#F5B301) */
+  --color-accent: oklch(0.82 0.17 85);
+  --color-accent-foreground: oklch(0.22 0.02 260);
 
   --color-muted: oklch(0.96 0.005 240);
   --color-muted-foreground: oklch(0.55 0.01 240);
@@ -39,17 +39,17 @@
 
   --color-border: oklch(0.90 0.005 240);
   --color-input: oklch(0.90 0.005 240);
-  --color-ring: oklch(0.52 0.22 255);
+  --color-ring: oklch(0.54 0.25 293);
 
   /* Sidebar */
   --color-sidebar: oklch(0.98 0.003 240);
   --color-sidebar-foreground: oklch(0.15 0.01 240);
-  --color-sidebar-primary: oklch(0.52 0.22 255);
+  --color-sidebar-primary: oklch(0.54 0.25 293);
   --color-sidebar-primary-foreground: oklch(1 0 0);
   --color-sidebar-accent: oklch(0.94 0.01 240);
   --color-sidebar-accent-foreground: oklch(0.35 0.01 240);
   --color-sidebar-border: oklch(0.90 0.005 240);
-  --color-sidebar-ring: oklch(0.52 0.22 255);
+  --color-sidebar-ring: oklch(0.54 0.25 293);
 
   --font-sans: 'Inter', 'Nunito', system-ui, sans-serif;
   --font-display: 'Nunito', 'Inter', system-ui, sans-serif;
@@ -95,7 +95,7 @@
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: oklch(0.96 0.005 240); }
   ::-webkit-scrollbar-thumb { background: oklch(0.75 0.01 240); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: oklch(0.52 0.22 255); }
+  ::-webkit-scrollbar-thumb:hover { background: oklch(0.54 0.25 293); }
 }
 
 /* ─── Container ────────────────────────────────────────────────────────────── */
@@ -314,12 +314,12 @@
   }
 
   .liga-tab:hover {
-    color: oklch(0.52 0.22 255);
+    color: oklch(0.54 0.25 293);
   }
 
   .liga-tab.active {
-    color: oklch(0.52 0.22 255);
-    border-bottom-color: oklch(0.52 0.22 255);
+    color: oklch(0.54 0.25 293);
+    border-bottom-color: oklch(0.54 0.25 293);
   }
 }
 
@@ -347,7 +347,7 @@
     display: inline-block;
     width: 4px;
     height: 1.25em;
-    background: oklch(0.52 0.22 255);
+    background: oklch(0.54 0.25 293);
     border-radius: 2px;
   }
 }
@@ -357,7 +357,7 @@
   .price-tag {
     font-family: var(--font-display);
     font-weight: 800;
-    color: oklch(0.52 0.22 255);
+    color: oklch(0.54 0.25 293);
   }
 
   .price-from {

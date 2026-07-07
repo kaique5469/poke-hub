@@ -106,7 +106,7 @@ export default function Community() {
               <>
                 {!isAuthenticated && (
                   <div className="card-white text-center py-6">
-                    <Users className="w-10 h-10 mx-auto mb-3" style={{ color: "oklch(0.52 0.22 255)" }} />
+                    <Users className="w-10 h-10 mx-auto mb-3" style={{ color: "oklch(0.54 0.25 293)" }} />
                     <p className="font-bold mb-1" style={{ color: "oklch(0.18 0.02 240)" }}>Join the Community</p>
                     <p className="text-sm mb-4" style={{ color: "oklch(0.52 0.015 240)" }}>Sign in to post, like, and interact with other players</p>
                     <a href={getLoginUrl()} className="btn-primary text-sm">Sign In</a>
@@ -117,7 +117,7 @@ export default function Community() {
             )}
             {activeTab === "metagame" && (
               <div className="card-white text-center py-12">
-                <TrendingUp className="w-12 h-12 mx-auto mb-3" style={{ color: "oklch(0.52 0.22 255)" }} />
+                <TrendingUp className="w-12 h-12 mx-auto mb-3" style={{ color: "oklch(0.54 0.25 293)" }} />
                 <p className="font-bold text-lg mb-2" style={{ color: "oklch(0.18 0.02 240)" }}>Metagame Analysis</p>
                 <p className="text-sm mb-4" style={{ color: "oklch(0.52 0.015 240)" }}>See top decks, trends, and competitive insights</p>
                 <Link href="/metagame" className="btn-primary text-sm">View Metagame</Link>
@@ -125,7 +125,7 @@ export default function Community() {
             )}
             {activeTab === "decks" && (
               <div className="card-white text-center py-12">
-                <Swords className="w-12 h-12 mx-auto mb-3" style={{ color: "oklch(0.52 0.22 255)" }} />
+                <Swords className="w-12 h-12 mx-auto mb-3" style={{ color: "oklch(0.54 0.25 293)" }} />
                 <p className="font-bold text-lg mb-2" style={{ color: "oklch(0.18 0.02 240)" }}>Community Decks</p>
                 <p className="text-sm mb-4" style={{ color: "oklch(0.52 0.015 240)" }}>Browse and share competitive decklists</p>
                 <Link href="/deck-builder" className="btn-primary text-sm">Build a Deck</Link>
@@ -133,7 +133,7 @@ export default function Community() {
             )}
             {activeTab === "tournaments" && (
               <div className="card-white text-center py-12">
-                <Trophy className="w-12 h-12 mx-auto mb-3" style={{ color: "oklch(0.52 0.22 255)" }} />
+                <Trophy className="w-12 h-12 mx-auto mb-3" style={{ color: "oklch(0.54 0.25 293)" }} />
                 <p className="font-bold text-lg mb-2" style={{ color: "oklch(0.18 0.02 240)" }}>Tournament Hub</p>
                 <p className="text-sm mb-4" style={{ color: "oklch(0.52 0.015 240)" }}>Results, standings, and upcoming events</p>
                 <Link href="/tournaments" className="btn-primary text-sm">View Tournaments</Link>
@@ -141,7 +141,7 @@ export default function Community() {
             )}
             {activeTab === "binder" && (
               <div className="card-white text-center py-12">
-                <BookMarked className="w-12 h-12 mx-auto mb-3" style={{ color: "oklch(0.52 0.22 255)" }} />
+                <BookMarked className="w-12 h-12 mx-auto mb-3" style={{ color: "oklch(0.54 0.25 293)" }} />
                 <p className="font-bold text-lg mb-2" style={{ color: "oklch(0.18 0.02 240)" }}>Collection Showcase</p>
                 <p className="text-sm mb-4" style={{ color: "oklch(0.52 0.015 240)" }}>Share your binder and see others' collections</p>
                 <Link href="/binder" className="btn-primary text-sm">My Binder</Link>
@@ -188,7 +188,7 @@ export default function Community() {
                   <Link key={link.href} href={link.href}
                     className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold"
                     style={{ color: "oklch(0.35 0.02 240)" }}>
-                    <span style={{ color: "oklch(0.52 0.22 255)" }}>{link.icon}</span>
+                    <span style={{ color: "oklch(0.54 0.25 293)" }}>{link.icon}</span>
                     {link.label}
                   </Link>
                 ))}

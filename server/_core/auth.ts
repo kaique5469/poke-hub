@@ -77,13 +77,13 @@ export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
       const { name, email, password } = req.body as { name?: string; email?: string; password?: string };
-      if (!email || !password) return res.status(400).json({ error: "Email e senha são obrigatórios" });
-      if (password.length < 8) return res.status(400).json({ error: "A senha deve ter pelo menos 8 caracteres" });
+      if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
+      if (password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
       const normEmail = email.trim().toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normEmail)) return res.status(400).json({ error: "Email inválido" });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normEmail)) return res.status(400).json({ error: "Invalid email" });
 
       const existing = await db.getUserByEmail(normEmail);
-      if (existing) return res.status(409).json({ error: "Já existe uma conta com este email" });
+      if (existing) return res.status(409).json({ error: "An account with this email already exists" });
 
       const passwordHash = await bcrypt.hash(password, 10);
       const openId = `local:${randomUUID()}`;
@@ -109,25 +109,25 @@ export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body as { email?: string; password?: string };
-      if (!email || !password) return res.status(400).json({ error: "Email e senha são obrigatórios" });
+      if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
 
       const user = await db.getUserByEmail(email.trim().toLowerCase());
-      if (!user || !user.passwordHash) return res.status(401).json({ error: "Email ou senha incorretos" });
+      if (!user || !user.passwordHash) return res.status(401).json({ error: "Incorrect email or password" });
 
       const ok = await bcrypt.compare(password, user.passwordHash);
-      if (!ok) return res.status(401).json({ error: "Email ou senha incorretos" });
+      if (!ok) return res.status(401).json({ error: "Incorrect email or password" });
 
       await setSessionCookie(req, res, user.id, user.openId);
       return res.json({ ok: true, user: { id: user.id, name: user.name, email: user.email } });
     } catch (err) {
       console.error("[auth] login failed:", err);
-      return res.status(500).json({ error: "Erro interno ao entrar" });
+      return res.status(500).json({ error: "Internal sign-in error" });
     }
   });
 
   // Google OAuth — step 1: redirect to Google
   app.get("/api/auth/google", (req: Request, res: Response) => {
-    if (!ENV.googleClientId) return res.status(500).send("Google OAuth não configurado (GOOGLE_CLIENT_ID).");
+    if (!ENV.googleClientId) return res.status(500).send("Google OAuth is not configured (GOOGLE_CLIENT_ID).");
     const redirectUri = `${appBaseUrl(req)}/api/auth/google/callback`;
     const params = new URLSearchParams({
       client_id: ENV.googleClientId,

@@ -308,7 +308,7 @@ function TopStrip({ title, items, metric }: {
   return (
     <div className="mb-6">
       <h3 className="font-black text-sm mb-2 flex items-center gap-1.5" style={{ color: "oklch(0.18 0.02 240)" }}>
-        <Sparkles className="w-4 h-4" style={{ color: "oklch(0.52 0.22 255)" }} />{title}
+        <Sparkles className="w-4 h-4" style={{ color: "oklch(0.54 0.25 293)" }} />{title}
       </h3>
       <div className="flex gap-3 overflow-x-auto pb-2">
         {items.map(c => (
@@ -446,7 +446,7 @@ export default function Bazaar() {
                   <button key={v} onClick={() => { setFilter(v); setPage(1); }}
                     className={cn("px-3 py-2 rounded-xl text-sm font-bold border transition-all",
                       filter === v ? "text-white border-transparent" : "bg-white border-gray-200 text-gray-600")}
-                    style={filter === v ? { background: "oklch(0.52 0.22 255)" } : undefined}>
+                    style={filter === v ? { background: "oklch(0.54 0.25 293)" } : undefined}>
                     {l}
                   </button>
                 ))}

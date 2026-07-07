@@ -6,7 +6,7 @@ import { storagePut } from "../storage";
 
 export async function generateImage(opts: { prompt: string }): Promise<{ url: string | null }> {
   if (!ENV.openaiApiKey) {
-    throw new Error("OPENAI_API_KEY não configurada — geração de imagens desativada.");
+    throw new Error("OPENAI_API_KEY not configured — image generation disabled.");
   }
   const resp = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",

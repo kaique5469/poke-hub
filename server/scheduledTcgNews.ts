@@ -59,7 +59,7 @@ export async function tcgNewsHandler(req: Request, res: Response) {
     // 2. Resolve the admin user as article author
     const adminUser = await getAdminUser();
     if (!adminUser) {
-      return res.status(500).json({ error: "Admin não encontrado — registre-se com o OWNER_EMAIL primeiro." });
+      return res.status(500).json({ error: "Admin user not found — register with the OWNER_EMAIL first." });
     }
     const authorId = adminUser.id;
 

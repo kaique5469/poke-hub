@@ -323,7 +323,7 @@ export default function Auctions() {
                     {isAuthenticated ? (
                       <Button
                         className="w-full text-sm font-bold text-white rounded-lg"
-                        style={{ background: isUrgent ? "#ef4444" : "oklch(0.52 0.22 255)", border: "none" }}
+                        style={{ background: isUrgent ? "#ef4444" : "oklch(0.54 0.25 293)", border: "none" }}
                         onClick={() => setBidDialog({
                           open: true,
                           auctionId: auction.id,
@@ -335,7 +335,7 @@ export default function Auctions() {
                         {isUrgent ? "Bid Now — Ending Soon!" : `Bid (Current: $${currentBid.toFixed(2)})`}
                       </Button>
                     ) : (
-                      <a href={getLoginUrl()} className="block w-full text-center text-sm font-bold text-white py-2 rounded-lg" style={{ background: "oklch(0.52 0.22 255)" }}>
+                      <a href={getLoginUrl()} className="block w-full text-center text-sm font-bold text-white py-2 rounded-lg" style={{ background: "oklch(0.54 0.25 293)" }}>
                         Sign In to Bid
                       </a>
                     )}
@@ -354,7 +354,7 @@ export default function Auctions() {
               <p className="text-sm text-gray-500">Create an auction and reach thousands of collectors across the USA.</p>
             </div>
             <Link href="/sell">
-              <Button className="text-white font-bold shrink-0" style={{ background: "oklch(0.52 0.22 255)", border: "none" }}>
+              <Button className="text-white font-bold shrink-0" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
                 <ChevronRight size={16} className="mr-1" />
                 List a Card
               </Button>

@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { ArenaMark } from "@/components/ArenaLogo";
 
 export default function Footer() {
   return (
@@ -8,14 +9,11 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-black"
-                style={{ background: "linear-gradient(135deg, oklch(0.52 0.22 255), oklch(0.42 0.22 270))" }}>
-                ⚡
-              </div>
-              <span className="font-black text-lg text-white" style={{ fontFamily: "Nunito, sans-serif" }}>PokéHub USA</span>
+              <ArenaMark size={30} />
+              <span className="font-black text-lg text-white" style={{ fontFamily: "Nunito, sans-serif" }}>TCG&nbsp;ARENA</span>
             </div>
             <p className="text-xs leading-relaxed mb-4" style={{ color: "oklch(0.62 0.01 240)" }}>
-              The #1 Pokémon TCG platform for collectors and competitive players in the USA.
+              Trade. Collect. Compete. The card game marketplace where collectors compete.
             </p>
             <div className="flex gap-2">
               {["𝕏", "📘", "📸", "▶"].map((icon, i) => (
@@ -68,7 +66,7 @@ export default function Footer() {
         <div className="border-t pt-6" style={{ borderColor: "oklch(0.28 0.02 240)" }}>
           <div className="flex flex-col md:flex-row items-center justify-between gap-3">
             <p className="text-xs text-center md:text-left" style={{ color: "oklch(0.52 0.015 240)" }}>
-              © 2025 PokéHub USA. Pokémon and all related names are trademarks of Nintendo, Game Freak & Creatures Inc. This site is not affiliated with or endorsed by The Pokémon Company.
+              © 2026 TCG Arena. Pokémon and all related names are trademarks of Nintendo, Game Freak & Creatures Inc. This site is not affiliated with or endorsed by The Pokémon Company.
             </p>
             <div className="flex gap-4 text-xs" style={{ color: "oklch(0.52 0.015 240)" }}>
               <a href="#" className="hover:text-white transition-colors">Privacy</a>
