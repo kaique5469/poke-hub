@@ -313,8 +313,14 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
       </div>
 
       {/* Subtitle band */}
-      <div className="relative z-10 bg-white py-2.5 px-14 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center">
-        <p className="text-gray-700 text-xs md:text-sm font-medium">{slide.subtitle}</p>
+      <div
+        className="relative z-10 py-3 px-14 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center"
+        style={{
+          background: `linear-gradient(90deg, ${slide.badgeColor}26 0%, #ffffff 30%, #ffffff 70%, ${slide.badgeColor}26 100%)`,
+          borderBottom: `3px solid ${slide.badgeColor}`,
+        }}
+      >
+        <p className="text-gray-800 text-xs md:text-sm font-semibold">{slide.subtitle}</p>
         <Link href={slide.href}>
           <Button
             size="sm"
