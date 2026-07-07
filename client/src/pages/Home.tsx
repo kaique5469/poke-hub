@@ -209,73 +209,93 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden"
-      style={{ background: slide.bg, minHeight: "300px" }}
+      className="relative rounded-2xl overflow-hidden flex flex-col shadow-lg"
+      style={{ background: slide.bg, minHeight: "340px" }}
     >
-      {/* Right-side art */}
-      {slide.art && (
-        <img
-          src={slide.art}
-          alt=""
-          loading="lazy"
-          className={
-            slide.artStyle === "card"
-              ? "absolute right-6 md:right-12 top-1/2 -translate-y-1/2 h-[220px] md:h-[240px] rounded-lg shadow-2xl rotate-3 z-0 hidden sm:block"
-              : slide.artStyle === "pokemon"
-                ? "absolute right-4 md:right-14 bottom-0 h-[88%] object-contain drop-shadow-2xl z-0 hidden sm:block"
-                : "absolute right-0 top-0 h-full w-1/2 object-cover opacity-40 z-0 hidden sm:block [mask-image:linear-gradient(to_left,black,transparent)]"
-          }
+      {/* Art stage (top) */}
+      <div className="relative flex-1 min-h-[200px] overflow-hidden">
+        {slide.art && (
+          <img
+            src={slide.art}
+            alt=""
+            loading="lazy"
+            className={
+              slide.artStyle === "card"
+                ? "absolute left-1/2 -translate-x-1/2 -bottom-6 h-[115%] rounded-lg shadow-2xl rotate-3 z-0"
+                : slide.artStyle === "pokemon"
+                  ? "absolute left-1/2 -translate-x-1/2 bottom-0 h-[105%] object-contain drop-shadow-2xl z-0"
+                  : "absolute inset-0 w-full h-full object-cover opacity-60 z-0 [mask-image:linear-gradient(to_top,transparent,black_35%)]"
+            }
+          />
+        )}
+        {/* Side glow accents */}
+        <div
+          className="absolute -left-20 top-1/2 -translate-y-1/2 w-64 h-64 rounded-full opacity-25 blur-3xl z-0"
+          style={{ background: slide.badgeColor }}
         />
-      )}
-      <div className="relative z-10 p-8 md:p-10 flex flex-col justify-center min-h-[300px]">
+        <div
+          className="absolute -right-20 top-1/2 -translate-y-1/2 w-64 h-64 rounded-full opacity-25 blur-3xl z-0"
+          style={{ background: slide.badgeColor }}
+        />
         <Badge
-          className="w-fit mb-3 text-xs font-bold px-3 py-1"
+          className="absolute top-4 left-4 text-xs font-bold px-3 py-1 z-10"
           style={{ background: slide.badgeColor, color: "white", border: "none" }}
         >
           {slide.badge}
         </Badge>
-        {slide.logo ? (
-          <img src={slide.logo} alt={slide.title} className="h-12 object-contain mb-3 max-w-[220px]" />
-        ) : (
-          <h1
-            className="text-2xl md:text-4xl font-black text-white mb-3 max-w-lg leading-tight"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {slide.title}
-          </h1>
+        {slide.logo && (
+          <img
+            src={slide.logo}
+            alt=""
+            className="absolute top-4 right-4 h-10 object-contain max-w-[160px] z-10"
+          />
         )}
-        <p className="text-white/70 text-sm md:text-base mb-5 max-w-md">{slide.subtitle}</p>
-        <Link href={slide.href}>
-          <Button
-            className="w-fit font-bold px-6 py-2.5 rounded-full text-white"
-            style={{ background: slide.badgeColor, border: "none" }}
-          >
-            {slide.cta} <ArrowRight size={16} className="ml-2" />
-          </Button>
-        </Link>
+        {/* Dots */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrent(i)}
+              className={`h-2 rounded-full transition-all ${i === current ? "w-6 bg-white" : "w-2 bg-white/40"}`}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Dots */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setCurrent(i)}
-            className={`h-2 rounded-full transition-all ${i === current ? "w-6 bg-white" : "w-2 bg-white/40"}`}
-          />
-        ))}
+      {/* Title ribbon (Liga style) */}
+      <div className="relative z-10 py-3 px-14 text-center" style={{ background: slide.badgeColor }}>
+        <h1
+          className="text-lg md:text-2xl font-black text-white uppercase tracking-wide leading-tight"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {slide.title}
+        </h1>
+      </div>
+
+      {/* Subtitle band */}
+      <div className="relative z-10 bg-white py-2.5 px-14 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center">
+        <p className="text-gray-700 text-xs md:text-sm font-medium">{slide.subtitle}</p>
+        <Link href={slide.href}>
+          <Button
+            size="sm"
+            className="rounded-full font-bold text-white shrink-0 h-7 px-4 text-xs"
+            style={{ background: slide.badgeColor, border: "none" }}
+          >
+            {slide.cta} <ArrowRight size={13} className="ml-1.5" />
+          </Button>
+        </Link>
       </div>
 
       {/* Nav arrows */}
       <button
         onClick={() => setCurrent(c => (c - 1 + slides.length) % slides.length)}
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white z-10 transition-colors"
+        className="absolute left-3 top-[35%] w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white z-20 transition-colors"
       >
         <ChevronLeft size={18} />
       </button>
       <button
         onClick={() => setCurrent(c => (c + 1) % slides.length)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white z-10 transition-colors"
+        className="absolute right-3 top-[35%] w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white z-20 transition-colors"
       >
         <ChevronRight size={18} />
       </button>

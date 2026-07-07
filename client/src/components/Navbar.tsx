@@ -42,6 +42,7 @@ const BinderIcon = ({ size = 20, className = "" }: { size?: number; className?: 
 const navSections = [
   {
     id: "cards",
+    color: "#7C3AED",
     label: "Cards",
     icon: <PokeballIcon size={18} />,
     items: [
@@ -55,6 +56,7 @@ const navSections = [
   },
   {
     id: "pokedex",
+    color: "#d97706",
     label: "Pokédex",
     icon: <PokeballIcon size={18} />,
     items: [
@@ -65,6 +67,7 @@ const navSections = [
   },
   {
     id: "products",
+    color: "#FF2E9A",
     label: "Products",
     icon: <Package size={18} />,
     items: [
@@ -77,6 +80,7 @@ const navSections = [
   },
   {
     id: "accessories",
+    color: "#0891b2",
     label: "Accessories",
     icon: <Wrench size={18} />,
     items: [
@@ -89,6 +93,7 @@ const navSections = [
   },
   {
     id: "community",
+    color: "#10b981",
     label: "Community",
     icon: <Users size={18} />,
     items: [
@@ -361,59 +366,63 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* ─── Navigation Bar ──────────────────────────────────────────────── */}
-        <div className="border-t border-gray-100 hidden md:block">
+        {/* ─── Navigation Bar (Liga-style mega menu) ──────────────────────── */}
+        <div className="border-t border-gray-100 hidden md:block relative" onMouseLeave={() => setActiveMenu(null)}>
           <div className="container">
-            <nav className="flex items-center gap-0">
+            <nav className="flex items-stretch">
               {navSections.map(section => (
-                <div key={section.id} className="relative">
-                  <button
-                    onMouseEnter={() => setActiveMenu(section.id)}
-                    onMouseLeave={() => setActiveMenu(null)}
-                    className={`flex items-center gap-1.5 px-4 py-3 text-sm font-semibold transition-colors border-b-2 ${
-                      activeMenu === section.id
-                        ? "text-blue-600 border-blue-600"
-                        : "text-gray-700 border-transparent hover:text-blue-600"
-                    }`}
-                  >
-                    <span className={activeMenu === section.id ? "text-blue-600" : "text-gray-400"}>
-                      {section.icon}
-                    </span>
-                    {section.label}
-                    <ChevronDown size={13} className={`transition-transform ${activeMenu === section.id ? "rotate-180" : ""}`} />
-                  </button>
-
-                  {/* Mega Menu Dropdown */}
-                  {activeMenu === section.id && (
-                    <div
-                      className="absolute top-full left-0 bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50 animate-fade-in"
-                      style={{ minWidth: "280px" }}
-                      onMouseEnter={() => setActiveMenu(section.id)}
-                      onMouseLeave={() => setActiveMenu(null)}
-                    >
-                      {section.items.map(item => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className="flex items-start gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors group"
-                        >
-                          <span className="mt-0.5 text-gray-400 group-hover:text-blue-600 transition-colors shrink-0">
-                            {item.icon}
-                          </span>
-                          <div>
-                            <div className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                              {item.label}
-                            </div>
-                            <div className="text-xs text-gray-400">{item.desc}</div>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <button
+                  key={section.id}
+                  onMouseEnter={() => setActiveMenu(section.id)}
+                  onClick={() => setActiveMenu(activeMenu === section.id ? null : section.id)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-bold transition-all rounded-t-xl"
+                  style={activeMenu === section.id
+                    ? { background: section.color, color: "white" }
+                    : { color: "#374151" }}
+                >
+                  <span style={{ color: activeMenu === section.id ? "white" : section.color }}>
+                    {section.icon}
+                  </span>
+                  {section.label}
+                  <ChevronDown size={13} className={`transition-transform ${activeMenu === section.id ? "rotate-180" : ""}`} />
+                </button>
               ))}
             </nav>
           </div>
+
+          {/* Full-width mega menu panel */}
+          {activeMenu && (() => {
+            const section = navSections.find(sec => sec.id === activeMenu);
+            if (!section) return null;
+            return (
+              <div className="absolute top-full left-0 right-0 bg-white shadow-2xl border-t z-50 animate-fade-in"
+                style={{ borderTopColor: section.color, borderTopWidth: "3px" }}>
+                <div className="container py-5 grid grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-5">
+                  {section.items.map(item => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setActiveMenu(null)}
+                      className="flex items-start gap-3 group"
+                    >
+                      <span
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0 transition-transform group-hover:scale-110"
+                        style={{ background: section.color }}
+                      >
+                        {item.icon}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-gray-800 group-hover:text-primary transition-colors">
+                          {item.label}
+                        </div>
+                        <div className="text-xs text-gray-500 leading-snug mt-0.5">{item.desc}</div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ─── Mobile Search ────────────────────────────────────────────────── */}
