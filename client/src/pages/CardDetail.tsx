@@ -778,13 +778,6 @@ export default function CardDetail() {
                       </div>
                     )}
                   </div>
-
-                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
-                    <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-700 leading-relaxed">
-                      CardMarket prices are live (EUR). TCGPlayer, eBay and other store prices may be estimates. Actual prices may vary. TCG Arena may earn a small commission from affiliate links at no extra cost to you.
-                    </p>
-                  </div>
                 </div>
               </TabsContent>
 
