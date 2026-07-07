@@ -111,6 +111,8 @@ interface HeroSlide {
   /** Large art rendered on the right side of the banner */
   art?: string | null;
   artStyle?: "card" | "square" | "pokemon";
+  /** Collage art on the left/right edges: [left, right] */
+  sideArt?: [string | null, string | null];
 }
 
 function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; articles?: any[]; hotCard?: any }) {
@@ -131,6 +133,10 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         logo: newestSet?.images?.logo ?? null,
         art: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png",
         artStyle: "pokemon",
+        sideArt: [
+          "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png",
+          "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/658.png",
+        ],
       },
     ];
 
@@ -149,6 +155,7 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         logo: null,
         art: hotCard.image ?? null,
         artStyle: "card",
+        sideArt: [hotCard.image ?? null, hotCard.image ?? null],
       });
     }
 
@@ -183,6 +190,10 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         logo: null,
         art: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png",
         artStyle: "pokemon",
+        sideArt: [
+          "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/302.png",
+          "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/778.png",
+        ],
       },
       {
         title: "Build Your Championship Deck",
@@ -195,6 +206,10 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         logo: null,
         art: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/384.png",
         artStyle: "pokemon",
+        sideArt: [
+          "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/130.png",
+          "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/445.png",
+        ],
       },
     );
     return base;
@@ -214,6 +229,31 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
     >
       {/* Art stage (top) */}
       <div className="relative flex-1 min-h-[200px] overflow-hidden">
+        {/* Side collage art */}
+        {slide.sideArt?.[0] && (
+          <img
+            src={slide.sideArt[0]}
+            alt=""
+            loading="lazy"
+            className={
+              slide.artStyle === "card"
+                ? "absolute left-[6%] -bottom-8 h-[95%] rounded-lg shadow-xl -rotate-12 opacity-70 z-0 hidden md:block"
+                : "absolute left-[7%] bottom-0 h-[72%] object-contain drop-shadow-xl -rotate-6 opacity-85 z-0 hidden md:block"
+            }
+          />
+        )}
+        {slide.sideArt?.[1] && (
+          <img
+            src={slide.sideArt[1]}
+            alt=""
+            loading="lazy"
+            className={
+              slide.artStyle === "card"
+                ? "absolute right-[6%] -bottom-8 h-[95%] rounded-lg shadow-xl rotate-12 opacity-70 z-0 hidden md:block"
+                : "absolute right-[7%] bottom-0 h-[72%] object-contain drop-shadow-xl rotate-6 opacity-85 z-0 hidden md:block"
+            }
+          />
+        )}
         {slide.art && (
           <img
             src={slide.art}
