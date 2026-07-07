@@ -96,14 +96,45 @@ export const appRouter = router({
         supertype: z.string().optional(),
       }))
       .query(async ({ input }) => {
-        const parts: string[] = [];
-        if (input.q) parts.push(`name:"${input.q}*"`);
-        if (input.set) parts.push(`set.id:${input.set}`);
-        if (input.type) parts.push(`types:${input.type}`);
-        if (input.rarity) parts.push(`rarity:"${input.rarity}"`);
-        if (input.supertype) parts.push(`supertype:${input.supertype}`);
-        const q = parts.join(" ");
-        return searchCards({ q: q || undefined, page: input.page, pageSize: input.pageSize, orderBy: "-set.releaseDate" });
+        const buildFilters = () => {
+          const parts: string[] = [];
+          if (input.set) parts.push(`set.id:${input.set}`);
+          if (input.type) parts.push(`types:${input.type}`);
+          if (input.rarity) parts.push(`rarity:"${input.rarity}"`);
+          if (input.supertype) parts.push(`supertype:${input.supertype}`);
+          return parts;
+        };
+        const run = (extra: string[]) => {
+          const q = [...extra, ...buildFilters()].join(" ");
+          return searchCards({ q: q || undefined, page: input.page, pageSize: input.pageSize, orderBy: "-set.releaseDate" });
+        };
+
+        const raw = (input.q ?? "").trim();
+
+        // ── Card-code search ──
+        if (raw) {
+          // Full card id, e.g. "sv7-45"
+          const idMatch = raw.match(/^([a-z0-9.]+)-(\d+[a-zA-Z]*|[A-Z]+\d+)$/i);
+          if (idMatch) {
+            const result = await run([`id:${raw.toLowerCase()}`]);
+            if (result.totalCount > 0) return result;
+          }
+          // Collector number, e.g. "123/193"
+          const numMatch = raw.match(/^(\d{1,3}[a-zA-Z]?)\s*\/\s*(\d{1,3})$/);
+          if (numMatch) {
+            const result = await run([`number:${numMatch[1]}`, `set.printedTotal:${numMatch[2]}`]);
+            if (result.totalCount > 0) return result;
+          }
+          // Set code + number, e.g. "PAL 123", "TEF-45", "MEW 151"
+          const codeMatch = raw.match(/^([a-zA-Z]{2,6})[\s-]+(\d{1,3}[a-zA-Z]?)$/);
+          if (codeMatch) {
+            const result = await run([`set.ptcgoCode:${codeMatch[1].toUpperCase()}`, `number:${codeMatch[2]}`]);
+            if (result.totalCount > 0) return result;
+          }
+        }
+
+        // ── Default: name search ──
+        return run(raw ? [`name:"${raw}*"`] : []);
       }),
 
     getById: publicProcedure

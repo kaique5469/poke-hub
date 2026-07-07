@@ -133,7 +133,7 @@ export default function Cards() {
               type="text"
               value={inputQ}
               onChange={(e) => setInputQ(e.target.value)}
-              placeholder="Search by card name…"
+              placeholder="Search by name or code (e.g. PAL 123, 25/102)…"
               className="w-full pl-9 pr-4 py-2.5 bg-card border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-colors"
             />
           </div>
