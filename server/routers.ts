@@ -5,7 +5,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getCMCardByTcgId, getCMPriceHistory } from "./cardmarketApi.js";
+import { getCMCardByTcgId, getCMPriceHistory, searchCMCardsGrid } from "./cardmarketApi.js";
 import {
   addBinderCard,
   createAlert,
@@ -51,6 +51,7 @@ import {
   getTcgPlayerUrl,
   isSpecialRare,
   searchCards,
+  GRID_SELECT,
 } from "./lib/pokemontcg";
 import {
   countryFlag,
@@ -106,34 +107,50 @@ export const appRouter = router({
         };
         const run = (extra: string[]) => {
           const q = [...extra, ...buildFilters()].join(" ");
-          return searchCards({ q: q || undefined, page: input.page, pageSize: input.pageSize, orderBy: "-set.releaseDate" });
+          return searchCards({ q: q || undefined, page: input.page, pageSize: input.pageSize, orderBy: "-set.releaseDate", select: GRID_SELECT });
         };
 
         const raw = (input.q ?? "").trim();
+        // Strip leading zeros from a collector number, keeping letter suffixes ("025" → "25", "012a" → "12a")
+        const cleanNum = (n: string) => n.replace(/^0+(?=\d)/, "");
 
-        // ── Card-code search ──
-        if (raw) {
-          // Full card id, e.g. "sv7-45"
-          const idMatch = raw.match(/^([a-z0-9.]+)-(\d+[a-zA-Z]*|[A-Z]+\d+)$/i);
-          if (idMatch) {
-            const result = await run([`id:${raw.toLowerCase()}`]);
-            if (result.totalCount > 0) return result;
-          }
-          // Collector number, e.g. "123/193"
-          const numMatch = raw.match(/^(\d{1,3}[a-zA-Z]?)\s*\/\s*(\d{1,3})$/);
-          if (numMatch) {
-            const result = await run([`number:${numMatch[1]}`, `set.printedTotal:${numMatch[2]}`]);
-            if (result.totalCount > 0) return result;
-          }
-          // Set code + number, e.g. "PAL 123", "TEF-45", "MEW 151"
-          const codeMatch = raw.match(/^([a-zA-Z]{2,6})[\s-]+(\d{1,3}[a-zA-Z]?)$/);
-          if (codeMatch) {
-            const result = await run([`set.ptcgoCode:${codeMatch[1].toUpperCase()}`, `number:${codeMatch[2]}`]);
-            if (result.totalCount > 0) return result;
+        // ── Card-code detection (before hitting any API) ──
+        const idMatch = raw.match(/^([a-z0-9.]+)-(\d+[a-zA-Z]*|[A-Z]+\d+)$/i);          // "sv7-45"
+        const numMatch = raw.match(/^(\d{1,3}[a-zA-Z]?)\s*\/\s*(\d{1,3})$/);          // "25/102", "025/086"
+        const setCodeMatch = raw.match(/^([a-zA-Z]{2,6})[\s-]+(\d{1,3}[a-zA-Z]?)$/);     // "PAL 123"
+
+        let codeQuery: string[] | null = null;
+        if (idMatch) codeQuery = [`id:${raw.toLowerCase()}`];
+        else if (numMatch) codeQuery = [`number:${cleanNum(numMatch[1])}`, `set.printedTotal:${parseInt(numMatch[2], 10)}`];
+        else if (setCodeMatch) codeQuery = [`set.ptcgoCode:${setCodeMatch[1].toUpperCase()}`, `number:${cleanNum(setCodeMatch[2])}`];
+
+        // "25/102" and "sv7-45" formats only exist on pokemontcg.io — skip RapidAPI for those
+        const rapidQuery = numMatch
+          ? null
+          : setCodeMatch
+            ? `${setCodeMatch[1].toUpperCase()} ${cleanNum(setCodeMatch[2])}` // matches card_code_number "PAL 123"
+            : idMatch ? null : raw;
+
+        // ── Primary: RapidAPI (CardMarket API TCG). Falls back on quota/error/empty ──
+        const hasFilters = !!(input.set || input.type || input.rarity || input.supertype);
+        if (rapidQuery && !hasFilters) {
+          try {
+            const rapid = await searchCMCardsGrid(rapidQuery, input.page, input.pageSize);
+            if (rapid && rapid.count > 0) return rapid;
+          } catch {
+            // fall through to pokemontcg.io
           }
         }
 
-        // ── Default: name search ──
+        // ── Fallback: pokemontcg.io — code + name in parallel; code wins when it has results ──
+        if (codeQuery) {
+          const [byCode, byName] = await Promise.allSettled([run(codeQuery), run([`name:"${raw}*"`])]);
+          if (byCode.status === "fulfilled" && byCode.value.totalCount > 0) return byCode.value;
+          if (byName.status === "fulfilled") return byName.value;
+          if (byCode.status === "fulfilled") return byCode.value;
+          throw byName.reason;
+        }
+
         return run(raw ? [`name:"${raw}*"`] : []);
       }),
 

@@ -14,18 +14,44 @@ if (API_KEY) headers["X-Api-Key"] = API_KEY;
 // Simple in-memory cache
 const cache = new Map<string, { data: unknown; expires: number }>();
 
+const inflight = new Map<string, Promise<unknown>>();
+
 function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
   const hit = cache.get(key);
-  if (hit && hit.expires > Date.now()) return Promise.resolve(hit.data as T);
-  return fn().then((data) => {
-    cache.set(key, { data, expires: Date.now() + ttlMs });
-    return data;
-  });
+  const now = Date.now();
+  if (hit && hit.expires > now) return Promise.resolve(hit.data as T);
+
+  // Deduplicate concurrent identical requests
+  const existing = inflight.get(key);
+  if (existing) {
+    if (hit) return Promise.resolve(hit.data as T); // stale-while-revalidate
+    return existing as Promise<T>;
+  }
+
+  const p = fn()
+    .then((data) => {
+      cache.set(key, { data, expires: Date.now() + ttlMs });
+      inflight.delete(key);
+      return data;
+    })
+    .catch((err) => {
+      inflight.delete(key);
+      if (hit) return hit.data as T; // serve stale on upstream error
+      throw err;
+    });
+  inflight.set(key, p);
+
+  // Stale hit: refresh in background, return stale immediately
+  if (hit) {
+    (p as Promise<T>).catch(() => {});
+    return Promise.resolve(hit.data as T);
+  }
+  return p as Promise<T>;
 }
 
 const TTL = {
   CARD: 24 * 60 * 60 * 1000,        // 24h for individual cards
-  SEARCH: 10 * 60 * 1000,           // 10min for search results
+  SEARCH: 30 * 60 * 1000,           // 30min for search results
   SETS: 60 * 60 * 1000,             // 1h for sets list
   HIGH_VALUE: 30 * 60 * 1000,       // 30min for high-value cards
 };
@@ -125,10 +151,19 @@ export interface SearchCardsResult {
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { headers });
-  if (!res.ok) throw new Error(`PokémonTCG API error ${res.status}: ${path}`);
-  return res.json() as Promise<T>;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 25_000);
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, { headers, signal: controller.signal });
+    if (!res.ok) throw new Error(`PokémonTCG API error ${res.status}: ${path}`);
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
+  }
 }
+
+/** Slim field set for card grids — cuts payload ~70% vs full card objects. */
+export const GRID_SELECT = "id,name,number,rarity,types,supertype,images,set,tcgplayer";
 
 export async function searchCards(params: SearchCardsParams): Promise<SearchCardsResult> {
   const qs = new URLSearchParams();
@@ -189,7 +224,7 @@ export async function getHighValueCards(page = 1): Promise<SearchCardsResult> {
   ];
   const q = rarities.map((r) => `rarity:"${r}"`).join(" OR ");
   return cached(`high-value:${page}`, TTL.HIGH_VALUE, () =>
-    searchCards({ q, page, pageSize: 20, orderBy: "-set.releaseDate" })
+    searchCards({ q, page, pageSize: 20, orderBy: "-set.releaseDate", select: GRID_SELECT })
   );
 }
 

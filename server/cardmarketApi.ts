@@ -179,3 +179,73 @@ function buildPrices(card: any): CMCardPrices {
     },
   };
 }
+
+// ─── Card search (grid) via RapidAPI ─────────────────────────────────────────
+// Maps CardMarket API TCG results to the pokemontcg.io card shape the client
+// grid expects. Free plan = 100 req/day, so results are cached for 24h.
+import type { SearchCardsResult, PtcgCard } from "./lib/pokemontcg.js";
+
+const SEARCH_TTL_MS = 24 * 60 * 60 * 1000;
+
+function mapCMCardToPtcg(c: any): PtcgCard | null {
+  const tcgid: string | null = c.tcgid ?? null;
+  if (!tcgid || !c.image) return null; // need pokemontcg id for detail page links
+  const setId = tcgid.slice(0, tcgid.lastIndexOf("-"));
+  const marketUsd =
+    c.prices?.tcg_player?.market_price ??
+    c.prices?.cardmarket?.["30d_average"] ??
+    c.prices?.cardmarket?.lowest_near_mint ??
+    null;
+  return {
+    id: tcgid,
+    name: c.name ?? "",
+    supertype: c.supertype ?? "Pokémon",
+    number: String(c.card_number ?? ""),
+    rarity: c.rarity ?? undefined,
+    hp: c.hp != null ? String(c.hp) : undefined,
+    set: {
+      id: setId,
+      name: c.episode?.name ?? "",
+      series: c.series?.name ?? "",
+      printedTotal: c.episode?.cards_printed_total ?? 0,
+      total: c.episode?.cards_total ?? 0,
+      releaseDate: c.episode?.released_at ?? "",
+      updatedAt: "",
+      images: { symbol: c.episode?.logo ?? "", logo: c.episode?.logo ?? "" },
+    },
+    images: { small: c.image, large: c.image },
+    tcgplayer: marketUsd != null
+      ? { url: "", updatedAt: "", prices: { normal: { market: marketUsd } } }
+      : undefined,
+  } as PtcgCard;
+}
+
+export async function searchCMCardsGrid(
+  query: string,
+  page = 1,
+  pageSize = 24,
+): Promise<SearchCardsResult | null> {
+  const cacheKey = `cm:grid:${query.toLowerCase()}:${page}:${pageSize}`;
+  const hit = cache.get(cacheKey) as CacheEntry<SearchCardsResult> | undefined;
+  if (hit && Date.now() < hit.expiresAt) return hit.data;
+
+  const result = await cmFetch<{ data: any[]; meta?: { total?: number; last_page?: number } }>(
+    `/pokemon/cards?search=${encodeURIComponent(query)}&per_page=${pageSize}&page=${page}`
+  );
+  if (!result?.data) return null; // quota/error → caller falls back
+
+  const cards = result.data.map(mapCMCardToPtcg).filter((c): c is PtcgCard => c !== null);
+  const totalCount =
+    result.meta?.total ??
+    (result.data.length === pageSize ? page * pageSize + 1 : (page - 1) * pageSize + result.data.length);
+
+  const mapped: SearchCardsResult = {
+    data: cards,
+    page,
+    pageSize,
+    count: cards.length,
+    totalCount,
+  };
+  cache.set(cacheKey, { data: mapped, expiresAt: Date.now() + SEARCH_TTL_MS });
+  return mapped;
+}
