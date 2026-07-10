@@ -20,6 +20,20 @@ const TIER: Record<string, { bg: string; bar: string; text: string; icon: ReactN
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** Small comparison chip shown under each feedback card. */
+function HintChip({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold border"
+      style={ok
+        ? { background: "#d1fae5", borderColor: "#10B981", color: "#065f46" }
+        : { background: "#f3f4f6", borderColor: "#e5e7eb", color: "#9ca3af" }}
+    >
+      {ok ? "✓" : "✗"} {label}
+    </span>
+  );
+}
+
 export default function GuessGame() {
   usePageMeta({ title: "Guess the Pokémon — TCG Arena", description: "Guess the hidden Pokémon, earn points and climb the TCG Arena leaderboard." });
   const { user, isAuthenticated } = useAuth();
@@ -195,6 +209,19 @@ export default function GuessGame() {
                           </div>
                           <p className="text-sm font-semibold" style={{ color: t.text }}>{g.message}</p>
                           <p className="text-xs text-gray-500">{g.detail}</p>
+                          {g.comparisons && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              <HintChip ok={g.comparisons.family} label="Evolution line" />
+                              <HintChip
+                                ok={!!g.comparisons.sharedType}
+                                label={g.comparisons.sharedType
+                                  ? `${cap(g.comparisons.sharedType)} energy`
+                                  : `${(g.guess.types ?? []).map(cap).join("/") || "?"} energy`}
+                              />
+                              <HintChip ok={g.comparisons.generation} label={`Gen ${g.guess.generation}`} />
+                              <HintChip ok={g.comparisons.region} label={g.guess.region} />
+                            </div>
+                          )}
                         </div>
                         <span className="text-[11px] text-gray-400 font-medium shrink-0">Attempt {g.attempt} / {maxAttempts}</span>
                       </div>

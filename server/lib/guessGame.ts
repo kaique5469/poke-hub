@@ -31,6 +31,13 @@ export interface GuessFeedback {
     region: string;
   };
   attempt: number;
+  /** Per-dimension comparison for the hint chips shown under each card */
+  comparisons: {
+    family: boolean;
+    sharedType: string | null;
+    generation: boolean;
+    region: boolean;
+  };
 }
 
 interface EvoFamily {
@@ -94,6 +101,17 @@ export async function evaluateGuess(
   const [guess, target] = await Promise.all([getDexEntry(guessId), getDexEntry(targetId)]);
   if (!guess || !target) throw new Error("Pokémon not found");
 
+  const [gFam, tFam] = await Promise.all([
+    getEvolutionFamily(guess.id).catch(() => null),
+    getEvolutionFamily(target.id).catch(() => null),
+  ]);
+
+  const exact = guess.id === target.id;
+  const sameFamily = exact || !!(gFam && tFam && tFam.ids.includes(guess.id));
+  const sharedType = guess.types.find((t) => target.types.includes(t)) ?? null;
+  const sameGen = guess.generation === target.generation;
+  const sameRegion = sameGen; // regions map 1:1 to generations
+
   const base = {
     guess: {
       id: guess.id,
@@ -104,9 +122,15 @@ export async function evaluateGuess(
       region: REGION_BY_GEN[guess.generation] ?? "Unknown",
     },
     attempt,
+    comparisons: {
+      family: sameFamily,
+      sharedType,
+      generation: sameGen,
+      region: sameRegion,
+    },
   };
 
-  if (guess.id === target.id) {
+  if (exact) {
     return {
       ...base,
       tier: "win",
@@ -116,22 +140,16 @@ export async function evaluateGuess(
     };
   }
 
-  // Same evolutionary family (strongest hint)
-  const [gFam, tFam] = await Promise.all([
-    getEvolutionFamily(guess.id).catch(() => null),
-    getEvolutionFamily(target.id).catch(() => null),
-  ]);
-  if (gFam && tFam && tFam.ids.includes(guess.id)) {
+  if (sameFamily) {
     return {
       ...base,
       tier: "green",
       match: "family",
       message: "Same evolutionary line!",
-      detail: `The target is in the ${cap(tFam.familyName)} family.`,
+      detail: `The target is in the ${cap(tFam?.familyName ?? guess.name)} family.`,
     };
   }
 
-  const sharedType = guess.types.find((t) => target.types.includes(t));
   if (sharedType) {
     return {
       ...base,
@@ -142,7 +160,7 @@ export async function evaluateGuess(
     };
   }
 
-  if (guess.generation === target.generation) {
+  if (sameGen) {
     return {
       ...base,
       tier: "yellow",
@@ -152,8 +170,6 @@ export async function evaluateGuess(
     };
   }
 
-  // Adjacent-region partial hint: same region grouping (gen ±1 shares no region
-  // in the main series, so treat "close generation" as the cool BLUE hint)
   if (Math.abs(guess.generation - target.generation) === 1) {
     return {
       ...base,
