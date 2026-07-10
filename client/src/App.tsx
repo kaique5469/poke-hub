@@ -17,6 +17,7 @@ const Cards = lazy(() => import("./pages/Cards"));
 const CardDetail = lazy(() => import("./pages/CardDetail"));
 const Sets = lazy(() => import("./pages/Sets"));
 const Pokedex = lazy(() => import("./pages/Pokedex"));
+const GuessGame = lazy(() => import("./pages/GuessGame"));
 const PokemonDetail = lazy(() => import("./pages/PokemonDetail"));
 const Metagame = lazy(() => import("./pages/Metagame"));
 const DeckBuilder = lazy(() => import("./pages/DeckBuilder"));
