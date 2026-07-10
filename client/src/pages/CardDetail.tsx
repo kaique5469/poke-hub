@@ -993,7 +993,7 @@ export default function CardDetail() {
                       <ShoppingCart size={32} className="mx-auto mb-2 opacity-30" />
                       <p className="text-sm font-medium">No TCG Arena sellers listed yet</p>
                       <p className="text-xs mt-1">Be the first to sell this card on TCG Arena!</p>
-                      <Link href="/sell">
+                      <Link href="/sell-card">
                         <Button size="sm" className="mt-3 text-xs text-white" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
                           List for Sale
                         </Button>

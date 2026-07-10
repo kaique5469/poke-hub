@@ -33,6 +33,82 @@ const mockListings = [
   { id: "L-003", card: "Base Set Charizard", set: "Base Set", price: 850.00, condition: "SP", views: 312, watchers: 45, status: "sold", img: "https://images.pokemontcg.io/base1/4_hires.png" },
 ];
 
+
+/** Stripe Connect payouts card — shown in the Selling tab. */
+function PayoutsCard() {
+  const utils = trpc.useUtils();
+  const status = trpc.store.connectStatus.useQuery();
+  const onboard = trpc.store.connectOnboard.useMutation({
+    onSuccess: (res) => { window.location.href = res.url; },
+    onError: (e) => toast.error(e.message),
+  });
+
+  if (status.isLoading) return null;
+  const st = status.data;
+
+  if (!st?.hasStore) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <div>
+          <h3 className="font-bold text-gray-800">Sell on TCG Arena</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Open your free store to list cards and receive payments.</p>
+        </div>
+        <Link href="/open-store">
+          <Button size="sm" className="text-white text-xs font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
+            Open your store <ArrowRight size={12} className="ml-1" />
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-gray-800">Payouts</h3>
+            {st.payoutsEnabled ? (
+              <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: "#d1fae5", color: "#065f46" }}>Active</span>
+            ) : st.connected ? (
+              <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: "#fef3c7", color: "#92400e" }}>Onboarding incomplete</span>
+            ) : (
+              <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: "#fee2e2", color: "#991b1b" }}>Not connected</span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mt-1 max-w-md">
+            {st.payoutsEnabled
+              ? "Your Stripe account is connected. 95% of every card sale is transferred directly to you."
+              : "Connect your Stripe account to receive card payments directly in your bank. Takes about 2 minutes."}
+          </p>
+        </div>
+        {!st.payoutsEnabled && (
+          <Button
+            size="sm"
+            disabled={onboard.isPending}
+            onClick={() => onboard.mutate()}
+            className="text-white text-xs font-bold shrink-0"
+            style={{ background: "#635BFF", border: "none" }}
+          >
+            {onboard.isPending ? "Redirecting..." : st.connected ? "Finish Stripe setup" : "Connect Stripe"}
+            <ArrowRight size={12} className="ml-1" />
+          </Button>
+        )}
+        {st.payoutsEnabled && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs font-bold shrink-0"
+            onClick={() => { void utils.store.connectStatus.invalidate(); toast.success("Status refreshed"); }}
+          >
+            Refresh status
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
   delivered: { bg: "#d1fae5", text: "#065f46", label: "Delivered" },
   shipped: { bg: "#dbeafe", text: "#1e40af", label: "Shipped" },
@@ -343,6 +419,7 @@ export default function UserDashboard() {
             {/* Selling Tab */}
             {activeTab === "selling" && (
               <div className="space-y-4">
+                <PayoutsCard />
                 <div className="bg-white rounded-xl border border-gray-100 p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-gray-800">My Listings</h3>

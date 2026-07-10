@@ -35,6 +35,9 @@ const Bazaar = lazy(() => import("./pages/Bazaar"));
 const Articles = lazy(() => import("./pages/Articles"));
 const ArticleDetail = lazy(() => import("./pages/ArticleDetail"));
 const SellCard = lazy(() => import("./pages/SellCard"));
+const Sell = lazy(() => import("./pages/Sell"));
+const OpenStore = lazy(() => import("./pages/OpenStore"));
+const StorePage = lazy(() => import("./pages/StorePage"));
 const PlayerProfile = lazy(() => import("./pages/PlayerProfile"));
 const ProfileEdit = lazy(() => import("./pages/ProfileEdit"));
 const UserDashboard = lazy(() => import("./pages/UserDashboard"));
@@ -97,7 +100,10 @@ function Router() {
           <Route path="/bazaar" component={Bazaar} />
           <Route path="/articles" component={Articles} />
           <Route path="/articles/:slug" component={ArticleDetail} />
-          <Route path="/sell" component={SellCard} />
+          <Route path="/sell" component={Sell} />
+          <Route path="/sell-card" component={SellCard} />
+          <Route path="/open-store" component={OpenStore} />
+          <Route path="/store/:slug" component={StorePage} />
           <Route path="/profile/:username" component={PlayerProfile} />
           <Route path="/profile/edit" component={ProfileEdit} />
           <Route path="/dashboard" component={UserDashboard} />

@@ -80,6 +80,14 @@ import {
 import { toggleAuctionWatch, getUserWatchedAuctionIds } from "./db";
 import { createNotification, getListingsByCardWithSeller } from "./marketplaceDb";
 import {
+  createStore,
+  getStoreBySlug,
+  getStoreByUserId,
+  getStoreListings,
+  updateStore,
+} from "./storeDb";
+import { createAccountLink, createConnectAccount, getAccountStatus, stripeEnabled } from "./lib/stripe";
+import {
   bazaarRouter,
   cartRouter,
   listingsRouter as marketplaceListingsRouter,
@@ -756,6 +764,95 @@ export const appRouter = router({
 
 
   // ─── Guess the Pokémon (game) ──────────────────────────────────────────────
+  store: router({
+    /** The logged-in user's own store (null if none yet). */
+    mine: protectedProcedure.query(({ ctx }) => getStoreByUserId(ctx.user.id)),
+
+    create: protectedProcedure
+      .input(z.object({
+        storeName: z.string().min(3).max(128),
+        tagline: z.string().max(256).optional(),
+        description: z.string().max(4000).optional(),
+        location: z.string().max(128).optional(),
+        paymentMethods: z.array(z.enum(["card", "paypal"])).min(1),
+        shipsFrom: z.string().max(128).optional(),
+        handlingDays: z.number().int().min(1).max(10).default(2),
+        shippingPolicy: z.string().max(4000).optional(),
+        returnPolicy: z.string().max(4000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          return await createStore(ctx.user.id, input);
+        } catch (e) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: e instanceof Error ? e.message : "Failed" });
+        }
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        storeName: z.string().min(3).max(128).optional(),
+        tagline: z.string().max(256).optional(),
+        description: z.string().max(4000).optional(),
+        location: z.string().max(128).optional(),
+        paymentMethods: z.array(z.enum(["card", "paypal"])).min(1).optional(),
+        shipsFrom: z.string().max(128).optional(),
+        handlingDays: z.number().int().min(1).max(10).optional(),
+        shippingPolicy: z.string().max(4000).optional(),
+        returnPolicy: z.string().max(4000).optional(),
+        status: z.enum(["active", "paused"]).optional(),
+      }))
+      .mutation(({ input, ctx }) => updateStore(ctx.user.id, input)),
+
+    bySlug: publicProcedure
+      .input(z.object({ slug: z.string().min(1).max(140) }))
+      .query(async ({ input }) => {
+        const row = await getStoreBySlug(input.slug);
+        if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Store not found" });
+        const listings = await getStoreListings(row.store.userId);
+        return { ...row, listings };
+      }),
+
+    /** Start (or resume) Stripe Connect onboarding — returns the hosted URL. */
+    connectOnboard: protectedProcedure.mutation(async ({ ctx }) => {
+      if (!stripeEnabled()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Card payments are not configured yet" });
+      }
+      const store = await getStoreByUserId(ctx.user.id);
+      if (!store) throw new TRPCError({ code: "BAD_REQUEST", message: "Open your store first" });
+      try {
+        let accountId = store.stripeAccountId;
+        if (!accountId) {
+          accountId = await createConnectAccount(ctx.user.email);
+          await updateStore(ctx.user.id, { stripeAccountId: accountId });
+        }
+        const proto = (ctx.req.headers["x-forwarded-proto"] as string | undefined)?.split(",")[0] ?? ctx.req.protocol;
+        const origin = `${proto}://${ctx.req.get("host")}`;
+        const url = await createAccountLink(accountId, origin);
+        return { url };
+      } catch (e) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e instanceof Error ? e.message : "Stripe error" });
+      }
+    }),
+
+    /** Live Connect status — persists payoutsEnabled so checkout can gate on it. */
+    connectStatus: protectedProcedure.query(async ({ ctx }) => {
+      const store = await getStoreByUserId(ctx.user.id);
+      if (!store) return { hasStore: false, connected: false, payoutsEnabled: false };
+      if (!store.stripeAccountId || !stripeEnabled()) {
+        return { hasStore: true, connected: false, payoutsEnabled: false };
+      }
+      try {
+        const status = await getAccountStatus(store.stripeAccountId);
+        if (status.payoutsEnabled !== store.stripePayoutsEnabled) {
+          await updateStore(ctx.user.id, { stripePayoutsEnabled: status.payoutsEnabled });
+        }
+        return { hasStore: true, connected: true, payoutsEnabled: status.payoutsEnabled, detailsSubmitted: status.detailsSubmitted };
+      } catch {
+        return { hasStore: true, connected: true, payoutsEnabled: store.stripePayoutsEnabled };
+      }
+    }),
+  }),
+
   game: router({
     /** Start a new round (abandons any active one). Target stays server-side. */
     start: protectedProcedure.mutation(async ({ ctx }) => {

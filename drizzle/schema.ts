@@ -361,6 +361,8 @@ export const orders = mysqlTable("orders", {
   quantity: int("quantity").default(1).notNull(),
   totalUsd: decimal("totalUsd", { precision: 10, scale: 2 }).notNull(),
   status: mysqlEnum("status", ["pending", "paid", "shipped", "delivered", "cancelled", "disputed"]).default("pending").notNull(),
+  paymentStatus: mysqlEnum("paymentStatus", ["unpaid", "processing", "paid", "refunded"]).default("unpaid").notNull(),
+  stripeSessionId: varchar("stripeSessionId", { length: 255 }),
   buyerProtection: boolean("buyerProtection").default(false).notNull(),
   trackingNumber: varchar("trackingNumber", { length: 256 }),
   notes: text("notes"),
@@ -490,3 +492,32 @@ export const gameStats = mysqlTable("game_stats", {
 });
 
 export type GameStats = typeof gameStats.$inferSelect;
+
+// ─── Seller Stores ────────────────────────────────────────────────────────────
+
+export const sellerStores = mysqlTable("seller_stores", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  storeName: varchar("storeName", { length: 128 }).notNull(),
+  slug: varchar("slug", { length: 140 }).notNull().unique(),
+  tagline: varchar("tagline", { length: 256 }),
+  description: text("description"),
+  logoUrl: text("logoUrl"),
+  bannerUrl: text("bannerUrl"),
+  location: varchar("location", { length: 128 }),
+  /** e.g. ["card", "paypal"] — card == Stripe checkout on-platform */
+  paymentMethods: json("paymentMethods"),
+  /** Stripe Connect (Express) account id — payouts go directly to the seller */
+  stripeAccountId: varchar("stripeAccountId", { length: 255 }),
+  stripePayoutsEnabled: boolean("stripePayoutsEnabled").default(false).notNull(),
+  shipsFrom: varchar("shipsFrom", { length: 128 }),
+  handlingDays: int("handlingDays").default(2).notNull(),
+  shippingPolicy: text("shippingPolicy"),
+  returnPolicy: text("returnPolicy"),
+  status: mysqlEnum("status", ["active", "paused"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SellerStore = typeof sellerStores.$inferSelect;
+export type InsertSellerStore = typeof sellerStores.$inferInsert;

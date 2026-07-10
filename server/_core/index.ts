@@ -10,6 +10,8 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { tcgNewsHandler } from "../scheduledTcgNews";
+import { verifyWebhook } from "../lib/stripe";
+import { markOrdersPaid, payoutSellers } from "../storeDb";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -33,6 +35,24 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Stripe webhook needs the RAW body for signature verification — register
+  // it before the JSON body parser.
+  app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    const event = verifyWebhook(req.body as Buffer, req.headers["stripe-signature"] as string | undefined);
+    if (!event) return res.status(400).json({ error: "invalid signature" });
+    if (event.type === "checkout.session.completed") {
+      try {
+        const n = await markOrdersPaid(event.data.object.id);
+        await payoutSellers(event.data.object.id);
+        console.log(`[stripe] session ${event.data.object.id} completed — ${n} order(s) marked paid`);
+      } catch (e) {
+        console.error("[stripe] failed to mark orders paid:", e);
+        return res.status(500).json({ error: "processing failed" });
+      }
+    }
+    return res.json({ received: true });
+  });
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));

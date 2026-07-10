@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
-import { Minus, Package, Plus, ShoppingCart, Star, Trash2 } from "lucide-react";
+import { CreditCard, LockKeyhole, Minus, Package, Plus, ShieldCheck, ShoppingCart, Star, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,6 +63,16 @@ export default function Cart() {
         toast.success(`${res.orderIds.length} order(s) created! Total $${res.totalUsd.toFixed(2)}`);
       }
       navigate("/orders");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const stripeAvailable = trpc.cart.stripeAvailable.useQuery();
+  const stripeCheckout = trpc.cart.stripeCheckout.useMutation({
+    onSuccess: (res) => {
+      invalidate();
+      utils.orders.myPurchases.invalidate();
+      window.location.href = res.checkoutUrl;
     },
     onError: (e) => toast.error(e.message),
   });
@@ -212,13 +222,30 @@ export default function Cart() {
                 placeholder="Note to sellers (optional) — shipping preferences, payment arrangement..."
                 className="mb-3 text-sm" rows={3} />
 
-              <Button className="w-full" size="lg" disabled={checkout.isPending}
+              {stripeAvailable.data && (
+                <Button className="w-full gap-2 mb-2" size="lg"
+                  style={{ background: "#635BFF" }}
+                  disabled={stripeCheckout.isPending || checkout.isPending}
+                  onClick={() => stripeCheckout.mutate({ notes: notes.trim() || undefined })}>
+                  <CreditCard size={16} />
+                  {stripeCheckout.isPending ? "Redirecting to secure checkout…" : "Pay with card"}
+                </Button>
+              )}
+              <Button className="w-full" size="lg" variant={stripeAvailable.data ? "outline" : "default"}
+                disabled={checkout.isPending || stripeCheckout.isPending}
                 onClick={() => checkout.mutate({ notes: notes.trim() || undefined })}>
-                {checkout.isPending ? "Placing orders…" : "Place order"}
+                {checkout.isPending ? "Placing orders…" : "Order & arrange payment with seller"}
               </Button>
+
+              {/* Trust badges */}
+              <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-gray-100 text-[10px] font-bold text-gray-400">
+                <span className="inline-flex items-center gap-1"><LockKeyhole size={11} /> SSL encrypted</span>
+                <span className="inline-flex items-center gap-1"><CreditCard size={11} /> Stripe secure</span>
+                <span className="inline-flex items-center gap-1"><ShieldCheck size={11} /> Buyer protection</span>
+              </div>
               <p className="text-[11px] mt-3 leading-snug" style={{ color: "oklch(0.52 0.015 240)" }}>
-                Payment and shipping are arranged directly with each seller after the order is placed.
-                One order is created per item line; you can track everything in My Orders.
+                Card payments are confirmed instantly and covered by buyer protection.
+                Choosing "arrange with seller" creates the orders and you settle payment directly with each seller.
               </p>
             </div>
           </div>

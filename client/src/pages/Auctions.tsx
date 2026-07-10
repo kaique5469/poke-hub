@@ -250,7 +250,7 @@ export default function Auctions() {
             <h2 className="text-xl font-bold text-gray-700 mb-2">No Active Auctions</h2>
             <p className="text-gray-400 text-sm mb-6">Check back soon — new auctions are added regularly.</p>
             {isAuthenticated && (
-              <Link href="/sell">
+              <Link href="/sell-card">
                 <Button className="bg-blue-600 hover:bg-blue-700">List a Card for Auction</Button>
               </Link>
             )}
@@ -353,7 +353,7 @@ export default function Auctions() {
               <h3 className="font-bold text-gray-800 mb-1">Have rare cards to sell?</h3>
               <p className="text-sm text-gray-500">Create an auction and reach thousands of collectors across the USA.</p>
             </div>
-            <Link href="/sell">
+            <Link href="/sell-card">
               <Button className="text-white font-bold shrink-0" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
                 <ChevronRight size={16} className="mr-1" />
                 List a Card

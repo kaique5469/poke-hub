@@ -48,6 +48,7 @@ const navSections = [
       { label: "Card Database", href: "/cards", icon: <Search size={16}/>, desc: "Search all 15,000+ cards" },
       { label: "Editions / Sets", href: "/sets", icon: <Layers size={16}/>, desc: "Browse by set and series" },
       { label: "Marketplace", href: "/shop", icon: <ShoppingCart size={16}/>, desc: "Buy & sell products" },
+      { label: "Sell on TCG Arena", href: "/sell", icon: <TrendingUp size={16}/>, desc: "Open your store for free" },
       { label: "Price Trends", href: "/cards?tab=trends", icon: <TrendingUp size={16}/>, desc: "Market price history" },
       { label: "Want List", href: "/bazaar", icon: <Heart size={16}/>, desc: "Cards you want to buy" },
       { label: "Auctions", href: "/auctions", icon: <Zap size={16}/>, desc: "Live card auctions" },
@@ -184,6 +185,7 @@ export default function Navbar() {
           <div className="flex items-center gap-4 opacity-80">
             <Link href="/articles" className="hover:opacity-100 transition-opacity">Blog</Link>
             <Link href="/tournaments" className="hover:opacity-100 transition-opacity">Tournaments</Link>
+            <Link href="/sell" className="hover:opacity-100 transition-opacity">Start Selling</Link>
             <Link href="/game" className="hover:opacity-100 transition-opacity flex items-center gap-1.5">
               Guess Game
               <span className="text-[9px] font-black bg-[#F5B301] text-black rounded-full px-1.5 py-px leading-tight">NEW</span>
@@ -326,7 +328,8 @@ export default function Navbar() {
                           { href: "/binder", icon: <BinderIcon size={15}/>, label: "My Binder" },
                           { href: "/decks", icon: <Layers size={15}/>, label: "My Decks" },
                           { href: "/orders", icon: <Package size={15}/>, label: "My Orders" },
-                          { href: "/sell", icon: <TrendingUp size={15}/>, label: "Sell Cards" },
+                          { href: "/sell-card", icon: <TrendingUp size={15}/>, label: "Sell Cards" },
+                          { href: "/sell", icon: <Package size={15}/>, label: "My Store" },
                           { href: "/profile/edit", icon: <Settings size={15}/>, label: "Settings" },
                         ].map(item => (
                           <Link key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">

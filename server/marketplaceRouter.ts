@@ -38,6 +38,8 @@ import {
   updateListing,
   updateOrderStatus,
 } from "./marketplaceDb";
+import { attachStripeSession, getUnpayableCartSellers } from "./storeDb";
+import { createCheckoutSession, stripeEnabled } from "./lib/stripe";
 import { ensureProductsSeeded } from "./seedProducts";
 
 const conditionEnum = z.enum(["M", "NM", "SP", "MP", "HP", "D"]);
@@ -158,6 +160,36 @@ export const cartRouter = router({
     .mutation(({ input, ctx }) => rethrow(() => updateCartItem(ctx.user.id, input.cartItemId, input.quantity))),
 
   clear: protectedProcedure.mutation(({ ctx }) => rethrow(() => clearCart(ctx.user.id))),
+
+  /** Stripe checkout: creates the orders then redirects to Stripe-hosted payment. */
+  stripeCheckout: protectedProcedure
+    .input(z.object({ notes: z.string().max(1000).optional() }).optional())
+    .mutation(async ({ input, ctx }) => {
+      if (!stripeEnabled()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Card payments are not available yet" });
+      }
+      const notReady = await getUnpayableCartSellers(ctx.user.id);
+      if (notReady.length > 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Card payment unavailable: ${notReady.join(", ")} ${notReady.length > 1 ? "haven't" : "hasn't"} set up payouts yet. Use "Order & arrange payment with seller" instead.`,
+        });
+      }
+      const result = await rethrow(() => checkoutCart(ctx.user.id, input?.notes));
+      const proto = (ctx.req.headers["x-forwarded-proto"] as string | undefined)?.split(",")[0] ?? ctx.req.protocol;
+      const origin = `${proto}://${ctx.req.get("host")}`;
+      const session = await createCheckoutSession({
+        amountUsd: result.totalUsd,
+        description: `TCG Arena order (${result.orderIds.length} item${result.orderIds.length > 1 ? "s" : ""})`,
+        orderIds: result.orderIds,
+        buyerEmail: ctx.user.email,
+        origin,
+      });
+      await attachStripeSession(result.orderIds, session.id);
+      return { checkoutUrl: session.url, orderIds: result.orderIds, skipped: result.skipped };
+    }),
+
+  stripeAvailable: publicProcedure.query(() => stripeEnabled()),
 
   checkout: protectedProcedure
     .input(z.object({ notes: z.string().max(2000).optional() }).default({}))
