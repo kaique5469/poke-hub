@@ -76,6 +76,7 @@ function Router() {
           <Route path="/cards" component={Cards} />
           <Route path="/cards/:id" component={CardDetail} />
           <Route path="/sets" component={Sets} />
+          <Route path="/game" component={GuessGame} />
           <Route path="/pokedex" component={Pokedex} />
           <Route path="/pokedex/:id" component={PokemonDetail} />
           <Route path="/metagame" component={Metagame} />

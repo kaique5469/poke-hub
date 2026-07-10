@@ -6,8 +6,7 @@ import { trpc } from "@/lib/trpc";
 import {
   Search, ShoppingCart, User, ChevronDown, Menu, X, Bell,
   BookOpen, Layers, Package, Wrench, Users, Star, Trophy,
-  TrendingUp, Zap, Shield, Heart, LogOut, Settings, BarChart2
-} from "lucide-react";
+  TrendingUp, Zap, Shield, Heart, LogOut, Settings, BarChart2, Gamepad2 } from "lucide-react";
 import ArenaLogo from "@/components/ArenaLogo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,6 +101,7 @@ const navSections = [
       { label: "Deck Builder", href: "/deck-builder", icon: <Wrench size={16}/>, desc: "Build your deck" },
       { label: "Binders", href: "/binder", icon: <BinderIcon size={16}/>, desc: "Public collections" },
       { label: "Bazaar", href: "/bazaar", icon: <Users size={16}/>, desc: "Trade & swap cards" },
+      { label: "Guess Game", href: "/game", icon: <Gamepad2 size={16}/>, desc: "Guess the Pokémon, earn points" },
       { label: "Tournaments", href: "/tournaments", icon: <Trophy size={16}/>, desc: "Events & results" },
       { label: "Metagame", href: "/metagame", icon: <BarChart2 size={16}/>, desc: "Top decks & trends" },
     ],

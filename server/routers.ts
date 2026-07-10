@@ -60,6 +60,23 @@ import {
   getUpcomingTournaments,
 } from "./lib/limitless";
 import { getPokedexTypeCounts, queryPokedex } from "./lib/pokedex";
+import {
+  evaluateGuess,
+  getDexEntry,
+  pickRandomTarget,
+  MAX_ATTEMPTS,
+  POINTS_PER_ATTEMPT,
+  REGION_BY_GEN,
+  type GuessFeedback,
+} from "./lib/guessGame";
+import {
+  createRound,
+  getActiveRound,
+  getLeaderboard,
+  getStats,
+  recordResult,
+  saveRoundProgress,
+} from "./gameDb";
 import { toggleAuctionWatch, getUserWatchedAuctionIds } from "./db";
 import { createNotification, getListingsByCardWithSeller } from "./marketplaceDb";
 import {
@@ -735,6 +752,109 @@ export const appRouter = router({
         });
         return { success: true };
       }),
+  }),
+
+
+  // ─── Guess the Pokémon (game) ──────────────────────────────────────────────
+  game: router({
+    /** Start a new round (abandons any active one). Target stays server-side. */
+    start: protectedProcedure.mutation(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const targetId = await pickRandomTarget();
+      const round = await createRound(user.id, targetId);
+      if (!round) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not start game" });
+      return {
+        roundId: round.id,
+        attemptsRemaining: MAX_ATTEMPTS,
+        maxAttempts: MAX_ATTEMPTS,
+        guesses: [] as GuessFeedback[],
+        status: "active" as const,
+      };
+    }),
+
+    /** Resume the active round after a refresh (never reveals the target). */
+    current: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const round = await getActiveRound(user.id);
+      if (!round) return null;
+      const guesses = (round.guesses as GuessFeedback[] | null) ?? [];
+      return {
+        roundId: round.id,
+        attemptsRemaining: MAX_ATTEMPTS - round.attemptsUsed,
+        maxAttempts: MAX_ATTEMPTS,
+        guesses,
+        status: round.status,
+      };
+    }),
+
+    /** Submit a guess — graded server-side against the hidden target. */
+    guess: protectedProcedure
+      .input(z.object({ roundId: z.number().int(), pokemonId: z.number().int().min(1).max(1025) }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const round = await getActiveRound(user.id);
+        if (!round || round.id !== input.roundId || round.status !== "active") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No active round — start a new game." });
+        }
+
+        const prev = (round.guesses as GuessFeedback[] | null) ?? [];
+        if (prev.some((g) => g.guess.id === input.pokemonId)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "You already tried that Pokémon." });
+        }
+
+        const attempt = round.attemptsUsed + 1;
+        const feedback = await evaluateGuess(input.pokemonId, round.targetId, attempt);
+        const guesses = [feedback, ...prev];
+
+        const won = feedback.tier === "win";
+        const outOfAttempts = !won && attempt >= MAX_ATTEMPTS;
+        const roundScore = won ? (MAX_ATTEMPTS - attempt) * POINTS_PER_ATTEMPT + POINTS_PER_ATTEMPT : 0;
+
+        await saveRoundProgress(round.id, {
+          attemptsUsed: attempt,
+          guesses,
+          status: won ? "won" : outOfAttempts ? "lost" : "active",
+          roundScore,
+        });
+
+        let reveal: { id: number; name: string; sprite: string; types: string[]; generation: number; region: string } | null = null;
+        if (won || outOfAttempts) {
+          await recordResult(user.id, won, roundScore, attempt);
+          const t = await getDexEntry(round.targetId);
+          if (t) {
+            reveal = {
+              id: t.id,
+              name: t.name.charAt(0).toUpperCase() + t.name.slice(1),
+              sprite: t.sprite,
+              types: t.types,
+              generation: t.generation,
+              region: REGION_BY_GEN[t.generation] ?? "Unknown",
+            };
+          }
+        }
+
+        return {
+          feedback,
+          guesses,
+          attemptsRemaining: MAX_ATTEMPTS - attempt,
+          status: won ? ("won" as const) : outOfAttempts ? ("lost" as const) : ("active" as const),
+          roundScore,
+          reveal,
+        };
+      }),
+
+    myStats: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return getStats(user.id);
+    }),
+
+    leaderboard: publicProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(50).default(20) }).default({ limit: 20 }))
+      .query(({ input }) => getLeaderboard(input.limit)),
   }),
 
   pokemon: router({

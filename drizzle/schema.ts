@@ -460,3 +460,33 @@ export const bannerSlides = mysqlTable("banner_slides", {
 });
 
 export type BannerSlide = typeof bannerSlides.$inferSelect;
+
+// ─── Guess Game ───────────────────────────────────────────────────────────────
+
+export const gameRounds = mysqlTable("game_rounds", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  targetId: int("targetId").notNull(),
+  attemptsUsed: int("attemptsUsed").default(0).notNull(),
+  status: mysqlEnum("status", ["active", "won", "lost"]).default("active").notNull(),
+  roundScore: int("roundScore").default(0).notNull(),
+  guesses: json("guesses"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  endedAt: timestamp("endedAt"),
+});
+
+export type GameRound = typeof gameRounds.$inferSelect;
+
+export const gameStats = mysqlTable("game_stats", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  totalPoints: int("totalPoints").default(0).notNull(),
+  wins: int("wins").default(0).notNull(),
+  losses: int("losses").default(0).notNull(),
+  streak: int("streak").default(0).notNull(),
+  bestAttempts: int("bestAttempts"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type GameStats = typeof gameStats.$inferSelect;
