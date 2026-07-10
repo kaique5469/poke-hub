@@ -5,7 +5,7 @@ import {
   ChevronRight, ChevronLeft, TrendingUp, Zap, Package,
   Trophy, Star, ArrowRight, Clock, Eye,
   BarChart2, Users, BookOpen, Newspaper, Sparkles,
-  CalendarDays
+  CalendarDays, Gamepad2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +139,24 @@ function HeroSection({ newestSet, articles, hotCard }: { newestSet: any; article
         ],
       },
     ];
+
+    // Guess Game promo slide
+    base.push({
+      title: "New Game: Guess the Pokémon",
+      subtitle: "15 tries to find the hidden Pokémon. Earn points, build streaks and climb the arena leaderboard!",
+      badge: "New Minigame",
+      badgeColor: "#FF2E9A",
+      bg: "linear-gradient(135deg, #0B1220 0%, #3b0f3f 55%, #86198f 100%)",
+      cta: "Play Now",
+      href: "/game",
+      logo: null,
+      art: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/132.png",
+      artStyle: "pokemon",
+      sideArt: [
+        "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/92.png",
+        "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/39.png",
+      ],
+    });
 
     // Hot card slide (Special Illustration Rare art)
     if (hotCard) {
@@ -667,6 +685,32 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* ─── Guess Game Promo ──────────────────────────────────────────── */}
+        <Link href="/game">
+          <div
+            className="relative rounded-2xl overflow-hidden cursor-pointer group shadow-lg"
+            style={{ background: "linear-gradient(120deg, #7C3AED 0%, #a21caf 55%, #FF2E9A 100%)" }}
+          >
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/132.png" alt="" loading="lazy" className="absolute right-4 md:right-16 bottom-0 h-[92%] object-contain drop-shadow-2xl opacity-95 group-hover:scale-105 transition-transform hidden sm:block" />
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/92.png" alt="" loading="lazy" className="absolute right-[26%] -bottom-2 h-[62%] object-contain opacity-50 hidden md:block" />
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/39.png" alt="" loading="lazy" className="absolute -left-6 -bottom-6 h-[70%] object-contain opacity-20" />
+            <div className="relative z-10 p-7 md:p-9 max-w-xl">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider bg-white/20 text-white rounded-full px-3 py-1 mb-3">
+                <Gamepad2 size={13} /> New Minigame
+              </span>
+              <h2 className="text-2xl md:text-3xl font-black text-white leading-tight mb-2" style={{ fontFamily: "var(--font-display)" }}>
+                Guess the Pokémon
+              </h2>
+              <p className="text-white/85 text-sm md:text-base mb-4">
+                A hidden Pokémon awaits. You get 15 tries — warmth hints show if you're close. Win points, keep your streak and top the arena leaderboard!
+              </p>
+              <span className="inline-flex items-center gap-2 bg-white text-fuchsia-700 font-black text-sm rounded-full px-6 py-2.5 group-hover:scale-105 transition-transform">
+                <Gamepad2 size={16} /> Play Now — It's Free
+              </span>
+            </div>
+          </div>
+        </Link>
 
         {/* ─── Live Auctions ─────────────────────────────────────────────── */}
         {liveAuctions && liveAuctions.length > 0 && (

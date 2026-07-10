@@ -184,6 +184,10 @@ export default function Navbar() {
           <div className="flex items-center gap-4 opacity-80">
             <Link href="/articles" className="hover:opacity-100 transition-opacity">Blog</Link>
             <Link href="/tournaments" className="hover:opacity-100 transition-opacity">Tournaments</Link>
+            <Link href="/game" className="hover:opacity-100 transition-opacity flex items-center gap-1.5">
+              Guess Game
+              <span className="text-[9px] font-black bg-[#F5B301] text-black rounded-full px-1.5 py-px leading-tight">NEW</span>
+            </Link>
             <Link href="/drops" className="hover:opacity-100 transition-opacity">Drop Alerts</Link>
           </div>
         </div>
