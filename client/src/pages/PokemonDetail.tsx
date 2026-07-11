@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { TypeIcon } from "@/components/TypeIcon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -487,7 +488,7 @@ export default function PokemonDetail() {
                         key={type}
                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border ${ts.bg} ${ts.text} ${ts.border}`}
                       >
-                        <span>{ts.icon}</span>
+                        <TypeIcon type={type} size={18} />
                         {capitalize(type)}
                       </span>
                     );

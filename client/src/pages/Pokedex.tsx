@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { Search, X, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { TypeIcon, TYPE_COLOR } from "@/components/TypeIcon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
@@ -54,36 +55,38 @@ const displayName = (n: string) =>
 
 function TypeBadge({ type }: { type: string }) {
   const t = TYPES.find(t => t.id === type);
-  return (
-    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs"
-      style={{ background: t?.color ?? "#9CA3AF" }} title={t?.label ?? type}>
-      {t?.icon ?? "?"}
-    </span>
-  );
+  return <TypeIcon type={type} size={28} title={t?.label ?? type} />;
 }
 
 function PokemonCard({ p }: { p: DexEntry }) {
   const [imgError, setImgError] = useState(false);
-  const mainType = TYPES.find(t => t.id === p.types[0]);
+  const c1 = TYPE_COLOR[p.types[0]] ?? "#9CA3AF";
+  const c2 = TYPE_COLOR[p.types[1] ?? p.types[0]] ?? c1;
   return (
     <Link href={`/pokedex/${p.id}`}
-      className="bg-white border border-gray-200 rounded-xl p-3 hover:border-blue-300 hover:shadow-md transition-all group flex flex-col items-center">
-      <div className="w-full aspect-square rounded-xl flex items-center justify-center"
-        style={{ background: `${mainType?.color ?? "#9CA3AF"}14` }}>
+      className="bg-white rounded-2xl overflow-hidden transition-all duration-200 group flex flex-col items-center border-2 hover:-translate-y-1"
+      style={{ borderColor: `${c1}55`, boxShadow: `0 2px 10px ${c1}22` }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 10px 28px ${c1}55`; e.currentTarget.style.borderColor = c1; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = `0 2px 10px ${c1}22`; e.currentTarget.style.borderColor = `${c1}55`; }}>
+      <div className="w-full aspect-square flex items-center justify-center relative p-3"
+        style={{ background: `radial-gradient(circle at 50% 40%, ${c1}45 0%, ${c1}20 55%, ${c2}12 100%)` }}>
+        <span className="absolute top-2 right-3 font-black text-[13px]" style={{ color: `${c1}` , opacity: 0.65 }}>
+          #{String(p.id).padStart(4, "0")}
+        </span>
         {!imgError ? (
           <img src={p.sprite} alt={p.name} loading="lazy"
-            className="w-[85%] h-[85%] object-contain group-hover:scale-110 transition-transform duration-200"
+            className="w-[92%] h-[92%] object-contain drop-shadow-lg group-hover:scale-110 transition-transform duration-200"
             onError={() => setImgError(true)} />
-        ) : <span className="text-3xl">❓</span>}
+        ) : <span className="text-4xl">❓</span>}
       </div>
-      <p className="text-[11px] font-bold mt-2" style={{ color: "oklch(0.52 0.015 240)" }}>
-        #{String(p.id).padStart(4, "0")}
-      </p>
-      <p className="font-black text-sm text-center line-clamp-1" style={{ color: "oklch(0.18 0.02 240)" }}>
-        {displayName(p.name)}
-      </p>
-      <div className="flex gap-1 mt-1.5">
-        {p.types.map(t => <TypeBadge key={t} type={t} />)}
+      <div className="w-full px-3 pt-2.5 pb-3.5 flex flex-col items-center gap-2">
+        <p className="font-black text-base sm:text-lg text-center line-clamp-1 uppercase tracking-wide"
+          style={{ color: "oklch(0.18 0.02 240)", fontFamily: "var(--font-display)" }}>
+          {displayName(p.name)}
+        </p>
+        <div className="flex gap-2">
+          {p.types.map(t => <TypeBadge key={t} type={t} />)}
+        </div>
       </div>
     </Link>
   );
@@ -168,7 +171,7 @@ export default function Pokedex() {
                   <button key={t.id} onClick={() => resetAnd(() => setType(type === t.id ? null : t.id))}
                     className={cn("filter-option w-full justify-between", type === t.id && "active")}>
                     <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.color }} />
+                      <TypeIcon type={t.id} size={16} />
                       {t.label}
                     </span>
                     {typeCounts && (
@@ -213,7 +216,7 @@ export default function Pokedex() {
                     className={cn("shrink-0 px-2.5 py-1 rounded-full text-xs font-bold border transition-all",
                       type === t.id ? "text-white border-transparent" : "bg-white border-gray-200")}
                     style={type === t.id ? { background: t.color } : { color: t.color }}>
-                    {t.icon} {t.label}
+                    <span className="inline-flex items-center gap-1.5"><TypeIcon type={t.id} size={16} /> {t.label}</span>
                   </button>
                 ))}
               </div>
@@ -231,8 +234,8 @@ export default function Pokedex() {
             </div>
 
             {isLoading && entries.length === 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
-                {Array.from({ length: 18 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
+                {Array.from({ length: 15 }).map((_, i) => <Skeleton key={i} className="h-64 rounded-2xl" />)}
               </div>
             ) : entries.length === 0 ? (
               <div className="text-center py-20">
@@ -241,7 +244,7 @@ export default function Pokedex() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
                   {entries.map(p => <PokemonCard key={p.id} p={p} />)}
                 </div>
                 <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-6">
