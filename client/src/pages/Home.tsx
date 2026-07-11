@@ -50,8 +50,43 @@ function formatDate(dateStr: string): string {
   });
 }
 
-// ─── Static TCG News (curated, updated periodically) ─────────────────────────
-const tcgNews = [
+// ─── TCG News: live from the articles DB (daily cron publishes them) ─────────
+const CATEGORY_META: Record<string, { label: string; color: string }> = {
+  news: { label: "News", color: "#e94560" },
+  tournament: { label: "Tournament", color: "#8b5cf6" },
+  set_review: { label: "Set Review", color: "#F5B301" },
+  strategy: { label: "Strategy", color: "#3b82f6" },
+  deck_guide: { label: "Deck Guide", color: "#7C3AED" },
+  collector: { label: "Market Watch", color: "#10b981" },
+};
+
+const NEWS_ART_IDS = [151, 887, 133, 249, 6, 25, 150, 448];
+
+function newsItemFromArticle(a: any, i: number) {
+  const meta = CATEGORY_META[a.category] ?? CATEGORY_META.news;
+  const tagArt = a.tags?.includes("charizard") ? 6
+    : a.tags?.includes("pikachu") ? 25
+    : a.tags?.includes("mewtwo") ? 150
+    : a.tags?.includes("eevee") ? 133
+    : null;
+  const hasCover = Boolean(a.coverImageUrl);
+  return {
+    id: String(a.id),
+    title: a.title,
+    excerpt: a.subtitle ?? "",
+    category: meta.label,
+    categoryColor: meta.color,
+    date: a.publishedAt ?? a.createdAt,
+    href: `/articles/${a.slug}`,
+    pokemonArt: hasCover
+      ? a.coverImageUrl
+      : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${tagArt ?? NEWS_ART_IDS[i % NEWS_ART_IDS.length]}.png`,
+    isCover: hasCover,
+  };
+}
+
+// Fallback shown only while the DB has no published articles yet
+const fallbackNews = [
   {
     id: "n1",
     title: "Scarlet & Violet — Stellar Crown Now Available",
@@ -381,7 +416,7 @@ export default function Home() {
   );
 
   const { data: articles, isLoading: loadingArticles } = trpc.articles.list.useQuery(
-    { limit: 4 },
+    { limit: 12 },
     { staleTime: 5 * 60 * 1000, retry: false }
   );
 
@@ -401,6 +436,13 @@ export default function Home() {
   );
 
   const newestSet = recentSets?.[0] ?? null;
+
+  // TCG News = latest 4 published articles (live); Latest Articles = the next ones
+  const newsItems = ((articles as any[]) ?? []).slice(0, 4).map(newsItemFromArticle);
+  const tcgNews = newsItems.length > 0 ? newsItems : fallbackNews;
+  const latestArticles = ((articles as any[]) ?? []).length > 4
+    ? ((articles as any[]) ?? []).slice(4, 8)
+    : ((articles as any[]) ?? []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -550,7 +592,9 @@ export default function Home() {
                           <img
                             src={top.pokemonArt}
                             alt=""
-                            className="w-24 h-24 object-contain drop-shadow-xl group-hover:scale-110 transition-transform"
+                            className={(top as any).isCover
+                              ? "w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              : "w-24 h-24 object-contain drop-shadow-xl group-hover:scale-110 transition-transform"}
                             loading="lazy"
                           />
                         </div>
@@ -588,7 +632,9 @@ export default function Home() {
                         <img
                           src={news.pokemonArt}
                           alt=""
-                          className="h-16 object-contain drop-shadow-lg group-hover:scale-110 transition-transform"
+                          className={(news as any).isCover
+                            ? "w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            : "h-16 object-contain drop-shadow-lg group-hover:scale-110 transition-transform"}
                           loading="lazy"
                         />
                       </div>
@@ -784,9 +830,9 @@ export default function Home() {
                 <Skeleton key={i} className="h-48 rounded-xl" />
               ))}
             </div>
-          ) : articles && articles.length > 0 ? (
+          ) : latestArticles && latestArticles.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {articles.map((article: any) => {
+              {latestArticles.map((article: any) => {
                 // Pick a Pokémon art based on article tags or category
                 const pokemonNum = article.tags?.includes("charizard") ? 6
                   : article.tags?.includes("pikachu") ? 25
@@ -798,9 +844,11 @@ export default function Home() {
                     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-violet-200 hover:shadow-md transition-all group h-full">
                       <div className="h-24 bg-gradient-to-br from-[#0B1220] to-[#4c2a8a] flex items-end justify-center overflow-hidden">
                         <img
-                          src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonNum}.png`}
+                          src={article.coverImageUrl || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonNum}.png`}
                           alt=""
-                          className="h-20 object-contain drop-shadow-lg group-hover:scale-110 transition-transform"
+                          className={article.coverImageUrl
+                            ? "w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            : "h-20 object-contain drop-shadow-lg group-hover:scale-110 transition-transform"}
                           loading="lazy"
                         />
                       </div>
