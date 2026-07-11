@@ -69,7 +69,10 @@ function newsItemFromArticle(a: any, i: number) {
     : a.tags?.includes("mewtwo") ? 150
     : a.tags?.includes("eevee") ? 133
     : null;
-  const hasCover = Boolean(a.coverImageUrl);
+  // Transparent PNGs (official Pokémon artwork / set logos) render as art on a
+  // gradient; only real photos/illustrations render full-bleed.
+  const isTransparentArt = /official-artwork|images\.pokemontcg\.io/.test(a.coverImageUrl ?? "");
+  const hasCover = Boolean(a.coverImageUrl) && !isTransparentArt;
   return {
     id: String(a.id),
     title: a.title,
@@ -78,7 +81,7 @@ function newsItemFromArticle(a: any, i: number) {
     categoryColor: meta.color,
     date: a.publishedAt ?? a.createdAt,
     href: `/articles/${a.slug}`,
-    pokemonArt: hasCover
+    pokemonArt: a.coverImageUrl
       ? a.coverImageUrl
       : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${tagArt ?? NEWS_ART_IDS[i % NEWS_ART_IDS.length]}.png`,
     isCover: hasCover,
@@ -846,7 +849,7 @@ export default function Home() {
                         <img
                           src={article.coverImageUrl || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemonNum}.png`}
                           alt=""
-                          className={article.coverImageUrl
+                          className={article.coverImageUrl && !/official-artwork|images\.pokemontcg\.io/.test(article.coverImageUrl)
                             ? "w-full h-full object-cover group-hover:scale-105 transition-transform"
                             : "h-20 object-contain drop-shadow-lg group-hover:scale-110 transition-transform"}
                           loading="lazy"

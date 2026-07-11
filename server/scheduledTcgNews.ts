@@ -12,7 +12,6 @@
 
 import type { Request, Response } from "express";
 import { invokeLLM, invokeLLMWithWebSearch } from "./_core/llm";
-import { generateImage } from "./_core/imageGeneration";
 import { upsertArticleBySlug, getAdminUser } from "./db";
 import { ENV } from "./_core/env";
 
@@ -26,9 +25,13 @@ interface IncomingArticle {
   tags?: string[];
   /** true only for MAJOR news (new set release, big ban list, major tournament) → shows in homepage hero banner */
   featured?: boolean;
-  /** Ready-made cover image URL (e.g. official set logo/art). Takes priority over generation. */
+  /** Ready-made cover image URL (e.g. official set logo/art). Takes priority. */
   coverImageUrl?: string;
-  /** Description for AI-generated cover art when no coverImageUrl is given. */
+  /** National Pokédex number of the most relevant Pokémon → official artwork cover. */
+  coverPokemonId?: number;
+  /** pokemontcg.io set id (e.g. "sv7") → official set logo cover. */
+  coverSetId?: string;
+  /** Legacy: description for AI-generated cover art (no longer used). */
   coverImagePrompt?: string;
 }
 
@@ -101,9 +104,12 @@ async function processArticles(body: { articles?: IncomingArticle[]; topic?: str
     "category": "news",
     "tags": ["tag1", "tag2"],
     "featured": false,
-    "coverImagePrompt": "Short visual description for the article cover art (no text in image)"
+    "coverPokemonId": 6,
+    "coverSetId": "sv7"
   }
 ]
+"coverPokemonId": National Pokédex number (1-1025) of the single Pokémon most relevant to the article (e.g. 6 for Charizard). ALWAYS include it.
+"coverSetId": ONLY if the article is about a specific TCG set, its official set id in pokemontcg.io format (e.g. "sv7", "sv8pt5", "swsh12"). Omit otherwise.
 Categories allowed: strategy | deck_guide | set_review | tournament | collector | news
 Set "featured": true ONLY for major news that deserves the homepage hero banner — a new set release/reveal, a major ban list or rotation announcement, or results of a major tournament (Worlds, Regionals, NAIC). Everything else must be "featured": false.`;
 
@@ -168,18 +174,15 @@ Keep content factual and relevant to the US TCG market.`,
       const slug = `${prefix}-${baseSlug}`;
       const now = new Date();
 
-      // Cover art: explicit URL from agent > AI-generated > null (best-effort)
+      // Cover art: real official images only — explicit URL > set logo > Pokémon artwork
       let coverImageUrl: string | null = art.coverImageUrl ?? null;
+      if (!coverImageUrl && art.coverSetId && /^[a-z0-9pt.]{2,12}$/i.test(art.coverSetId)) {
+        coverImageUrl = `https://images.pokemontcg.io/${art.coverSetId.toLowerCase()}/logo.png`;
+      }
       if (!coverImageUrl) {
-        try {
-          const prompt = art.coverImagePrompt
-            ? `${art.coverImagePrompt}. Vibrant editorial illustration for a Pokémon TCG news site, wide 16:9 composition, dynamic lighting, NO text or words in the image.`
-            : `Editorial cover illustration for a Pokémon TCG article titled "${art.title}". Vibrant trading-card-game atmosphere, holographic sparkle accents, wide 16:9 composition, NO text or words in the image.`;
-          const { url } = await generateImage({ prompt });
-          coverImageUrl = url ?? null;
-        } catch (imgErr) {
-          console.warn(`[tcg-news] Cover generation failed for "${art.title}":`, imgErr);
-        }
+        const dexId = Number(art.coverPokemonId);
+        const safeId = Number.isInteger(dexId) && dexId >= 1 && dexId <= 1025 ? dexId : 25;
+        coverImageUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${safeId}.png`;
       }
 
       // "featured" travels as a tag — featured articles power the homepage hero banner

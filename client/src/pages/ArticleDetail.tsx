@@ -227,11 +227,16 @@ export default function ArticleDetail() {
 
         {/* Cover Image */}
         {article.coverImageUrl && (
-          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 aspect-[21/9]">
+          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 aspect-[21/9]"
+            style={/official-artwork|images\.pokemontcg\.io/.test(article.coverImageUrl)
+              ? { background: "linear-gradient(135deg, #0B1220 0%, #2b1a55 55%, #5B21B6 100%)" }
+              : undefined}>
             <img
               src={article.coverImageUrl}
               alt={article.title}
-              className="w-full h-full object-cover"
+              className={/official-artwork|images\.pokemontcg\.io/.test(article.coverImageUrl)
+                ? "w-full h-full object-contain p-6 drop-shadow-2xl"
+                : "w-full h-full object-cover"}
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
           </div>
