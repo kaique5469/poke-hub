@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useLocation } from "wouter";
+import { useSearch } from "wouter";
 import { Search, SlidersHorizontal, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,15 +26,25 @@ const SPECIAL_RARITIES = new Set([
 
 export default function Cards() {
   usePageMeta("Cards", "Search every Pokémon TCG card ever printed with live prices from TCGPlayer and CardMarket.");
-  const [location] = useLocation();
-  const params = useMemo(() => new URLSearchParams(location.includes("?") ? location.split("?")[1] : ""), [location]);
+  const search = useSearch();
+  const params = useMemo(() => new URLSearchParams(search), [search]);
 
   const [q, setQ] = useState(params.get("q") ?? "");
   const [inputQ, setInputQ] = useState(params.get("q") ?? "");
   const [type, setType] = useState(params.get("type") ?? "");
   const [rarity, setRarity] = useState(params.get("rarity") ?? "");
   const [supertype, setSupertype] = useState("");
-  const [set, setSet] = useState("");
+  const [set, setSet] = useState(params.get("set") ?? "");
+
+  // Keep filters in sync when the URL query changes (e.g. Home → set card)
+  useEffect(() => {
+    setQ(params.get("q") ?? "");
+    setInputQ(params.get("q") ?? "");
+    setType(params.get("type") ?? "");
+    setRarity(params.get("rarity") ?? "");
+    setSet(params.get("set") ?? "");
+    setPage(1);
+  }, [params]);
   const [showFilters, setShowFilters] = useState(false);
 
   // Infinite scroll state
