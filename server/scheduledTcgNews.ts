@@ -11,7 +11,7 @@
  */
 
 import type { Request, Response } from "express";
-import { invokeLLM } from "./_core/llm";
+import { invokeLLM, invokeLLMWithWebSearch } from "./_core/llm";
 import { generateImage } from "./_core/imageGeneration";
 import { upsertArticleBySlug, getAdminUser } from "./db";
 import { ENV } from "./_core/env";
@@ -92,15 +92,7 @@ async function processArticles(body: { articles?: IncomingArticle[]; topic?: str
       });
       const topic = body?.topic ?? "latest Pokémon TCG news, new set releases, tournament results, and card market trends";
 
-      const llmResponse = await invokeLLM({
-        messages: [
-          {
-            role: "system",
-            content: `You are a Pokémon TCG journalist writing for PokéHub USA, the #1 TCG platform for US collectors and competitive players. 
-Today is ${today}.
-Write 2 news articles about: ${topic}.
-Return ONLY a valid JSON array (no markdown, no code fences) with this exact shape:
-[
+      const jsonShape = `[
   {
     "title": "Article title (max 80 chars)",
     "subtitle": "One-sentence summary (max 160 chars)",
@@ -113,20 +105,47 @@ Return ONLY a valid JSON array (no markdown, no code fences) with this exact sha
   }
 ]
 Categories allowed: strategy | deck_guide | set_review | tournament | collector | news
-Set "featured": true ONLY for major news that deserves the homepage hero banner — a new set release/reveal, a major ban list or rotation announcement, or results of a major tournament (Worlds, Regionals, NAIC). Everything else must be "featured": false.
-Keep content factual and relevant to the US TCG market.`,
-          },
-          {
-            role: "user",
-            content: `Write 2 Pokémon TCG news articles for today (${today}). Focus on: ${topic}`,
-          },
-        ],
-      });
+Set "featured": true ONLY for major news that deserves the homepage hero banner — a new set release/reveal, a major ban list or rotation announcement, or results of a major tournament (Worlds, Regionals, NAIC). Everything else must be "featured": false.`;
 
-      const rawContent = llmResponse?.choices?.[0]?.message?.content ?? "[]";
-      const raw = typeof rawContent === "string" ? rawContent : "[]";
-      // Strip any accidental markdown fences
-      const cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      let raw = "[]";
+      try {
+        // Primary path: real-time web search → articles based on actual news
+        raw = await invokeLLMWithWebSearch(
+          `You are a Pokémon TCG journalist writing for TCG Arena, a US marketplace for collectors and competitive players. Today is ${today}.
+First, SEARCH THE WEB for real Pokémon TCG news from the LAST 7 DAYS: ${topic}. Prioritize official Pokémon announcements, major tournament results, new set releases/reveals, and notable card price movements.
+Then write 2 news articles based ONLY on real facts you found (include real names, dates and numbers).
+Return ONLY a valid JSON array — no markdown, no code fences, no citations or annotations, no text before or after the JSON — with this exact shape:
+${jsonShape}`
+        );
+        console.log("[tcg-news] Generated articles via web search.");
+      } catch (searchErr) {
+        console.warn("[tcg-news] Web-search generation failed, falling back to plain LLM:", searchErr);
+        const llmResponse = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content: `You are a Pokémon TCG journalist writing for TCG Arena, a US marketplace for collectors and competitive players.
+Today is ${today}.
+Write 2 news articles about: ${topic}.
+Return ONLY a valid JSON array (no markdown, no code fences) with this exact shape:
+${jsonShape}
+Keep content factual and relevant to the US TCG market.`,
+            },
+            {
+              role: "user",
+              content: `Write 2 Pokémon TCG news articles for today (${today}). Focus on: ${topic}`,
+            },
+          ],
+        });
+        const rawContent = llmResponse?.choices?.[0]?.message?.content ?? "[]";
+        raw = typeof rawContent === "string" ? rawContent : "[]";
+      }
+
+      // Strip fences and any stray text around the JSON array
+      const noFences = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      const aStart = noFences.indexOf("[");
+      const aEnd = noFences.lastIndexOf("]");
+      const cleaned = aStart >= 0 && aEnd > aStart ? noFences.slice(aStart, aEnd + 1) : noFences;
       try {
         const parsed = JSON.parse(cleaned);
         if (Array.isArray(parsed)) {
