@@ -63,10 +63,24 @@ export async function tcgNewsHandler(req: Request, res: Response) {
     }
     const authorId = adminUser.id;
 
-    // 3. Accept pre-written articles from the agent body, or generate via LLM
-    let articlesToPublish: IncomingArticle[] = [];
-
+    // 3. Respond immediately — generation takes minutes and the proxy would
+    //    kill the connection. Processing continues in the background.
     const body = req.body as { articles?: IncomingArticle[]; topic?: string };
+    res.status(202).json({ ok: true, accepted: true, message: "Generating articles in background — check /articles in ~2 min." });
+
+    processArticles(body, authorId).catch(err => console.error("[tcg-news] Background error:", err));
+  } catch (err: any) {
+    console.error("[tcg-news] Handler error:", err);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: String(err?.message ?? err) });
+    }
+  }
+}
+
+async function processArticles(body: { articles?: IncomingArticle[]; topic?: string }, authorId: number) {
+  {
+    // Accept pre-written articles from the agent body, or generate via LLM
+    let articlesToPublish: IncomingArticle[] = [];
 
     if (Array.isArray(body?.articles) && body.articles.length > 0) {
       // Agent sent pre-written articles — use them directly
@@ -120,7 +134,7 @@ Keep content factual and relevant to the US TCG market.`,
         }
       } catch {
         console.error("[tcg-news] Failed to parse LLM JSON:", cleaned.slice(0, 200));
-        return res.status(500).json({ error: "LLM returned invalid JSON", raw: cleaned.slice(0, 500) });
+        return;
       }
     }
 
@@ -173,14 +187,5 @@ Keep content factual and relevant to the US TCG market.`,
     const skipped = results.filter(r => !r.inserted).length;
 
     console.log(`[tcg-news] Published ${inserted} new articles, skipped ${skipped} duplicates.`);
-    return res.json({ ok: true, inserted, skipped, articles: results });
-
-  } catch (err: any) {
-    console.error("[tcg-news] Handler error:", err);
-    return res.status(500).json({
-      error: String(err?.message ?? err),
-      stack: err?.stack?.slice(0, 500),
-      timestamp: new Date().toISOString(),
-    });
   }
 }
