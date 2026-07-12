@@ -20,3 +20,9 @@ export const ENV = {
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
   isProduction: process.env.NODE_ENV === "production",
 };
+
+// Hard-fail: never run production with a missing/default JWT secret —
+// anyone could forge session tokens (including admin).
+if (ENV.isProduction && (!process.env.JWT_SECRET || process.env.JWT_SECRET === "dev-secret-change-me")) {
+  throw new Error("JWT_SECRET é obrigatório em produção (defina no Railway).");
+}

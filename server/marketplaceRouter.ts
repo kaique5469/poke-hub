@@ -38,7 +38,7 @@ import {
   updateListing,
   updateOrderStatus,
 } from "./marketplaceDb";
-import { attachStripeSession, getUnpayableCartSellers } from "./storeDb";
+import { attachStripeSession, getUnpayableCartSellers, getOrderById, releaseOrder, refundOrderMoney } from "./storeDb";
 import { createCheckoutSession, stripeEnabled } from "./lib/stripe";
 import { ensureProductsSeeded } from "./seedProducts";
 
@@ -208,9 +208,32 @@ export const ordersRouter = router({
       status: z.enum(["paid", "shipped", "delivered", "cancelled", "disputed"]),
       trackingNumber: z.string().max(256).optional(),
     }))
-    .mutation(({ input, ctx }) => rethrow(() =>
-      updateOrderStatus(input.orderId, ctx.user.id, input.status, input.trackingNumber),
-    )),
+    .mutation(async ({ input, ctx }) => {
+      const result = await rethrow(() =>
+        updateOrderStatus(input.orderId, ctx.user.id, input.status, input.trackingNumber),
+      );
+      // ESCROW: a paid order that gets cancelled is refunded to the buyer.
+      // (Transition rules only allow cancelling before shipping.)
+      if (input.status === "cancelled") {
+        await refundOrderMoney(input.orderId).catch((e) =>
+          console.error(`[stripe] refund for cancelled order #${input.orderId} failed:`, e));
+      }
+      return result;
+    }),
+
+  /**
+   * Buyer confirms everything is OK with a delivered order → releases the
+   * escrow to the seller immediately (instead of waiting the 7-day window).
+   */
+  confirmReceipt: protectedProcedure
+    .input(z.object({ orderId: z.number().int().positive() }))
+    .mutation(({ input, ctx }) => rethrow(async () => {
+      const order = await getOrderById(input.orderId);
+      if (!order || order.buyerId !== ctx.user.id) throw new Error("Order not found");
+      if (order.status !== "delivered") throw new Error("Order is not delivered yet");
+      const released = await releaseOrder(input.orderId);
+      return { released };
+    })),
 
   review: protectedProcedure
     .input(z.object({

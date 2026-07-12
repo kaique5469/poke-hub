@@ -59,6 +59,7 @@ export async function createCheckoutSession(opts: {
 }
 
 export interface StripeEvent {
+  id: string;
   type: string;
   data: { object: { id: string; metadata?: Record<string, string> } };
 }
@@ -108,13 +109,19 @@ async function stripeGet(path: string): Promise<Record<string, unknown>> {
   return data;
 }
 
-async function stripePost(path: string, params: Record<string, string | number>): Promise<Record<string, unknown>> {
+async function stripePost(
+  path: string,
+  params: Record<string, string | number>,
+  idempotencyKey?: string,
+): Promise<Record<string, unknown>> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${key()}`,
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
   const res = await fetch(`${API}${path}`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${key()}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers,
     body: encode(params),
   });
   const data = (await res.json()) as Record<string, unknown> & { error?: { message?: string } };
@@ -170,6 +177,7 @@ export async function createTransfer(opts: {
   destination: string;
   sourceCharge: string;
   description: string;
+  idempotencyKey?: string;
 }): Promise<string> {
   const data = await stripePost("/transfers", {
     amount: opts.amountCents,
@@ -177,6 +185,12 @@ export async function createTransfer(opts: {
     destination: opts.destination,
     source_transaction: opts.sourceCharge,
     description: opts.description,
-  });
+  }, opts.idempotencyKey);
+  return data.id as string;
+}
+
+/** Refund a charge in full (cancellation/dispute before escrow release). */
+export async function createRefund(chargeId: string, idempotencyKey?: string): Promise<string> {
+  const data = await stripePost("/refunds", { charge: chargeId }, idempotencyKey);
   return data.id as string;
 }

@@ -10,8 +10,9 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { tcgNewsHandler } from "../scheduledTcgNews";
+import { autoReleaseHandler } from "../scheduledRelease";
 import { verifyWebhook } from "../lib/stripe";
-import { markOrdersPaid, payoutSellers } from "../storeDb";
+import { markOrdersPaid, wasEventProcessed, recordEvent } from "../storeDb";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -40,17 +41,23 @@ async function startServer() {
   app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
     const event = verifyWebhook(req.body as Buffer, req.headers["stripe-signature"] as string | undefined);
     if (!event) return res.status(400).json({ error: "invalid signature" });
-    if (event.type === "checkout.session.completed") {
-      try {
-        const n = await markOrdersPaid(event.data.object.id);
-        await payoutSellers(event.data.object.id);
-        console.log(`[stripe] session ${event.data.object.id} completed — ${n} order(s) marked paid`);
-      } catch (e) {
-        console.error("[stripe] failed to mark orders paid:", e);
-        return res.status(500).json({ error: "processing failed" });
+    try {
+      // Idempotency: Stripe redelivers events — never process the same one twice.
+      if (await wasEventProcessed(event.id)) {
+        return res.json({ received: true, duplicate: true });
       }
+      if (event.type === "checkout.session.completed") {
+        // ESCROW: only mark paid + hold funds. Seller payout happens at
+        // release time (buyer confirms receipt or auto-release after delivery).
+        const n = await markOrdersPaid(event.data.object.id);
+        console.log(`[stripe] session ${event.data.object.id} completed — ${n} order(s) marked paid (funds held)`);
+      }
+      await recordEvent(event.id, event.type);
+      return res.json({ received: true });
+    } catch (e) {
+      console.error("[stripe] webhook processing failed:", e);
+      return res.status(500).json({ error: "processing failed" });
     }
-    return res.json({ received: true });
   });
 
   // Configure body parser with larger size limit for file uploads
@@ -62,6 +69,7 @@ async function startServer() {
 
   // ── Scheduled cron endpoints ──────────────────────────────────────────────
   app.post("/api/scheduled/tcg-news", tcgNewsHandler);
+  app.post("/api/scheduled/auto-release", autoReleaseHandler);
   // tRPC API
   app.use(
     "/api/trpc",

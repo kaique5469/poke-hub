@@ -454,7 +454,7 @@ const BUYER_TRANSITIONS: Record<string, string[]> = {
   pending: ["cancelled"],
   paid: ["disputed"],
   shipped: ["delivered", "disputed"],
-  delivered: [],
+  delivered: ["disputed"], // dispute window while escrow is held (blocked after release)
   cancelled: [],
   disputed: [],
 };
@@ -481,9 +481,32 @@ export async function updateOrderStatus(
       throw new Error(`Cannot change order from "${order.status}" to "${newStatus}"`);
     }
 
+    // ESCROW: once the payout was released to the seller, disputes go through
+    // support — the money is no longer held by the platform.
+    if (newStatus === "disputed" && order.payoutStatus === "released") {
+      throw new Error("The payment for this order was already released. Contact support to open a claim.");
+    }
+
     await tx.update(orders)
       .set({ status: newStatus, trackingNumber: trackingNumber ?? order.trackingNumber })
       .where(eq(orders.id, orderId));
+
+    // ESCROW schedule:
+    //  - shipped   → fallback auto-release in 21 days (protects seller if buyer never confirms)
+    //  - delivered → buyer confirmed receipt of package; auto-release in 7 days
+    //    (buyer can still dispute in that window; "Confirm receipt" releases instantly)
+    if (newStatus === "shipped") {
+      await tx.update(orders)
+        .set({ autoReleaseAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000) })
+        .where(eq(orders.id, orderId));
+    }
+    if (newStatus === "delivered") {
+      await tx.update(orders)
+        .set({ deliveredAt: new Date(), autoReleaseAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) })
+        .where(eq(orders.id, orderId));
+    }
+    // Dispute freezes the escrow clock (status leaves shipped/delivered, so the
+    // auto-release query no longer matches it).
 
     // Restock on cancellation
     if (newStatus === "cancelled") {

@@ -35,7 +35,7 @@ function HintChip({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export default function GuessGame() {
-  usePageMeta({ title: "Guess the Pokémon — TCG Arena", description: "Guess the hidden Pokémon, earn points and climb the TCG Arena leaderboard." });
+  usePageMeta("Guess the Pokémon", "Guess the hidden Pokémon, earn points and climb the TCG Arena leaderboard.");
   const { user, isAuthenticated } = useAuth();
   const utils = trpc.useUtils();
 

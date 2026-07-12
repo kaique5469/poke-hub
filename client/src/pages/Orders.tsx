@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
-import { Package, Star, Truck } from "lucide-react";
+import { CheckCircle2, Package, ShieldCheck, Star, Truck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -25,9 +25,13 @@ const STATUS_STYLE: Record<OrderStatus, { label: string; bg: string; fg: string 
   disputed: { label: "Disputed", bg: "#FEE2E2", fg: "#991B1B" },
 };
 
+type PayoutStatus = "held" | "released" | "refunded";
+
 interface OrderRow {
   order: {
     id: number; quantity: number; totalUsd: string; status: OrderStatus;
+    payoutStatus?: PayoutStatus; autoReleaseAt?: string | Date | null;
+    paymentStatus?: string;
     trackingNumber: string | null; notes: string | null; createdAt: string | Date;
   };
   cardListing: { cardName: string; imageUrl: string | null; condition: string; cardId: string } | null;
@@ -43,6 +47,23 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   return (
     <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-black uppercase"
       style={{ background: s.bg, color: s.fg }}>{s.label}</span>
+  );
+}
+
+/** Escrow badge — shows where the money is. */
+function PayoutBadge({ payoutStatus, paid, role }: { payoutStatus?: PayoutStatus; paid: boolean; role: "buyer" | "seller" }) {
+  if (!paid || !payoutStatus) return null;
+  const map: Record<PayoutStatus, { label: string; bg: string; fg: string }> = {
+    held: { label: role === "buyer" ? "Payment protected" : "Payout held", bg: "#F3E8FF", fg: "#6B21A8" },
+    released: { label: role === "buyer" ? "Completed" : "Payout sent", bg: "#D1FAE5", fg: "#065F46" },
+    refunded: { label: "Refunded", bg: "#FEE2E2", fg: "#991B1B" },
+  };
+  const s = map[payoutStatus];
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-black uppercase"
+      style={{ background: s.bg, color: s.fg }}>
+      <ShieldCheck className="w-3 h-3" />{s.label}
+    </span>
   );
 }
 
@@ -103,6 +124,15 @@ function OrderCard({
     onError: (e) => toast.error(e.message),
   });
 
+  const confirmReceipt = trpc.orders.confirmReceipt.useMutation({
+    onSuccess: (r) => {
+      toast.success(r.released ? "Payment released to seller. Thanks!" : "Receipt confirmed");
+      utils.orders.myPurchases.invalidate();
+      utils.orders.mySales.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const o = row.order;
   const name = row.cardListing?.cardName ?? row.productName ?? "Item";
   const img = row.cardListing?.imageUrl ?? row.productImageUrl;
@@ -137,6 +167,17 @@ function OrderCard({
       actions.push(<Button key="dispute" size="sm" variant="ghost" className="text-red-600" disabled={update.isPending} onClick={() => setStatus("disputed")}>Open dispute</Button>);
     }
     if (o.status === "delivered") {
+      if (o.payoutStatus === "held") {
+        actions.push(
+          <Button key="confirm" size="sm" disabled={confirmReceipt.isPending} className="gap-1.5"
+            onClick={() => confirmReceipt.mutate({ orderId: o.id })}>
+            <CheckCircle2 className="w-4 h-4" />
+            {confirmReceipt.isPending ? "Releasing…" : "Confirm receipt & release payment"}
+          </Button>,
+          <Button key="dispute" size="sm" variant="ghost" className="text-red-600" disabled={update.isPending}
+            onClick={() => setStatus("disputed")}>Report a problem</Button>,
+        );
+      }
       actions.push(
         <Button key="review" size="sm" variant="outline" className="gap-1.5" onClick={() => onReview(o.id)}>
           <Star className="w-4 h-4" />Rate seller
@@ -168,8 +209,23 @@ function OrderCard({
             {o.trackingNumber && <span>· Tracking: <b>{o.trackingNumber}</b></span>}
           </div>
           {o.notes && <p className="text-xs mt-1 line-clamp-2" style={{ color: "oklch(0.52 0.015 240)" }}>“{o.notes}”</p>}
+          {o.payoutStatus === "held" && (o.status === "shipped" || o.status === "delivered") && (
+            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: "#6B21A8" }}>
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+              {role === "buyer"
+                ? o.status === "delivered"
+                  ? "Confirm receipt to release payment to the seller."
+                  : "Your payment is held safely until you confirm delivery."
+                : "Payout is held until the buyer confirms receipt."}
+              {o.autoReleaseAt && (
+                <span> Auto-releases {new Date(o.autoReleaseAt).toLocaleDateString()}.</span>
+              )}
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
+          <PayoutBadge payoutStatus={o.payoutStatus}
+            paid={o.status !== "pending" && o.status !== "cancelled"} role={role} />
           <StatusBadge status={o.status} />
           <span className="font-black" style={{ color: "oklch(0.18 0.02 240)" }}>${Number(o.totalUsd).toFixed(2)}</span>
         </div>

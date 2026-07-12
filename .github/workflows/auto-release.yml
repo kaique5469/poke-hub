@@ -1,0 +1,20 @@
+# Libera o escrow (payout ao vendedor) de pedidos entregues sem disputa.
+# Roda de hora em hora. Usa os mesmos secrets APP_URL e CRON_SECRET.
+
+name: Escrow Auto-Release
+
+on:
+  schedule:
+    - cron: "30 * * * *" # a cada hora, no minuto 30
+  workflow_dispatch: {}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar endpoint de auto-release
+        run: |
+          curl -sf -X POST "${{ secrets.APP_URL }}/api/scheduled/auto-release" \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -d '{}'

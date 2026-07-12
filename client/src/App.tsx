@@ -41,6 +41,7 @@ const StorePage = lazy(() => import("./pages/StorePage"));
 const PlayerProfile = lazy(() => import("./pages/PlayerProfile"));
 const ProfileEdit = lazy(() => import("./pages/ProfileEdit"));
 const UserDashboard = lazy(() => import("./pages/UserDashboard"));
+const AdminEscrow = lazy(() => import("./pages/AdminEscrow"));
 const Login = lazy(() => import("./pages/Login"));
 
 function PageLoader() {
@@ -107,6 +108,7 @@ function Router() {
           <Route path="/profile/:username" component={PlayerProfile} />
           <Route path="/profile/edit" component={ProfileEdit} />
           <Route path="/dashboard" component={UserDashboard} />
+          <Route path="/admin/escrow" component={AdminEscrow} />
           <Route path="/account" component={UserDashboard} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />

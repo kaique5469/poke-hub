@@ -1,19 +1,21 @@
 /** DB helpers for seller stores + Stripe payment status. */
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lte } from "drizzle-orm";
 import {
   cartItems,
   listings,
   notifications,
   orders,
+  payouts,
   productListings,
   products,
   sellerStores,
   users,
+  webhookEvents,
   type InsertSellerStore,
   type SellerStore,
 } from "../drizzle/schema";
 import { getDb } from "./db";
-import { createTransfer, getSessionCharge, stripeEnabled } from "./lib/stripe";
+import { createRefund, createTransfer, getSessionCharge, stripeEnabled } from "./lib/stripe";
 
 export function slugify(name: string): string {
   return name
@@ -114,21 +116,55 @@ export async function attachStripeSession(orderIds: number[], sessionId: string)
     .where(inArray(orders.id, orderIds));
 }
 
-/** Mark all orders of a Stripe session as paid + notify buyer/sellers. */
+// ─── Webhook idempotency ─────────────────────────────────────────────────────
+
+/** Has this Stripe event already been processed? */
+export async function wasEventProcessed(eventId: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db || !eventId) return false;
+  const rows = await db.select({ eventId: webhookEvents.eventId }).from(webhookEvents)
+    .where(eq(webhookEvents.eventId, eventId)).limit(1);
+  return rows.length > 0;
+}
+
+/** Record a processed Stripe event (idempotency marker). */
+export async function recordEvent(eventId: string, type: string): Promise<void> {
+  const db = await getDb();
+  if (!db || !eventId) return;
+  await db.insert(webhookEvents).values({ eventId, type }).catch(() => {}); // dup PK = already recorded
+}
+
+/**
+ * Mark all orders of a Stripe session as paid + notify buyer/sellers.
+ * ESCROW: funds stay HELD on the platform (payoutStatus=held) — the seller is
+ * paid only at release time (buyer confirmation or auto-release after delivery).
+ */
 export async function markOrdersPaid(sessionId: string): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
   const rows = await db.select().from(orders).where(eq(orders.stripeSessionId, sessionId));
   if (rows.length === 0) return 0;
 
+  // Charge id is needed later for the delayed transfer (source_transaction)
+  const charge = await getSessionCharge(sessionId).catch((e) => {
+    console.error("[stripe] failed to load charge for session", sessionId, e);
+    return null;
+  });
+
   await db.update(orders)
-    .set({ paymentStatus: "paid", status: "paid", buyerProtection: true })
+    .set({
+      paymentStatus: "paid",
+      status: "paid",
+      payoutStatus: "held",
+      buyerProtection: true,
+      ...(charge ? { stripeChargeId: charge } : {}),
+    })
     .where(eq(orders.stripeSessionId, sessionId));
 
   const notices = new Map<number, string>();
   for (const o of rows) {
-    notices.set(o.sellerId, `Payment confirmed for order #${o.id}. Ship the item to keep your seller rating high.`);
-    notices.set(o.buyerId, `Your payment for order #${o.id} was confirmed. The seller has been notified.`);
+    notices.set(o.sellerId, `Payment confirmed for order #${o.id}. Ship the item — your payout is released after delivery is confirmed.`);
+    notices.set(o.buyerId, `Your payment for order #${o.id} was confirmed. Funds are held securely until you receive your order (buyer protection).`);
   }
   for (const [userId, message] of Array.from(notices.entries())) {
     await db.insert(notifications).values({
@@ -180,61 +216,196 @@ export async function getUnpayableCartSellers(buyerId: number): Promise<string[]
 
 const PLATFORM_FEE = 0.05;
 
+/** 95% of the order total, computed in integer cents (no float drift). */
+export function sellerShareCents(totalUsd: string | number): number {
+  const totalCents = Math.round(parseFloat(String(totalUsd)) * 100);
+  return totalCents - Math.round(totalCents * PLATFORM_FEE);
+}
+
 /**
- * Transfer each seller's share (95%) of a paid Stripe session directly to
- * their connected account. Failures are logged and skipped — funds stay on
- * the platform balance for manual resolution.
+ * ESCROW RELEASE: transfer the seller's share (95%) of ONE order to their
+ * connected Stripe account. Idempotent — guarded by payoutStatus, a ledger
+ * row in `payouts` and a Stripe Idempotency-Key per order.
+ * Only valid when the order is delivered/completed and funds are held.
  */
-export async function payoutSellers(sessionId: string): Promise<void> {
-  if (!stripeEnabled()) return;
+export async function releaseOrder(orderId: number): Promise<boolean> {
   const db = await getDb();
-  if (!db) return;
-  const rows = await db.select().from(orders).where(eq(orders.stripeSessionId, sessionId));
-  if (rows.length === 0) return;
+  if (!db) return false;
 
-  const totals = new Map<number, number>();
-  for (const o of rows) {
-    totals.set(o.sellerId, (totals.get(o.sellerId) ?? 0) + parseFloat(String(o.totalUsd)));
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order) throw new Error("Order not found");
+  if (order.payoutStatus !== "held") return false; // already released/refunded → no-op
+  const pastWindow = order.autoReleaseAt !== null && order.autoReleaseAt <= new Date();
+  const releasable =
+    ["delivered", "completed"].includes(order.status) ||
+    (order.status === "shipped" && pastWindow); // buyer never confirmed → 21-day fallback
+  if (!releasable) throw new Error("Order is not delivered yet");
+
+  // Ledger guard: if a payout row already exists for this order, never send again.
+  const existing = await db.select().from(payouts).where(eq(payouts.orderId, orderId)).limit(1);
+  if (existing[0] && existing[0].status !== "failed") return false;
+
+  if (!stripeEnabled()) {
+    // No Stripe (e.g. PayPal order) — just mark released so the state machine completes.
+    await db.update(orders).set({ payoutStatus: "released" }).where(eq(orders.id, orderId));
+    return true;
   }
 
-  let charge: string | null = null;
+  if (!order.stripeChargeId) throw new Error("Order has no Stripe charge attached");
+
+  const [store] = await db.select().from(sellerStores)
+    .where(eq(sellerStores.userId, order.sellerId)).limit(1);
+  if (!store?.stripeAccountId || !store.stripePayoutsEnabled) {
+    throw new Error(`Seller ${order.sellerId} has no payout account — funds stay on platform`);
+  }
+
+  const amountCents = sellerShareCents(order.totalUsd);
+  if (amountCents <= 0) return false;
+
+  // Ledger first (pending), then transfer, then mark sent + released.
+  if (existing[0]) {
+    await db.update(payouts).set({ status: "pending" }).where(eq(payouts.orderId, orderId));
+  } else {
+    await db.insert(payouts).values({ orderId, sellerId: order.sellerId, amountCents, status: "pending" });
+  }
+
+  let transferId: string;
   try {
-    charge = await getSessionCharge(sessionId);
+    transferId = await createTransfer({
+      amountCents,
+      destination: store.stripeAccountId,
+      sourceCharge: order.stripeChargeId,
+      description: `TCG Arena payout — order #${orderId}`,
+      idempotencyKey: `payout_order_${orderId}`, // Stripe-side duplicate protection
+    });
   } catch (e) {
-    console.error("[stripe] failed to load charge for session", sessionId, e);
-    return;
+    await db.update(payouts).set({ status: "failed" }).where(eq(payouts.orderId, orderId));
+    throw e;
   }
-  if (!charge) return;
 
-  const stores = await db.select().from(sellerStores)
-    .where(inArray(sellerStores.userId, Array.from(totals.keys())));
+  await db.update(payouts).set({ stripeTransferId: transferId, status: "sent" })
+    .where(eq(payouts.orderId, orderId));
+  await db.update(orders).set({ payoutStatus: "released" }).where(eq(orders.id, orderId));
 
-  for (const [sellerId, total] of Array.from(totals.entries())) {
-    const store = stores.find((st) => st.userId === sellerId);
-    if (!store?.stripeAccountId || !store.stripePayoutsEnabled) {
-      console.error(`[stripe] seller ${sellerId} has no payout account — keeping funds on platform`);
-      continue;
-    }
-    const amountCents = Math.round(total * (1 - PLATFORM_FEE) * 100);
-    if (amountCents <= 0) continue;
-    try {
-      const transferId = await createTransfer({
-        amountCents,
-        destination: store.stripeAccountId,
-        sourceCharge: charge,
-        description: `TCG Arena payout — session ${sessionId}`,
-      });
-      console.log(`[stripe] transferred ${amountCents}c to seller ${sellerId} (${transferId})`);
-      await db.insert(notifications).values({
-        userId: sellerId,
-        type: "order_update",
-        title: "Payout sent",
-        message: `$${(amountCents / 100).toFixed(2)} was sent to your connected Stripe account (95% of the sale — 5% platform fee).`,
-        entityType: "order",
-        entityId: sessionId,
-      });
-    } catch (e) {
-      console.error(`[stripe] transfer to seller ${sellerId} failed`, e);
-    }
+  await db.insert(notifications).values({
+    userId: order.sellerId,
+    type: "order_update",
+    title: "Payout sent",
+    message: `$${(amountCents / 100).toFixed(2)} for order #${orderId} was sent to your Stripe account (95% of the sale — 5% platform fee).`,
+    entityType: "order",
+    entityId: String(orderId),
+  });
+  console.log(`[stripe] released ${amountCents}c to seller ${order.sellerId} for order #${orderId} (${transferId})`);
+  return true;
+}
+
+/**
+ * Refund the buyer in full (cancellation/dispute BEFORE release).
+ * Only acts while funds are still held.
+ */
+export async function refundOrderMoney(orderId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order || order.payoutStatus !== "held") return false;
+
+  if (stripeEnabled() && order.stripeChargeId && order.paymentStatus === "paid") {
+    await createRefund(order.stripeChargeId, `refund_order_${orderId}`);
+  }
+  await db.update(orders)
+    .set({ payoutStatus: "refunded", paymentStatus: "refunded" })
+    .where(eq(orders.id, orderId));
+
+  await db.insert(notifications).values({
+    userId: order.buyerId,
+    type: "order_update",
+    title: "Refund issued",
+    message: `Order #${orderId} was refunded in full to your original payment method (5-10 business days).`,
+    entityType: "order",
+    entityId: String(orderId),
+  });
+  console.log(`[stripe] refunded order #${orderId} (charge ${order.stripeChargeId ?? "n/a"})`);
+  return true;
+}
+
+/** Fetch a single order by id. */
+export async function getOrderById(orderId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  return order ?? null;
+}
+
+/** Orders whose escrow is due for automatic release (delivered + window passed). */
+export async function getOrdersDueForRelease(): Promise<{ id: number }[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: orders.id }).from(orders).where(and(
+    eq(orders.payoutStatus, "held"),
+    inArray(orders.status, ["delivered", "shipped"]),
+    lte(orders.autoReleaseAt, new Date()),
+  ));
+}
+
+// ─── Admin: escrow reconciliation ────────────────────────────────────────────
+
+/** Snapshot of the escrow state for the admin panel. */
+export async function getEscrowOverview() {
+  const db = await getDb();
+  if (!db) return { held: [], disputed: [], ledger: [], totals: { heldCents: 0, releasedCents: 0 } };
+
+  const paidOrders = await db.select().from(orders)
+    .where(eq(orders.paymentStatus, "paid"))
+    .orderBy(desc(orders.createdAt)).limit(200);
+
+  const held = paidOrders.filter(o => o.payoutStatus === "held" && o.status !== "disputed");
+  const disputed = paidOrders.filter(o => o.status === "disputed" && o.payoutStatus === "held");
+  const ledger = await db.select().from(payouts).orderBy(desc(payouts.createdAt)).limit(100);
+
+  const heldCents = held.reduce((s, o) => s + sellerShareCents(o.totalUsd), 0);
+  const releasedCents = ledger.filter(p => p.status === "sent").reduce((s, p) => s + p.amountCents, 0);
+
+  return { held, disputed, ledger, totals: { heldCents, releasedCents } };
+}
+
+/**
+ * Admin resolves a dispute while funds are held:
+ *  - refund_buyer  → full Stripe refund, order cancelled
+ *  - release_seller → escrow released to the seller
+ */
+export async function adminResolveDispute(
+  orderId: number,
+  resolution: "refund_buyer" | "release_seller",
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order) throw new Error("Order not found");
+  if (order.status !== "disputed") throw new Error("Order is not disputed");
+  if (order.payoutStatus !== "held") throw new Error("Funds are no longer held for this order");
+
+  if (resolution === "refund_buyer") {
+    await refundOrderMoney(orderId);
+    await db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, orderId));
+    await db.insert(notifications).values({
+      userId: order.sellerId,
+      type: "order_update",
+      title: "Dispute resolved",
+      message: `Order #${orderId}: the dispute was resolved in favor of the buyer — the payment was refunded.`,
+      entityType: "order",
+      entityId: String(orderId),
+    });
+  } else {
+    // Reinstate delivered so releaseOrder's state check passes, then release.
+    await db.update(orders).set({ status: "delivered" }).where(eq(orders.id, orderId));
+    await releaseOrder(orderId);
+    await db.insert(notifications).values({
+      userId: order.buyerId,
+      type: "order_update",
+      title: "Dispute resolved",
+      message: `Order #${orderId}: the dispute was resolved in favor of the seller — the payment was released.`,
+      entityType: "order",
+      entityId: String(orderId),
+    });
   }
 }

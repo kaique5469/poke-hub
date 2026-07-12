@@ -4,7 +4,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getCMCardByTcgId, getCMPriceHistory, searchCMCardsGrid } from "./cardmarketApi.js";
 import {
   addBinderCard,
@@ -80,10 +80,13 @@ import {
 import { toggleAuctionWatch, getUserWatchedAuctionIds } from "./db";
 import { createNotification, getListingsByCardWithSeller } from "./marketplaceDb";
 import {
+  adminResolveDispute,
   createStore,
+  getEscrowOverview,
   getStoreBySlug,
   getStoreByUserId,
   getStoreListings,
+  releaseOrder,
   updateStore,
 } from "./storeDb";
 import { createAccountLink, createConnectAccount, getAccountStatus, stripeEnabled } from "./lib/stripe";
@@ -851,6 +854,37 @@ export const appRouter = router({
         return { hasStore: true, connected: true, payoutsEnabled: store.stripePayoutsEnabled };
       }
     }),
+  }),
+
+  // ─── Escrow admin (reconciliation + dispute resolution) ────────────────────
+  escrow: router({
+    overview: adminProcedure.query(() => getEscrowOverview()),
+
+    resolveDispute: adminProcedure
+      .input(z.object({
+        orderId: z.number().int().positive(),
+        resolution: z.enum(["refund_buyer", "release_seller"]),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          await adminResolveDispute(input.orderId, input.resolution);
+          return { success: true };
+        } catch (e) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: e instanceof Error ? e.message : "Failed" });
+        }
+      }),
+
+    /** Manual release (e.g. a payout that previously failed). */
+    release: adminProcedure
+      .input(z.object({ orderId: z.number().int().positive() }))
+      .mutation(async ({ input }) => {
+        try {
+          const released = await releaseOrder(input.orderId);
+          return { released };
+        } catch (e) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: e instanceof Error ? e.message : "Failed" });
+        }
+      }),
   }),
 
   game: router({

@@ -23,11 +23,23 @@ const VIOLET = "#7C3AED";
 const INK = "#0B1220";
 
 const PAYMENT_OPTIONS = [
-  { value: "card", label: "Card (on-platform)", icon: <CreditCard size={18} />, desc: "Stripe secure checkout — paid out directly to your connected Stripe account. Orders get buyer protection.", recommended: true },
+  { value: "card", label: "Card (on-platform)", icon: <CreditCard size={18} />, desc: "Stripe secure checkout — funds are held in escrow and released to you when the buyer confirms delivery.", recommended: true },
   { value: "paypal", label: "PayPal", icon: <Wallet size={18} />, desc: "Arranged directly with the buyer via order messages." },
 ] as const;
 
 type PayMethod = (typeof PAYMENT_OPTIONS)[number]["value"];
+
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+  "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+  "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC","PR",
+] as const;
+
+const STEPS = [
+  { n: 1, label: "Identity" },
+  { n: 2, label: "Payments & shipping" },
+  { n: 3, label: "Review & launch" },
+] as const;
 
 const inputCls =
   "w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent bg-white";
@@ -49,10 +61,11 @@ export default function OpenStore() {
 
   // Step 2 — payments & shipping
   const [payments, setPayments] = useState<PayMethod[]>(["card"]);
-  const [shipsFrom, setShipsFrom] = useState("");
+  const [shipCity, setShipCity] = useState("");
+  const [shipState, setShipState] = useState("");
   const [handlingDays, setHandlingDays] = useState(2);
   const [shippingPolicy, setShippingPolicy] = useState(
-    "Orders ship within the handling time via tracked mail. Cards are sleeved, in toploaders and shipped in a bubble mailer.",
+    "We ship anywhere in the United States (all 50 states). Orders ship within the handling time via USPS with tracking. Cards are sleeved, in toploaders and shipped in a bubble mailer.",
   );
   const [returnPolicy, setReturnPolicy] = useState(
     "Returns accepted within 7 days if the item is not as described. Buyer pays return shipping unless the listing was inaccurate.",
@@ -98,6 +111,8 @@ export default function OpenStore() {
   const togglePayment = (v: PayMethod) =>
     setPayments((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
 
+  const shipsFrom = [shipCity.trim(), shipState].filter(Boolean).join(", ");
+
   const submit = () => {
     if (!agreed) return toast.error("Please accept the seller terms");
     createStore.mutate({
@@ -106,7 +121,7 @@ export default function OpenStore() {
       description: description.trim() || undefined,
       location: location.trim() || undefined,
       paymentMethods: payments,
-      shipsFrom: shipsFrom.trim() || undefined,
+      shipsFrom: shipsFrom ? `${shipsFrom}, USA` : undefined,
       handlingDays,
       shippingPolicy: shippingPolicy.trim() || undefined,
       returnPolicy: returnPolicy.trim() || undefined,
@@ -121,16 +136,26 @@ export default function OpenStore() {
           <h1 className="text-2xl md:text-3xl font-black" style={{ color: INK, fontFamily: "var(--font-display)" }}>Open your store</h1>
           <p className="text-sm text-gray-500 mt-1">Free to open. You can edit everything later.</p>
         </div>
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white"
-                style={{ background: step >= n ? VIOLET : "#d1d5db" }}
-              >
-                {n}
+        <div className="flex items-start justify-center mb-8">
+          {STEPS.map((s, i) => (
+            <div key={s.n} className="flex items-start">
+              <div className="flex flex-col items-center w-24">
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-black text-white transition-colors"
+                  style={{ background: step >= s.n ? VIOLET : "#d1d5db" }}
+                >
+                  {step > s.n ? <CheckCircle2 size={16} /> : s.n}
+                </div>
+                <span
+                  className="mt-1.5 text-[10px] font-black uppercase tracking-wide text-center leading-tight"
+                  style={{ color: step >= s.n ? VIOLET : "#9ca3af" }}
+                >
+                  {s.label}
+                </span>
               </div>
-              {n < 3 && <div className="w-10 h-1 rounded" style={{ background: step > n ? VIOLET : "#e5e7eb" }} />}
+              {i < STEPS.length - 1 && (
+                <div className="w-12 md:w-20 h-1 rounded mt-4" style={{ background: step > s.n ? VIOLET : "#e5e7eb" }} />
+              )}
             </div>
           ))}
         </div>
@@ -156,7 +181,7 @@ export default function OpenStore() {
               </div>
               <div>
                 <label className={labelCls}>Location</label>
-                <input className={inputCls} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City, Country" maxLength={128} />
+                <input className={inputCls} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City, State — e.g. Miami, FL" maxLength={128} />
               </div>
               <div className="flex justify-end">
                 <button
@@ -201,10 +226,25 @@ export default function OpenStore() {
                 </div>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 flex items-start gap-2.5">
+                <Truck size={18} className="text-emerald-600 mt-0.5 shrink-0" />
+                <div className="text-xs text-emerald-900 leading-relaxed">
+                  <span className="font-black uppercase">Nationwide shipping — USA</span>
+                  <p className="mt-0.5">All TCG Arena stores ship anywhere in the United States, all 50 states. Buyers from any state can order from you.</p>
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-3 gap-4">
                 <div>
-                  <label className={labelCls}>Ships from</label>
-                  <input className={inputCls} value={shipsFrom} onChange={(e) => setShipsFrom(e.target.value)} placeholder="City, Country" maxLength={128} />
+                  <label className={labelCls}>Ships from — city</label>
+                  <input className={inputCls} value={shipCity} onChange={(e) => setShipCity(e.target.value)} placeholder="e.g. Orlando" maxLength={100} />
+                </div>
+                <div>
+                  <label className={labelCls}>State</label>
+                  <select className={inputCls} value={shipState} onChange={(e) => setShipState(e.target.value)}>
+                    <option value="">Select…</option>
+                    {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className={labelCls}>Handling time (days)</label>
@@ -253,11 +293,12 @@ export default function OpenStore() {
                   {payments.map((p) => PAYMENT_OPTIONS.find((o) => o.value === p)?.label).join(", ")}
                 </div>
                 <div><span className="font-bold">Handling:</span> ships in {handlingDays} {handlingDays === 1 ? "day" : "days"}{shipsFrom && ` from ${shipsFrom}`}</div>
+                <div><span className="font-bold">Ships to:</span> United States — nationwide (all 50 states)</div>
               </div>
 
               <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-xs text-violet-900 leading-relaxed">
                 <div className="flex items-center gap-1.5 font-black uppercase mb-1"><LockKeyhole size={13} /> Seller terms</div>
-                Opening a store is free. A 5% commission applies to completed on-platform card payments. You commit to shipping within your handling time, describing card conditions accurately and honoring your return policy. Repeated disputes may pause your store.
+                Opening a store is free. A 5% commission applies to completed on-platform card payments. Payments are held in escrow and released to you when the buyer confirms delivery (or automatically 7 days after delivery). You commit to shipping anywhere in the US within your handling time, describing card conditions accurately and honoring your return policy. Repeated disputes may pause your store.
               </div>
 
               <label className="flex items-start gap-2.5 cursor-pointer text-sm text-gray-700">
@@ -282,9 +323,11 @@ export default function OpenStore() {
           )}
         </div>
 
-        <p className="text-center text-[11px] text-gray-400 mt-6 flex items-center justify-center gap-1.5">
-          <LockKeyhole size={12} /> Card payments are processed by Stripe. TCG Arena never stores card numbers.
-        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[11px] text-gray-400">
+          <span className="flex items-center gap-1.5"><LockKeyhole size={12} /> Payments processed by Stripe</span>
+          <span className="flex items-center gap-1.5"><ShieldCheck size={12} /> Escrow protection on every order</span>
+          <span className="flex items-center gap-1.5"><Truck size={12} /> Nationwide US shipping</span>
+        </div>
       </div>
     </div>
   );

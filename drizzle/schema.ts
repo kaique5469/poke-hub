@@ -363,6 +363,11 @@ export const orders = mysqlTable("orders", {
   status: mysqlEnum("status", ["pending", "paid", "shipped", "delivered", "cancelled", "disputed"]).default("pending").notNull(),
   paymentStatus: mysqlEnum("paymentStatus", ["unpaid", "processing", "paid", "refunded"]).default("unpaid").notNull(),
   stripeSessionId: varchar("stripeSessionId", { length: 255 }),
+  stripeChargeId: varchar("stripeChargeId", { length: 255 }),
+  /** Escrow: money held on platform until delivery is confirmed. */
+  payoutStatus: mysqlEnum("payoutStatus", ["held", "released", "refunded"]).default("held").notNull(),
+  deliveredAt: timestamp("deliveredAt"),
+  autoReleaseAt: timestamp("autoReleaseAt"),
   buyerProtection: boolean("buyerProtection").default(false).notNull(),
   trackingNumber: varchar("trackingNumber", { length: 256 }),
   notes: text("notes"),
@@ -371,6 +376,30 @@ export const orders = mysqlTable("orders", {
 });
 
 export type Order = typeof orders.$inferSelect;
+
+// ─── Stripe webhook idempotency ──────────────────────────────────────────────
+
+export const webhookEvents = mysqlTable("webhook_events", {
+  eventId: varchar("eventId", { length: 255 }).primaryKey(),
+  type: varchar("type", { length: 128 }).notNull(),
+  processedAt: timestamp("processedAt").defaultNow().notNull(),
+});
+
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+
+// ─── Seller payout ledger ────────────────────────────────────────────────────
+
+export const payouts = mysqlTable("payouts", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull(),
+  sellerId: int("sellerId").notNull(),
+  amountCents: int("amountCents").notNull(),
+  stripeTransferId: varchar("stripeTransferId", { length: 255 }),
+  status: mysqlEnum("status", ["pending", "sent", "failed", "reversed"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Payout = typeof payouts.$inferSelect;
 
 // ─── Cart ─────────────────────────────────────────────────────────────────────
 
