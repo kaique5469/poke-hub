@@ -396,7 +396,7 @@ export async function getPublishedArticles(limit = 20, category?: string) {
   if (!db) return [];
   const query = db.select().from(articles)
     .where(eq(articles.isPublished, true))
-    .orderBy(articles.publishedAt)
+    .orderBy(desc(articles.publishedAt), desc(articles.createdAt))
     .limit(limit);
   return query;
 }

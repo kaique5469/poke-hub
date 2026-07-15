@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 const Cards = lazy(() => import("./pages/Cards"));
 const CardDetail = lazy(() => import("./pages/CardDetail"));
 const Sets = lazy(() => import("./pages/Sets"));
+const SetDetail = lazy(() => import("./pages/SetDetail"));
 const Pokedex = lazy(() => import("./pages/Pokedex"));
 const GuessGame = lazy(() => import("./pages/GuessGame"));
 const PokemonDetail = lazy(() => import("./pages/PokemonDetail"));
@@ -81,6 +82,7 @@ function Router() {
           <Route path="/cards" component={Cards} />
           <Route path="/cards/:id" component={CardDetail} />
           <Route path="/sets" component={Sets} />
+          <Route path="/sets/:id" component={SetDetail} />
           <Route path="/game" component={GuessGame} />
           <Route path="/pokedex" component={Pokedex} />
           <Route path="/pokedex/:id" component={PokemonDetail} />

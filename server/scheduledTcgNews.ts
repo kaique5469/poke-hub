@@ -11,7 +11,7 @@
  */
 
 import type { Request, Response } from "express";
-import { invokeLLM, invokeLLMWithWebSearch } from "./_core/llm";
+import { invokeLLMWithWebSearch } from "./_core/llm";
 import { upsertArticleBySlug, getAdminUser } from "./db";
 import { ENV } from "./_core/env";
 
@@ -33,6 +33,8 @@ interface IncomingArticle {
   coverSetId?: string;
   /** Legacy: description for AI-generated cover art (no longer used). */
   coverImagePrompt?: string;
+  /** Sources used to verify facts. Auto-generated articles require at least one. */
+  sources?: Array<{ title: string; url: string }>;
 }
 
 // ─── Slug sanitizer ───────────────────────────────────────────────────────────
@@ -89,7 +91,7 @@ async function processArticles(body: { articles?: IncomingArticle[]; topic?: str
       // Agent sent pre-written articles — use them directly
       articlesToPublish = body.articles.slice(0, 5);
     } else {
-      // Fallback: ask the LLM to generate today's TCG news digest
+      // Research and generate today's TCG news digest
       const today = new Date().toLocaleDateString("en-US", {
         weekday: "long", year: "numeric", month: "long", day: "numeric",
       });
@@ -105,11 +107,13 @@ async function processArticles(body: { articles?: IncomingArticle[]; topic?: str
     "tags": ["tag1", "tag2"],
     "featured": false,
     "coverPokemonId": 6,
-    "coverSetId": "sv7"
+    "coverSetId": "sv7",
+    "sources": [{"title": "Official announcement", "url": "https://www.pokemon.com/..."}]
   }
 ]
 "coverPokemonId": National Pokédex number (1-1025) of the single Pokémon most relevant to the article (e.g. 6 for Charizard). ALWAYS include it.
 "coverSetId": ONLY if the article is about a specific TCG set, its official set id in pokemontcg.io format (e.g. "sv7", "sv8pt5", "swsh12"). Omit otherwise.
+"sources": 2-5 real HTTPS pages you used. Prefer official Pokémon announcements and primary tournament sources. This field is REQUIRED.
 Categories allowed: strategy | deck_guide | set_review | tournament | collector | news
 Set "featured": true ONLY for major news that deserves the homepage hero banner — a new set release/reveal, a major ban list or rotation announcement, or results of a major tournament (Worlds, Regionals, NAIC). Everything else must be "featured": false.`;
 
@@ -125,26 +129,10 @@ ${jsonShape}`
         );
         console.log("[tcg-news] Generated articles via web search.");
       } catch (searchErr) {
-        console.warn("[tcg-news] Web-search generation failed, falling back to plain LLM:", searchErr);
-        const llmResponse = await invokeLLM({
-          messages: [
-            {
-              role: "system",
-              content: `You are a Pokémon TCG journalist writing for TCG Arena, a US marketplace for collectors and competitive players.
-Today is ${today}.
-Write 2 news articles about: ${topic}.
-Return ONLY a valid JSON array (no markdown, no code fences) with this exact shape:
-${jsonShape}
-Keep content factual and relevant to the US TCG market.`,
-            },
-            {
-              role: "user",
-              content: `Write 2 Pokémon TCG news articles for today (${today}). Focus on: ${topic}`,
-            },
-          ],
-        });
-        const rawContent = llmResponse?.choices?.[0]?.message?.content ?? "[]";
-        raw = typeof rawContent === "string" ? rawContent : "[]";
+        // Never publish an unresearched fallback. A missed day is preferable
+        // to invented news appearing on a marketplace homepage.
+        console.error("[tcg-news] Web research failed; nothing was published:", searchErr);
+        return;
       }
 
       // Strip fences and any stray text around the JSON array
@@ -170,6 +158,14 @@ Keep content factual and relevant to the US TCG market.`,
     for (const art of articlesToPublish) {
       if (!art.title || !art.content) continue;
 
+      const sources = (art.sources ?? []).filter((source) =>
+        source?.title && /^https:\/\//i.test(source.url ?? "")
+      ).slice(0, 5);
+      if (!Array.isArray(body?.articles) && sources.length === 0) {
+        console.warn(`[tcg-news] Skipping ${art.title}: no verifiable sources.`);
+        continue;
+      }
+
       const baseSlug = sanitizeSlug(art.slug || art.title);
       const slug = `${prefix}-${baseSlug}`;
       const now = new Date();
@@ -188,12 +184,16 @@ Keep content factual and relevant to the US TCG market.`,
       // "featured" travels as a tag — featured articles power the homepage hero banner
       const tags = Array.from(new Set([...(art.featured ? ["featured"] : []), ...(art.tags ?? [])]));
 
+      const sourceSection = sources.length > 0
+        ? `\n\n## Sources\n${sources.map((source) => `- [${source.title}](${source.url})`).join("\n")}`
+        : "";
+
       const { inserted } = await upsertArticleBySlug({
         authorId,
         title: art.title.slice(0, 512),
         subtitle: art.subtitle?.slice(0, 500) ?? null,
         slug,
-        content: art.content,
+        content: `${art.content.trim()}${sourceSection}`,
         category: art.category ?? "news",
         tags,
         isPublished: true,

@@ -841,7 +841,7 @@ export default function Home() {
                   : article.tags?.includes("pikachu") ? 25
                   : article.tags?.includes("mewtwo") ? 150
                   : article.tags?.includes("eevee") ? 133
-                  : Math.floor(Math.random() * 150) + 1;
+                  : NEWS_ART_IDS[article.id % NEWS_ART_IDS.length];
                 return (
                   <Link key={article.id} href={`/articles/${article.slug}`}>
                     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-violet-200 hover:shadow-md transition-all group h-full">

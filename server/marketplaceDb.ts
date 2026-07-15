@@ -4,7 +4,7 @@
  *
  * Every mutation that touches more than one table runs inside a transaction.
  */
-import { and, asc, desc, eq, gte, inArray, like, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, like, lte, notLike, or, sql } from "drizzle-orm";
 import {
   bazaarListings,
   cartItems,
@@ -178,14 +178,44 @@ export async function countProducts(): Promise<number> {
   return Number(rows[0]?.count ?? 0);
 }
 
-/** Idempotent by slug — used by the auto-seeder. */
+/** Idempotent by slug and refreshes mutable catalog fields on every sync. */
 export async function upsertProductBySlug(data: InsertProduct) {
   const db = await getDb();
   if (!db) return;
-  const existing = await db.select({ id: products.id }).from(products)
-    .where(eq(products.slug, data.slug)).limit(1);
-  if (existing.length > 0) return;
-  await db.insert(products).values(data);
+  await db.insert(products).values(data).onDuplicateKeyUpdate({
+    set: {
+      name: data.name,
+      description: data.description ?? null,
+      imageUrl: data.imageUrl ?? null,
+      category: data.category,
+      language: data.language ?? "English",
+      setId: data.setId ?? null,
+      setName: data.setName ?? null,
+      minPriceUsd: data.minPriceUsd ?? null,
+      avgPriceUsd: data.avgPriceUsd ?? null,
+      maxPriceUsd: data.maxPriceUsd ?? null,
+      isActive: data.isActive ?? true,
+      updatedAt: new Date(),
+    },
+  });
+}
+
+/**
+ * Hide the old generated catalog once real products exist. Products referenced
+ * by a seller listing remain visible so no marketplace inventory is orphaned.
+ */
+export async function deactivateLegacyCatalogProducts(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const [legacy, referenced] = await Promise.all([
+    db.select({ id: products.id }).from(products).where(notLike(products.slug, "scrydex-%")),
+    db.select({ productId: productListings.productId }).from(productListings),
+  ]);
+  const protectedIds = new Set(referenced.map((row) => row.productId));
+  const ids = legacy.map((row) => row.id).filter((id) => !protectedIds.has(id));
+  if (ids.length === 0) return 0;
+  await db.update(products).set({ isActive: false }).where(inArray(products.id, ids));
+  return ids.length;
 }
 
 // ─── Product listings (sellers offering a sealed product) ───────────────────

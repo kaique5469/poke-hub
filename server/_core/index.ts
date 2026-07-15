@@ -11,6 +11,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { tcgNewsHandler } from "../scheduledTcgNews";
 import { autoReleaseHandler } from "../scheduledRelease";
+import { scrydexSyncHandler } from "../scheduledScrydex";
 import { verifyWebhook } from "../lib/stripe";
 import { markOrdersPaid, wasEventProcessed, recordEvent } from "../storeDb";
 
@@ -70,6 +71,7 @@ async function startServer() {
   // ── Scheduled cron endpoints ──────────────────────────────────────────────
   app.post("/api/scheduled/tcg-news", tcgNewsHandler);
   app.post("/api/scheduled/auto-release", autoReleaseHandler);
+  app.post("/api/scheduled/scrydex-sync", scrydexSyncHandler);
   // tRPC API
   app.use(
     "/api/trpc",

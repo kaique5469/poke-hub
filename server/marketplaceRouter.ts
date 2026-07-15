@@ -40,7 +40,7 @@ import {
 } from "./marketplaceDb";
 import { attachStripeSession, getUnpayableCartSellers, getOrderById, releaseOrder, refundOrderMoney } from "./storeDb";
 import { createCheckoutSession, stripeEnabled } from "./lib/stripe";
-import { ensureProductsSeeded } from "./seedProducts";
+import { ensureProductsSynced } from "./scrydexSync";
 
 const conditionEnum = z.enum(["M", "NM", "SP", "MP", "HP", "D"]);
 
@@ -69,7 +69,7 @@ export const productsRouter = router({
       pageSize: z.number().int().min(1).max(60).default(24),
     }).default({ page: 1, pageSize: 24 }))
     .query(async ({ input }) => {
-      await ensureProductsSeeded();
+      await ensureProductsSynced();
       return listProducts(input);
     }),
 
