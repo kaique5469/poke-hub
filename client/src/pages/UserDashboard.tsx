@@ -1,505 +1,737 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import {
+  ArrowRight,
+  BarChart2,
+  BookOpen,
+  CheckCircle2,
+  Eye,
+  Heart,
+  Package,
+  Plus,
+  Search,
+  Settings,
+  TrendingUp,
+  User,
+} from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import {
-  User, Package, Heart, ShoppingCart, Star, TrendingUp, Settings,
-  ArrowRight, Plus, Eye, Clock, CheckCircle, XCircle, Zap, BookOpen, BarChart2
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 
 const tabs = [
-  { id: "overview", label: "Overview", icon: BarChart2 },
-  { id: "binder", label: "My Binder", icon: Heart },
-  { id: "decks", label: "My Decks", icon: BookOpen },
-  { id: "orders", label: "Orders", icon: Package },
-  { id: "selling", label: "Selling", icon: TrendingUp },
-  { id: "settings", label: "Settings", icon: Settings },
-];
+  ["overview", "Overview", BarChart2],
+  ["binder", "My binder", Heart],
+  ["decks", "My decks", BookOpen],
+  ["orders", "Orders", Package],
+  ["selling", "Selling", TrendingUp],
+  ["settings", "Settings", Settings],
+] as const;
+const statusStyle: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-800",
+  paid: "bg-blue-100 text-blue-800",
+  shipped: "bg-indigo-100 text-indigo-800",
+  delivered: "bg-emerald-100 text-emerald-800",
+  cancelled: "bg-gray-100 text-gray-600",
+  disputed: "bg-red-100 text-red-700",
+  active: "bg-emerald-100 text-emerald-800",
+  sold: "bg-indigo-100 text-indigo-800",
+};
+const money = (value: number | string | null | undefined) =>
+  `$${Number(value ?? 0).toFixed(2)}`;
+const shortDate = (value: string | Date) =>
+  new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
-const mockOrders = [
-  { id: "ORD-001", card: "Charizard ex SAR", set: "Obsidian Flames", price: 285.00, status: "delivered", date: "Jun 28, 2026", seller: "PokéCollector_US", img: "https://images.pokemontcg.io/sv3/215_hires.png" },
-  { id: "ORD-002", card: "Umbreon VMAX Alt Art", set: "Evolving Skies", price: 420.00, status: "shipped", date: "Jul 1, 2026", seller: "RareFinds_NY", img: "https://images.pokemontcg.io/swsh7/215_hires.png" },
-  { id: "ORD-003", card: "Pikachu VMAX Rainbow", set: "Vivid Voltage", price: 145.00, status: "processing", date: "Jul 3, 2026", seller: "CardKing_TX", img: "https://images.pokemontcg.io/swsh4/188_hires.png" },
-];
-
-const mockListings = [
-  { id: "L-001", card: "Rayquaza VMAX Alt Art", set: "Evolving Skies", price: 380.00, condition: "NM", views: 142, watchers: 23, status: "active", img: "https://images.pokemontcg.io/swsh7/218_hires.png" },
-  { id: "L-002", card: "Lugia V Alt Art", set: "Silver Tempest", price: 195.00, condition: "NM", views: 87, watchers: 11, status: "active", img: "https://images.pokemontcg.io/swsh11/186_hires.png" },
-  { id: "L-003", card: "Base Set Charizard", set: "Base Set", price: 850.00, condition: "SP", views: 312, watchers: 45, status: "sold", img: "https://images.pokemontcg.io/base1/4_hires.png" },
-];
-
-
-/** Stripe Connect payouts card — shown in the Selling tab. */
 function PayoutsCard() {
   const utils = trpc.useUtils();
   const status = trpc.store.connectStatus.useQuery();
   const onboard = trpc.store.connectOnboard.useMutation({
-    onSuccess: (res) => { window.location.href = res.url; },
-    onError: (e) => toast.error(e.message),
+    onSuccess: result => {
+      window.location.href = result.url;
+    },
+    onError: error => toast.error(error.message),
   });
-
-  if (status.isLoading) return null;
-  const st = status.data;
-
-  if (!st?.hasStore) {
+  if (status.isLoading) return <Skeleton className="h-32 rounded-2xl" />;
+  const current = status.data;
+  if (!current?.hasStore)
     return (
-      <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-        <div>
-          <h3 className="font-bold text-gray-800">Sell on TCG Arena</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Open your free store to list cards and receive payments.</p>
+      <Panel>
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h3 className="font-black text-gray-950">
+              Start selling on TCG Arena
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Open a store before publishing marketplace inventory.
+            </p>
+          </div>
+          <Link href="/open-store">
+            <Button>Open your store</Button>
+          </Link>
         </div>
-        <Link href="/open-store">
-          <Button size="sm" className="text-white text-xs font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
-            Open your store <ArrowRight size={12} className="ml-1" />
-          </Button>
-        </Link>
-      </div>
+      </Panel>
     );
-  }
-
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+    <Panel>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-gray-800">Payouts</h3>
-            {st.payoutsEnabled ? (
-              <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: "#d1fae5", color: "#065f46" }}>Active</span>
-            ) : st.connected ? (
-              <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: "#fef3c7", color: "#92400e" }}>Onboarding incomplete</span>
-            ) : (
-              <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: "#fee2e2", color: "#991b1b" }}>Not connected</span>
-            )}
+            <h3 className="font-black text-gray-950">Seller payouts</h3>
+            <Status
+              value={current.payoutsEnabled ? "active" : "pending"}
+              label={current.payoutsEnabled ? "Active" : "Setup required"}
+            />
           </div>
-          <p className="text-xs text-gray-400 mt-1 max-w-md">
-            {st.payoutsEnabled
-              ? "Your Stripe account is connected. 95% of every card sale is transferred directly to you."
-              : "Connect your Stripe account to receive card payments directly in your bank. Takes about 2 minutes."}
+          <p className="mt-2 max-w-xl text-sm text-gray-500">
+            {current.payoutsEnabled
+              ? "Your Stripe account can receive marketplace payouts."
+              : "Complete Stripe onboarding to receive buyer payments safely."}
           </p>
         </div>
-        {!st.payoutsEnabled && (
-          <Button
-            size="sm"
-            disabled={onboard.isPending}
-            onClick={() => onboard.mutate()}
-            className="text-white text-xs font-bold shrink-0"
-            style={{ background: "#635BFF", border: "none" }}
-          >
-            {onboard.isPending ? "Redirecting..." : st.connected ? "Finish Stripe setup" : "Connect Stripe"}
-            <ArrowRight size={12} className="ml-1" />
+        {!current.payoutsEnabled ? (
+          <Button disabled={onboard.isPending} onClick={() => onboard.mutate()}>
+            {onboard.isPending
+              ? "Redirecting…"
+              : current.connected
+                ? "Finish setup"
+                : "Connect Stripe"}
           </Button>
-        )}
-        {st.payoutsEnabled && (
+        ) : (
           <Button
-            size="sm"
             variant="outline"
-            className="text-xs font-bold shrink-0"
-            onClick={() => { void utils.store.connectStatus.invalidate(); toast.success("Status refreshed"); }}
+            onClick={() => void utils.store.connectStatus.invalidate()}
           >
             Refresh status
           </Button>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
-
-const statusColors: Record<string, { bg: string; text: string; label: string }> = {
-  delivered: { bg: "#d1fae5", text: "#065f46", label: "Delivered" },
-  shipped: { bg: "#dbeafe", text: "#1e40af", label: "Shipped" },
-  processing: { bg: "#fef3c7", text: "#92400e", label: "Processing" },
-  active: { bg: "#d1fae5", text: "#065f46", label: "Active" },
-  sold: { bg: "#e0e7ff", text: "#3730a3", label: "Sold" },
-};
 
 export default function UserDashboard() {
   const { user, isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const binder = trpc.binder.list.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const decks = trpc.decks.myDecks.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const purchases = trpc.orders.myPurchases.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const sales = trpc.orders.mySales.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const cardListings = trpc.listings.myListings.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const productListings = trpc.products.myListings.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
 
-  const { data: binderCards, isLoading: loadingBinder } = trpc.binder.list.useQuery(
-    undefined,
-    { enabled: isAuthenticated, retry: false }
-  );
-
-  const { data: decks, isLoading: loadingDecks } = trpc.decks.myDecks.useQuery(
-    undefined,
-    { enabled: isAuthenticated, retry: false }
-  );
-
-  if (loading) {
+  if (loading)
     return (
       <div className="container py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Skeleton className="h-64 rounded-2xl" />
-          <div className="md:col-span-3 space-y-4">
-            <Skeleton className="h-12 rounded-xl" />
-            <Skeleton className="h-48 rounded-xl" />
-          </div>
-        </div>
+        <Skeleton className="h-72 rounded-3xl" />
       </div>
     );
-  }
-
-  if (!isAuthenticated) {
+  if (!isAuthenticated)
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-sm">
-          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
-            <User size={28} className="text-blue-600" />
+      <main className="flex min-h-[70vh] items-center justify-center bg-[#f6f7fb]">
+        <div className="max-w-sm text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-violet-100">
+            <User className="h-7 w-7 text-violet-600" />
           </div>
-          <h2 className="text-xl font-black text-gray-800 mb-2">Sign In Required</h2>
-          <p className="text-sm text-gray-500 mb-6">Access your dashboard, binder, decks, and orders by signing in.</p>
-          <a href={getLoginUrl()} className="inline-flex items-center gap-2 px-6 py-3 text-sm font-bold text-white rounded-xl" style={{ background: "oklch(0.54 0.25 293)" }}>
-            Sign In to Continue
+          <h1 className="mt-4 text-2xl font-black text-gray-950">
+            Sign in to your dashboard
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-gray-500">
+            Your real orders, inventory, binder and decks are private to your
+            account.
+          </p>
+          <a
+            href={getLoginUrl()}
+            className="mt-6 inline-flex rounded-full bg-violet-600 px-6 py-3 text-sm font-black text-white"
+          >
+            Sign in
           </a>
         </div>
-      </div>
+      </main>
     );
-  }
 
-  const binderValue: number = (binderCards ?? []).reduce((sum: number, c) => sum + (Number(c.priceUsd) || 0) * c.quantity, 0);
+  const binderValue = (binder.data ?? []).reduce(
+    (total, card) => total + Number(card.priceUsd ?? 0) * card.quantity,
+    0
+  );
+  const orderRows = purchases.data ?? [];
+  const salesRows = sales.data ?? [];
+  const singleRows = cardListings.data ?? [];
+  const sealedRows = productListings.data ?? [];
+  const grossSales = salesRows
+    .filter(row => row.order.status !== "cancelled")
+    .reduce((total, row) => total + Number(row.order.totalUsd), 0);
+  const activeListings =
+    singleRows.filter(item => item.status === "active").length +
+    sealedRows.filter(item => item.listing.status === "active").length;
+  const username =
+    user?.username ??
+    user?.name?.toLowerCase().replace(/[^a-z0-9]+/g, "-") ??
+    "trainer";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Profile Header */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="container py-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-black shrink-0" style={{ background: "oklch(0.54 0.25 293)" }}>
-              {user?.name?.[0]?.toUpperCase() ?? "U"}
-            </div>
-            <div className="flex-1">
-              <h1 className="text-xl font-black text-gray-900">{user?.name ?? "Trainer"}</h1>
-              <p className="text-sm text-gray-400">{user?.email}</p>
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-xs bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full border border-blue-100">
-                  {user?.role === "admin" ? "⚡ Admin" : "🎮 Trainer"}
-                </span>
-                <span className="text-xs text-gray-400">Member since 2026</span>
+    <main className="min-h-screen bg-[#f6f7fb]">
+      <section className="border-b border-gray-200 bg-white">
+        <div className="container flex flex-col gap-4 py-7 sm:flex-row sm:items-center">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-violet-600 text-2xl font-black text-white">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name ?? "Trainer"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              (user?.name?.[0]?.toUpperCase() ?? "T")
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black uppercase tracking-[.18em] text-violet-600">
+              Trainer dashboard
+            </p>
+            <h1 className="truncate text-2xl font-black text-gray-950">
+              {user?.name ?? "Trainer"}
+            </h1>
+            <p className="truncate text-sm text-gray-500">
+              @{username} · Member since{" "}
+              {user?.createdAt
+                ? new Date(user.createdAt).getFullYear()
+                : "recently"}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/profile/edit">
+              <Button variant="outline" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Edit profile
+              </Button>
+            </Link>
+            <Link href={`/profile/${username}`}>
+              <Button className="gap-2">
+                <Eye className="h-4 w-4" />
+                Public profile
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+      <div className="container grid gap-6 py-7 lg:grid-cols-[210px_1fr]">
+        <nav className="h-fit overflow-hidden rounded-2xl border border-gray-200 bg-white p-2 shadow-sm lg:sticky lg:top-4">
+          {tabs.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-black transition ${activeTab === id ? "bg-gray-950 text-white" : "text-gray-600 hover:bg-gray-50"}`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="min-w-0">
+          {activeTab === "overview" && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                <Stat
+                  label="Cards in binder"
+                  value={String(binder.data?.length ?? 0)}
+                  icon={Heart}
+                />
+                <Stat
+                  label="Binder value"
+                  value={money(binderValue)}
+                  icon={TrendingUp}
+                />
+                <Stat
+                  label="Decks"
+                  value={String(decks.data?.length ?? 0)}
+                  icon={BookOpen}
+                />
+                <Stat
+                  label="Purchases"
+                  value={String(orderRows.length)}
+                  icon={Package}
+                />
+              </div>
+              <Panel>
+                <Header
+                  title="Recent purchases"
+                  action={
+                    <Link
+                      href="/orders"
+                      className="text-xs font-black text-violet-700"
+                    >
+                      Manage orders
+                    </Link>
+                  }
+                />
+                {purchases.isLoading ? (
+                  <RowsLoading />
+                ) : (
+                  <OrderList
+                    rows={orderRows.slice(0, 4)}
+                    empty="You have not purchased anything yet."
+                  />
+                )}
+              </Panel>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <QuickLink
+                  href="/cards"
+                  title="Search real cards"
+                  text="Use live card data and USD market references."
+                  icon={Search}
+                />
+                <QuickLink
+                  href="/sets"
+                  title="Explore sets"
+                  text="Browse cards and sealed products together."
+                  icon={Package}
+                />
+                <QuickLink
+                  href="/sell"
+                  title="Manage your store"
+                  text="Publish inventory and track real sales."
+                  icon={TrendingUp}
+                />
               </div>
             </div>
-            <div className="flex gap-2">
-              <Link href="/profile/edit">
-                <Button variant="outline" size="sm" className="gap-1.5 text-sm font-semibold">
-                  <Settings size={14} /> Edit Profile
-                </Button>
-              </Link>
-              <Link href={`/profile/${user?.name?.toLowerCase().replace(/\s+/g, "-") ?? "me"}`}>
-                <Button size="sm" className="gap-1.5 text-sm font-semibold text-white" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
-                  <Eye size={14} /> Public Profile
-                </Button>
-              </Link>
+          )}
+          {activeTab === "binder" && (
+            <Panel>
+              <Header
+                title={`My binder (${binder.data?.length ?? 0})`}
+                action={
+                  <Link href="/binder">
+                    <Button size="sm">Open full binder</Button>
+                  </Link>
+                }
+              />
+              {binder.isLoading ? (
+                <RowsLoading />
+              ) : binder.data?.length ? (
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+                  {binder.data.slice(0, 15).map(card => (
+                    <Link
+                      key={card.id}
+                      href={`/cards/${card.cardId}`}
+                      className="group relative aspect-[2/3] overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+                    >
+                      {card.imageUrl ? (
+                        <img
+                          src={card.imageUrl}
+                          alt={card.cardName}
+                          className="h-full w-full object-contain p-1 transition group-hover:scale-105"
+                        />
+                      ) : (
+                        <span className="flex h-full items-center justify-center p-2 text-center text-xs text-gray-400">
+                          {card.cardName}
+                        </span>
+                      )}
+                      {card.quantity > 1 && (
+                        <span className="absolute right-1 top-1 rounded-full bg-gray-950 px-1.5 py-0.5 text-[9px] font-black text-white">
+                          ×{card.quantity}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <Empty
+                  icon={Heart}
+                  text="Your binder is empty."
+                  href="/cards"
+                  action="Browse cards"
+                />
+              )}
+            </Panel>
+          )}
+          {activeTab === "decks" && (
+            <Panel>
+              <Header
+                title={`My decks (${decks.data?.length ?? 0})`}
+                action={
+                  <Link href="/decks/builder">
+                    <Button size="sm" className="gap-1">
+                      <Plus className="h-4 w-4" />
+                      New deck
+                    </Button>
+                  </Link>
+                }
+              />
+              {decks.isLoading ? (
+                <RowsLoading />
+              ) : decks.data?.length ? (
+                <div className="space-y-2">
+                  {decks.data.map(deck => (
+                    <Link
+                      key={deck.id}
+                      href={`/decks/${deck.id}`}
+                      className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 hover:border-violet-300"
+                    >
+                      <BookOpen className="h-5 w-5 text-violet-600" />
+                      <div className="flex-1">
+                        <p className="font-black text-gray-950">{deck.name}</p>
+                        <p className="text-xs capitalize text-gray-500">
+                          {deck.format} · {deck.cardCount ?? 0} cards
+                        </p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-gray-300" />
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <Empty
+                  icon={BookOpen}
+                  text="You have not created a deck yet."
+                  href="/decks/builder"
+                  action="Build a deck"
+                />
+              )}
+            </Panel>
+          )}
+          {activeTab === "orders" && (
+            <Panel>
+              <Header
+                title="Purchase history"
+                action={
+                  <Link href="/orders">
+                    <Button size="sm">Full order center</Button>
+                  </Link>
+                }
+              />
+              {purchases.isLoading ? (
+                <RowsLoading />
+              ) : (
+                <OrderList
+                  rows={orderRows}
+                  empty="You have not purchased anything yet."
+                />
+              )}
+            </Panel>
+          )}
+          {activeTab === "selling" && (
+            <div className="space-y-5">
+              <PayoutsCard />
+              <div className="grid grid-cols-3 gap-3">
+                <Stat
+                  label="Gross orders"
+                  value={money(grossSales)}
+                  icon={TrendingUp}
+                />
+                <Stat
+                  label="Active listings"
+                  value={String(activeListings)}
+                  icon={Package}
+                />
+                <Stat
+                  label="Seller rating"
+                  value={
+                    user?.sellerRating
+                      ? Number(user.sellerRating).toFixed(1)
+                      : "—"
+                  }
+                  icon={CheckCircle2}
+                />
+              </div>
+              <Panel>
+                <Header
+                  title="My listings"
+                  action={
+                    <Link href="/sell">
+                      <Button size="sm" className="gap-1">
+                        <Plus className="h-4 w-4" />
+                        Add inventory
+                      </Button>
+                    </Link>
+                  }
+                />
+                {cardListings.isLoading || productListings.isLoading ? (
+                  <RowsLoading />
+                ) : !singleRows.length && !sealedRows.length ? (
+                  <Empty
+                    icon={Package}
+                    text="You have no marketplace listings."
+                    href="/sell"
+                    action="List an item"
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {singleRows.map(listing => (
+                      <ListingRow
+                        key={`card-${listing.id}`}
+                        name={listing.cardName}
+                        subtitle={`${listing.setName ?? "Pokémon TCG"} · ${listing.condition} · ${listing.quantity} available`}
+                        image={listing.imageUrl}
+                        price={listing.priceUsd}
+                        status={listing.status}
+                      />
+                    ))}
+                    {sealedRows.map(row => (
+                      <ListingRow
+                        key={`product-${row.listing.id}`}
+                        name={row.productName ?? "Sealed product"}
+                        subtitle={`${row.listing.condition} · ${row.listing.quantity} available`}
+                        image={row.productImageUrl}
+                        price={row.listing.priceUsd}
+                        status={row.listing.status}
+                      />
+                    ))}
+                  </div>
+                )}
+              </Panel>
             </div>
-          </div>
+          )}
+          {activeTab === "settings" && (
+            <Panel>
+              <Header title="Account settings" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ReadOnly label="Display name" value={user?.name ?? ""} />
+                <ReadOnly label="Email" value={user?.email ?? ""} />
+                <ReadOnly
+                  label="Username"
+                  value={user?.username ?? "Not set"}
+                />
+                <ReadOnly
+                  label="Account role"
+                  value={user?.role === "admin" ? "Administrator" : "Trainer"}
+                />
+              </div>
+              <Link href="/profile/edit">
+                <Button className="mt-5 gap-2">
+                  <Settings className="h-4 w-4" />
+                  Edit profile settings
+                </Button>
+              </Link>
+            </Panel>
+          )}
         </div>
       </div>
+    </main>
+  );
+}
 
-      <div className="container py-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar Tabs */}
-          <div className="lg:w-48 shrink-0">
-            <nav className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-              {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold transition-colors ${
-                    activeTab === tab.id
-                      ? "text-white"
-                      : "text-gray-600 hover:bg-gray-50"
-                  }`}
-                  style={activeTab === tab.id ? { background: "oklch(0.54 0.25 293)" } : {}}
-                >
-                  <tab.icon size={16} />
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
+function Panel({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      {children}
+    </section>
+  );
+}
+function Header({
+  title,
+  action,
+}: {
+  title: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h2 className="text-lg font-black text-gray-950">{title}</h2>
+      {action}
+    </div>
+  );
+}
+function Status({ value, label }: { value: string; label?: string }) {
+  return (
+    <span
+      className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${statusStyle[value] ?? "bg-gray-100 text-gray-600"}`}
+    >
+      {label ?? value}
+    </span>
+  );
+}
+function Stat({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <Icon className="h-5 w-5 text-violet-600" />
+      <p className="mt-3 text-xl font-black text-gray-950">{value}</p>
+      <p className="text-xs text-gray-500">{label}</p>
+    </div>
+  );
+}
+function RowsLoading() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 3 }, (_, i) => (
+        <Skeleton key={i} className="h-20 rounded-xl" />
+      ))}
+    </div>
+  );
+}
+function Empty({
+  icon: Icon,
+  text,
+  href,
+  action,
+}: {
+  icon: React.ElementType;
+  text: string;
+  href: string;
+  action: string;
+}) {
+  return (
+    <div className="py-14 text-center">
+      <Icon className="mx-auto h-8 w-8 text-gray-300" />
+      <p className="mt-3 text-sm font-bold text-gray-500">{text}</p>
+      <Link href={href}>
+        <Button size="sm" className="mt-4">
+          {action}
+        </Button>
+      </Link>
+    </div>
+  );
+}
+function OrderList({ rows, empty }: { rows: Array<any>; empty: string }) {
+  if (!rows.length)
+    return (
+      <div className="py-12 text-center text-sm font-bold text-gray-400">
+        {empty}
+      </div>
+    );
+  return (
+    <div className="space-y-2">
+      {rows.map(row => {
+        const name =
+          row.cardListing?.cardName ?? row.productName ?? "Marketplace item";
+        const image = row.cardListing?.imageUrl ?? row.productImageUrl;
+        return (
+          <div
+            key={row.order.id}
+            className="flex items-center gap-3 rounded-xl border border-gray-200 p-3"
+          >
+            {image ? (
+              <img
+                src={image}
+                alt={name}
+                className="h-16 w-12 object-contain"
+              />
+            ) : (
+              <div className="flex h-16 w-12 items-center justify-center rounded bg-gray-50">
+                <Package className="h-5 w-5 text-gray-300" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-black text-gray-950">
+                {name}
+              </p>
+              <p className="text-xs text-gray-500">
+                Order #{row.order.id} · {shortDate(row.order.createdAt)}
+              </p>
+              <p className="text-xs text-gray-400">
+                Seller:{" "}
+                {row.counterpartyName ??
+                  row.counterpartyUsername ??
+                  "Marketplace seller"}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="font-black text-gray-950">
+                {money(row.order.totalUsd)}
+              </p>
+              <Status value={row.order.status} />
+            </div>
           </div>
-
-          {/* Main Content */}
-          <div className="flex-1 min-w-0">
-            {/* Overview Tab */}
-            {activeTab === "overview" && (
-              <div className="space-y-4">
-                {/* Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    { label: "Cards in Binder", value: binderCards?.length ?? 0, icon: Heart, color: "#ef4444" },
-                    { label: "Binder Value", value: `$${(binderValue as number).toFixed(2)}`, icon: TrendingUp, color: "#10b981" },
-                    { label: "My Decks", value: decks?.length ?? 0, icon: BookOpen, color: "#8b5cf6" },
-                    { label: "Orders", value: mockOrders.length, icon: Package, color: "#f59e0b" },
-                  ].map(stat => (
-                    <div key={stat.label} className="bg-white rounded-xl border border-gray-100 p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: stat.color + "20" }}>
-                          <stat.icon size={16} style={{ color: stat.color }} />
-                        </div>
-                      </div>
-                      <div className="text-xl font-black text-gray-800">{stat.value}</div>
-                      <div className="text-xs text-gray-400">{stat.label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Recent Activity */}
-                <div className="bg-white rounded-xl border border-gray-100 p-5">
-                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <Clock size={16} className="text-gray-400" /> Recent Orders
-                  </h3>
-                  <div className="space-y-3">
-                    {mockOrders.slice(0, 3).map(order => {
-                      const s = statusColors[order.status];
-                      return (
-                        <div key={order.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
-                          <img src={order.img} alt={order.card} className="w-10 h-14 object-contain" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-sm text-gray-800 truncate">{order.card}</div>
-                            <div className="text-xs text-gray-400">{order.set} · {order.date}</div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-bold text-sm text-gray-800">${order.price.toFixed(2)}</div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: s?.bg, color: s?.text }}>
-                              {s?.label}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Quick Links */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    { label: "Browse Cards", href: "/cards", icon: "🃏", desc: "Find cards to add to your binder" },
-                    { label: "Build a Deck", href: "/decks/builder", icon: "🔧", desc: "Create and share your deck" },
-                    { label: "View Auctions", href: "/auctions", icon: "⚡", desc: "Bid on rare cards" },
-                  ].map(link => (
-                    <Link key={link.href} href={link.href}>
-                      <div className="bg-white rounded-xl border border-gray-100 p-4 poke-card hover:border-blue-200 transition-all">
-                        <div className="text-2xl mb-2">{link.icon}</div>
-                        <div className="font-bold text-sm text-gray-800">{link.label}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">{link.desc}</div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Binder Tab */}
-            {activeTab === "binder" && (
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-gray-800">My Binder ({binderCards?.length ?? 0} cards)</h3>
-                  <Link href="/binder">
-                    <Button size="sm" className="text-white gap-1.5 text-xs font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
-                      <Eye size={12} /> Full Binder
-                    </Button>
-                  </Link>
-                </div>
-                {loadingBinder ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                    {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="aspect-[2/3] rounded-lg" />)}
-                  </div>
-                ) : binderCards && binderCards.length > 0 ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                    {binderCards.slice(0, 15).map(card => (
-                      <Link key={card.id} href={`/cards/${card.cardId}`}>
-                        <div className="aspect-[2/3] bg-gray-50 rounded-lg border border-gray-100 overflow-hidden poke-card hover:border-blue-200 transition-all relative">
-                          {card.imageUrl ? (
-                            <img src={card.imageUrl} alt={card.cardName} className="w-full h-full object-contain p-1" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs text-center p-1">{card.cardName}</div>
-                          )}
-                          {card.quantity > 1 && (
-                            <span className="absolute top-1 right-1 text-[9px] font-black text-white bg-blue-500 rounded-full w-4 h-4 flex items-center justify-center">
-                              {card.quantity}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-gray-400">
-                    <Heart size={32} className="mx-auto mb-3 opacity-30" />
-                    <p className="text-sm font-medium">Your binder is empty</p>
-                    <Link href="/cards">
-                      <Button size="sm" className="mt-3 text-white text-xs" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
-                        Browse Cards
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Decks Tab */}
-            {activeTab === "decks" && (
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-gray-800">My Decks ({decks?.length ?? 0})</h3>
-                  <Link href="/decks/builder">
-                    <Button size="sm" className="text-white gap-1.5 text-xs font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
-                      <Plus size={12} /> New Deck
-                    </Button>
-                  </Link>
-                </div>
-                {loadingDecks ? (
-                  <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
-                ) : decks && decks.length > 0 ? (
-                  <div className="space-y-3">
-                    {decks.map((deck: { id: number; name: string; format: string; cardCount?: number | null; isPublic: boolean }) => (
-                      <Link key={deck.id} href={`/decks/${deck.id}`}>
-                        <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 poke-card hover:border-blue-200 transition-all">
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-lg">
-                            🃏
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-bold text-sm text-gray-800">{deck.name}</div>
-                            <div className="text-xs text-gray-400">{deck.format} · {deck.cardCount ?? 0} cards</div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {deck.isPublic && <Badge className="text-[10px]" style={{ background: "#d1fae5", color: "#065f46", border: "none" }}>Public</Badge>}
-                            <ArrowRight size={14} className="text-gray-300" />
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-gray-400">
-                    <BookOpen size={32} className="mx-auto mb-3 opacity-30" />
-                    <p className="text-sm font-medium">No decks yet</p>
-                    <Link href="/decks/builder">
-                      <Button size="sm" className="mt-3 text-white text-xs" style={{ background: "oklch(0.54 0.25 293)", border: "none" }}>
-                        Build Your First Deck
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Orders Tab */}
-            {activeTab === "orders" && (
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <h3 className="font-bold text-gray-800 mb-4">Purchase History</h3>
-                <div className="space-y-3">
-                  {mockOrders.map(order => {
-                    const s = statusColors[order.status];
-                    return (
-                      <div key={order.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50">
-                        <img src={order.img} alt={order.card} className="w-12 h-16 object-contain shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-sm text-gray-800">{order.card}</div>
-                          <div className="text-xs text-gray-400">{order.set}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">Seller: {order.seller} · {order.date}</div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="font-black text-gray-800">${order.price.toFixed(2)}</div>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 inline-block" style={{ background: s?.bg, color: s?.text }}>
-                            {s?.label}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Selling Tab */}
-            {activeTab === "selling" && (
-              <div className="space-y-4">
-                <PayoutsCard />
-                <div className="bg-white rounded-xl border border-gray-100 p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-gray-800">My Listings</h3>
-                    <Button size="sm" className="text-white gap-1.5 text-xs font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }} onClick={() => toast.info("Listing creation coming soon!")}>
-                      <Plus size={12} /> New Listing
-                    </Button>
-                  </div>
-                  <div className="space-y-3">
-                    {mockListings.map(listing => {
-                      const s = statusColors[listing.status];
-                      return (
-                        <div key={listing.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50">
-                          <img src={listing.img} alt={listing.card} className="w-10 h-14 object-contain shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-bold text-sm text-gray-800">{listing.card}</div>
-                            <div className="text-xs text-gray-400">{listing.set} · {listing.condition}</div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                              <span className="flex items-center gap-1"><Eye size={10} /> {listing.views} views</span>
-                              <span className="flex items-center gap-1"><Star size={10} /> {listing.watchers} watching</span>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-black text-gray-800">${listing.price.toFixed(2)}</div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 inline-block" style={{ background: s?.bg, color: s?.text }}>
-                              {s?.label}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Seller Stats */}
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: "Total Sales", value: "$850.00", icon: "💰" },
-                    { label: "Active Listings", value: "2", icon: "📋" },
-                    { label: "Seller Rating", value: "5.0 ⭐", icon: "🏆" },
-                  ].map(stat => (
-                    <div key={stat.label} className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-                      <div className="text-2xl mb-1">{stat.icon}</div>
-                      <div className="font-black text-gray-800">{stat.value}</div>
-                      <div className="text-xs text-gray-400">{stat.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Settings Tab */}
-            {activeTab === "settings" && (
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <h3 className="font-bold text-gray-800 mb-4">Account Settings</h3>
-                <div className="space-y-4">
-                  {[
-                    { label: "Display Name", value: user?.name ?? "", type: "text" },
-                    { label: "Email", value: user?.email ?? "", type: "email" },
-                  ].map(field => (
-                    <div key={field.label}>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">{field.label}</label>
-                      <input
-                        type={field.type}
-                        defaultValue={field.value}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2"
-                        readOnly
-                      />
-                    </div>
-                  ))}
-                  <div className="pt-2">
-                    <Button className="text-white font-bold" style={{ background: "oklch(0.54 0.25 293)", border: "none" }} onClick={() => toast.info("Settings saved!")}>
-                      Save Changes
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+        );
+      })}
+    </div>
+  );
+}
+function ListingRow({
+  name,
+  subtitle,
+  image,
+  price,
+  status,
+}: {
+  name: string;
+  subtitle: string;
+  image?: string | null;
+  price?: string | number | null;
+  status: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-gray-200 p-3">
+      {image ? (
+        <img src={image} alt={name} className="h-16 w-12 object-contain" />
+      ) : (
+        <div className="flex h-16 w-12 items-center justify-center rounded bg-gray-50">
+          <Package className="h-5 w-5 text-gray-300" />
         </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-black text-gray-950">{name}</p>
+        <p className="truncate text-xs text-gray-500">{subtitle}</p>
+      </div>
+      <div className="text-right">
+        <p className="font-black text-gray-950">{money(price)}</p>
+        <Status value={status} />
       </div>
     </div>
+  );
+}
+function QuickLink({
+  href,
+  title,
+  text,
+  icon: Icon,
+}: {
+  href: string;
+  title: string;
+  text: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-violet-300 hover:shadow-md"
+    >
+      <Icon className="h-5 w-5 text-violet-600" />
+      <p className="mt-3 font-black text-gray-950">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-gray-500">{text}</p>
+    </Link>
+  );
+}
+function ReadOnly({ label, value }: { label: string; value: string }) {
+  return (
+    <label>
+      <span className="mb-1 block text-xs font-black uppercase tracking-wider text-gray-500">
+        {label}
+      </span>
+      <input
+        readOnly
+        value={value}
+        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700"
+      />
+    </label>
   );
 }
