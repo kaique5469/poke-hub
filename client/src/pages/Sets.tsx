@@ -8,7 +8,7 @@ export default function Sets() {
   const { data, isLoading } = trpc.sets.list.useQuery();
 
   const seriesOrder = [
-    "Scarlet & Violet", "Sword & Shield", "Sun & Moon", "XY", "Black & White",
+    "Mega Evolution", "Scarlet & Violet", "Sword & Shield", "Sun & Moon", "XY", "Black & White",
     "HeartGold & SoulSilver", "Platinum", "Diamond & Pearl", "EX", "e-Card",
     "Neo", "Gym", "Base",
   ];
@@ -63,7 +63,7 @@ export default function Sets() {
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {grouped[series].map((set) => (
-                  <Link key={set.id} href={`/cards?set=${set.id}`}>
+                  <Link key={set.id} href={`/sets/${set.id}`}>
                     <div className="group bg-card border border-border rounded-xl p-4 hover:border-primary/30 hover:-translate-y-1 hover:shadow-[0_8px_24px_oklch(0_0_0/0.3)] transition-all duration-200 cursor-pointer h-full flex flex-col">
                       {/* Set logo */}
                       <div className="h-14 flex items-center justify-center mb-3">

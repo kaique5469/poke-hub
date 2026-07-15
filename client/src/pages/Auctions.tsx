@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { Clock, Zap, ChevronRight, Gavel, TrendingUp } from "lucide-react";
+import { Clock, Zap, ChevronRight, Gavel, TrendingUp, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -141,14 +141,6 @@ const conditionColors: Record<string, string> = {
   M: "#10b981", NM: "#22c55e", SP: "#f59e0b", MP: "#f97316", HP: "#ef4444", D: "#991b1b",
 };
 
-// ─── Fallback card images for demo auctions ─────────────────────────────────
-const DEMO_IMAGES = [
-  "https://images.pokemontcg.io/sv3/215_hires.png",
-  "https://images.pokemontcg.io/swsh4/188_hires.png",
-  "https://images.pokemontcg.io/swsh7/215_hires.png",
-  "https://images.pokemontcg.io/swsh11/186_hires.png",
-];
-
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function Auctions() {
   usePageMeta("Auctions", "Live Pokémon card auctions — bid on rare and graded cards.");
@@ -260,20 +252,27 @@ export default function Auctions() {
         {/* Auction Grid */}
         {!isLoading && sorted.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sorted.map((auction, idx) => {
+            {sorted.map((auction) => {
               const currentBid = auction.currentBidUsd ?? auction.startingBidUsd ?? 0;
               const isUrgent = new Date(auction.endsAt).getTime() - Date.now() < 3600000;
-              const imageUrl = auction.imageUrl ?? DEMO_IMAGES[idx % DEMO_IMAGES.length];
+              const imageUrl = auction.imageUrl;
               return (
                 <div key={auction.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden poke-card hover:border-blue-200 hover:shadow-md transition-all">
                   {/* Card Image */}
                   <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 p-6 flex items-center justify-center" style={{ minHeight: "180px" }}>
-                    <img
-                      src={imageUrl}
-                      alt={auction.cardName ?? auction.title}
-                      className="h-36 object-contain drop-shadow-lg"
-                      onError={e => { (e.target as HTMLImageElement).src = DEMO_IMAGES[0]; }}
-                    />
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={auction.cardName ?? auction.title}
+                        className="h-36 object-contain drop-shadow-lg"
+                        onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="text-center text-gray-300">
+                        <ImageOff className="w-10 h-10 mx-auto" />
+                        <span className="text-[10px] font-bold uppercase tracking-wide">No product photo</span>
+                      </div>
+                    )}
                     <div className="absolute top-3 left-3">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: conditionColors[auction.condition] ?? "#888" }}>
                         {auction.condition}

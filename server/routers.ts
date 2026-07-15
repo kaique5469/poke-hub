@@ -47,6 +47,7 @@ import {
   getEbayUrl,
   getHighValueCards,
   getPriceFromCard,
+  getSetById,
   getSets,
   getTcgPlayerUrl,
   isSpecialRare,
@@ -78,7 +79,8 @@ import {
   saveRoundProgress,
 } from "./gameDb";
 import { toggleAuctionWatch, getUserWatchedAuctionIds } from "./db";
-import { createNotification, getListingsByCardWithSeller } from "./marketplaceDb";
+import { createNotification, getListingsByCardWithSeller, listProducts } from "./marketplaceDb";
+import { ensureProductsSynced } from "./scrydexSync";
 import {
   adminResolveDispute,
   createStore,
@@ -256,6 +258,38 @@ export const appRouter = router({
       }
       return { sets, grouped };
     }),
+    detail: publicProcedure
+      .input(z.object({ id: z.string().min(1).max(64) }))
+      .query(async ({ input }) => {
+        const [set, cards, hotCards] = await Promise.all([
+          getSetById(input.id),
+          searchCards({
+            q: `set.id:${input.id}`,
+            page: 1,
+            pageSize: 48,
+            orderBy: "number",
+            select: GRID_SELECT,
+          }),
+          searchCards({
+            q: `set.id:${input.id} (rarity:\"Special Illustration Rare\" OR rarity:\"Hyper Rare\" OR rarity:\"Ultra Rare\" OR rarity:\"Illustration Rare\")`,
+            page: 1,
+            pageSize: 12,
+            orderBy: "-number",
+            select: GRID_SELECT,
+          }),
+        ]);
+        if (!set) throw new TRPCError({ code: "NOT_FOUND", message: "Set not found" });
+
+        await ensureProductsSynced();
+        const products = await listProducts({ setId: input.id, sort: "price_asc", page: 1, pageSize: 60 });
+        return {
+          set,
+          products: products.items,
+          cards: cards.data,
+          totalCards: cards.totalCount,
+          hotCards: hotCards.data,
+        };
+      }),
     recent: publicProcedure
       .input(z.object({ limit: z.number().int().min(1).max(20).default(8) }))
       .query(async ({ input }) => {

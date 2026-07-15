@@ -34,6 +34,8 @@ Requisitos: Node 20+, pnpm, um MySQL acessível (local ou o do Railway).
    - `APP_URL` → a URL pública gerada pelo Railway (Settings → Networking → Generate Domain)
    - `OWNER_EMAIL` → seu email (quem se registrar com ele vira admin)
    - `CRON_SECRET` → outra string aleatória
+   - `SCRYDEX_API_KEY` → Primary API Key da Scrydex (somente no serviço do app)
+   - `SCRYDEX_TEAM_ID` → Team ID da Scrydex
    - Opcionais: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, `OPENAI_API_KEY`, `RAPIDAPI_KEY`
    - `DATA_DIR` → `/data`
 
@@ -64,6 +66,17 @@ O endpoint `POST /api/scheduled/tcg-news` (protegido pelo header `x-cron-secret`
 - **Sem a chave**: aceita artigos pré-escritos no body (`{"articles": [...]}`).
 
 O workflow `.github/workflows/daily-articles.yml` chama o endpoint todo dia às 9h (Brasília). Configure os secrets `APP_URL` e `CRON_SECRET` no GitHub (Settings → Secrets → Actions). Artigos com `"featured": true` aparecem no banner da homepage.
+
+## Catálogo real de produtos selados
+
+O catálogo de booster boxes, ETBs, bundles, tins, packs e coleções vem da
+Scrydex. O backend importa imagens reais, expansão, idioma e preços de mercado
+em USD para o MySQL; as chaves nunca são enviadas ao navegador.
+
+- A primeira visita ao marketplace sincroniza o catálogo se ele estiver desatualizado.
+- `POST /api/scheduled/scrydex-sync` atualiza o catálogo e é protegido por `x-cron-secret`.
+- O workflow `.github/workflows/daily-catalog.yml` executa a atualização diariamente.
+- Produtos antigos gerados automaticamente são ocultados após a primeira sincronização real; produtos com anúncios de vendedores são preservados.
 
 ## Scripts
 

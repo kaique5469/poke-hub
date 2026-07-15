@@ -95,8 +95,12 @@ function ProductCard({ product, view }: { product: ProductRow; view: "grid" | "l
 
 export default function Shop() {
   usePageMeta("Shop", "Buy sealed Pokémon TCG products — booster boxes, ETBs, tins and accessories from verified sellers.");
-  const urlCat = new URLSearchParams(window.location.search).get("cat");
-  const [search, setSearch] = useState("");
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlCat = urlParams.get("cat");
+  const urlSet = urlParams.get("set");
+  const urlQuery = urlParams.get("q");
+  const [search, setSearch] = useState(urlQuery ?? "");
+  const [setFilter, setSetFilter] = useState(urlSet);
   const [activeCategory, setActiveCategory] = useState(urlCat && CATEGORIES.some(c => c.id === urlCat) ? urlCat : "all");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [sort, setSort] = useState<"newest" | "price_asc" | "price_desc" | "views">("newest");
@@ -105,6 +109,7 @@ export default function Shop() {
   const { data, isLoading } = trpc.products.list.useQuery({
     q: search.trim() || undefined,
     category: activeCategory === "all" ? undefined : activeCategory,
+    setId: setFilter ?? undefined,
     sort,
     page,
     pageSize: 24,
@@ -122,9 +127,9 @@ export default function Shop() {
         <div className="container">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl font-black" style={{ color: "oklch(0.18 0.02 240)" }}>Shop</h1>
+              <h1 className="text-2xl font-black" style={{ color: "oklch(0.18 0.02 240)" }}>Sealed Marketplace</h1>
               <p className="text-sm mt-0.5" style={{ color: "oklch(0.52 0.015 240)" }}>
-                Sealed products & accessories sold by the community
+                Real Pokémon TCG products, current market references and community sellers
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -173,6 +178,12 @@ export default function Shop() {
               <p className="text-sm font-bold" style={{ color: "oklch(0.52 0.015 240)" }}>
                 {isLoading ? "Loading…" : `${total} products`}
               </p>
+              {setFilter && (
+                <button onClick={() => { setSetFilter(null); setPage(1); window.history.replaceState({}, "", "/shop"); }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 text-violet-700 px-3 py-1 text-xs font-bold">
+                  Set: {setFilter} <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
 
             {isLoading ? (
@@ -183,7 +194,7 @@ export default function Shop() {
               <div className="text-center py-20">
                 <span className="text-6xl">🔍</span>
                 <p className="mt-4 font-bold text-lg" style={{ color: "oklch(0.35 0.02 240)" }}>No products found</p>
-                <button onClick={() => { setSearch(""); setActiveCategory("all"); setPage(1); }} className="btn-primary mt-4">Clear Filters</button>
+                <button onClick={() => { setSearch(""); setActiveCategory("all"); setSetFilter(null); setPage(1); window.history.replaceState({}, "", "/shop"); }} className="btn-primary mt-4">Clear Filters</button>
               </div>
             ) : (
               <>

@@ -488,7 +488,7 @@ export default function CardDetail() {
     return sortAsc ? rows : [...rows].reverse();
   }, [card, cardName, setName, tcgplayerUrl, priceVariants, externalPrices, sortAsc]);
 
-  // Price history from CardMarket API (real data) or simulated fallback
+  // Price history from CardMarket API. Never manufacture chart points.
   const priceHistory = useMemo(() => {
     if (externalPrices?.history && externalPrices.history.length > 0) {
       return externalPrices.history.map((h) => ({
@@ -497,13 +497,8 @@ export default function CardDetail() {
         "TCGPlayer ($)": h.tcg_market,
       }));
     }
-    // Simulated fallback
-    if (bestPrice <= 0) return [];
-    return Array.from({ length: 30 }, (_, i) => ({
-      date: new Date(Date.now() - (29 - i) * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      "TCGPlayer ($)": +(bestPrice * (0.85 + Math.random() * 0.3)).toFixed(2),
-    }));
-  }, [externalPrices, bestPrice]);
+    return [];
+  }, [externalPrices]);
 
   const hasRealHistory = externalPrices?.history && externalPrices.history.length > 0;
 
@@ -1008,7 +1003,7 @@ export default function CardDetail() {
                 <div className="bg-white rounded-xl border border-gray-100 p-4">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-sm text-gray-700">
-                      {hasRealHistory ? "90-Day Price History" : "30-Day Price History (Simulated)"}
+                      {hasRealHistory ? "90-Day Price History" : "Price History"}
                     </h3>
                     {hasRealHistory && (
                       <span className="text-[10px] text-green-600 font-semibold bg-green-50 px-2 py-0.5 rounded-full">Live from CardMarket</span>
@@ -1023,15 +1018,9 @@ export default function CardDetail() {
                         <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval={Math.floor(priceHistory.length / 6)} />
                         <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}`} />
                         <Tooltip />
-                        {hasRealHistory ? (
-                          <>
-                            <Line type="monotone" dataKey="CardMarket (€)" stroke="#16a34a" strokeWidth={2} dot={false} connectNulls />
-                            <Line type="monotone" dataKey="TCGPlayer ($)" stroke="#4f8ef7" strokeWidth={2} dot={false} connectNulls />
-                            <Legend />
-                          </>
-                        ) : (
-                          <Line type="monotone" dataKey="TCGPlayer ($)" stroke="#4f8ef7" strokeWidth={2} dot={false} />
-                        )}
+                        <Line type="monotone" dataKey="CardMarket (€)" stroke="#16a34a" strokeWidth={2} dot={false} connectNulls />
+                        <Line type="monotone" dataKey="TCGPlayer ($)" stroke="#4f8ef7" strokeWidth={2} dot={false} connectNulls />
+                        <Legend />
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (

@@ -64,6 +64,15 @@ function getInitials(name: string) {
     .slice(0, 2);
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // Improved markdown-to-HTML renderer with proper fenced code block support
 function renderMarkdown(content: string) {
   const lines = content.split("\n");
@@ -83,7 +92,7 @@ function renderMarkdown(content: string) {
         codeLines = [];
       } else {
         inCodeBlock = false;
-        const code = codeLines.join("\n").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const code = escapeHtml(codeLines.join("\n"));
         html.push(`<pre class="bg-gray-900 text-green-400 rounded-xl p-4 my-4 overflow-x-auto text-sm font-mono"><code>${code}</code></pre>`);
         codeLines = [];
       }
@@ -131,7 +140,7 @@ function renderMarkdown(content: string) {
   // Close any open structures
   if (inList) html.push("</ul>");
   if (inCodeBlock && codeLines.length > 0) {
-    const code = codeLines.join("\n").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const code = escapeHtml(codeLines.join("\n"));
     html.push(`<pre class="bg-gray-900 text-green-400 rounded-xl p-4 my-4 overflow-x-auto text-sm font-mono"><code>${code}</code></pre>`);
   }
 
@@ -139,11 +148,15 @@ function renderMarkdown(content: string) {
 }
 
 function inlineMarkdown(text: string): string {
-  return text
+  return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
     .replace(/`(.*?)`/g, '<code class="bg-gray-100 text-red-600 px-1 rounded text-sm font-mono">$1</code>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 underline hover:text-blue-700" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, escapedUrl: string) => {
+      const url = escapedUrl.replace(/&amp;/g, "&");
+      if (!/^https?:\/\//i.test(url)) return label;
+      return `<a href="${escapeHtml(url)}" class="text-blue-600 underline hover:text-blue-700" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`;
+    });
 }
 
 export default function ArticleDetail() {
