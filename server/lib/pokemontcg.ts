@@ -16,7 +16,11 @@ const cache = new Map<string, { data: unknown; expires: number }>();
 
 const inflight = new Map<string, Promise<unknown>>();
 
-function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+function cached<T>(
+  key: string,
+  ttlMs: number,
+  fn: () => Promise<T>
+): Promise<T> {
   const hit = cache.get(key);
   const now = Date.now();
   if (hit && hit.expires > now) return Promise.resolve(hit.data as T);
@@ -29,12 +33,12 @@ function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T>
   }
 
   const p = fn()
-    .then((data) => {
+    .then(data => {
       cache.set(key, { data, expires: Date.now() + ttlMs });
       inflight.delete(key);
       return data;
     })
-    .catch((err) => {
+    .catch(err => {
       inflight.delete(key);
       if (hit) return hit.data as T; // serve stale on upstream error
       throw err;
@@ -50,10 +54,10 @@ function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T>
 }
 
 const TTL = {
-  CARD: 24 * 60 * 60 * 1000,        // 24h for individual cards
-  SEARCH: 30 * 60 * 1000,           // 30min for search results
-  SETS: 60 * 60 * 1000,             // 1h for sets list
-  HIGH_VALUE: 30 * 60 * 1000,       // 30min for high-value cards
+  CARD: 24 * 60 * 60 * 1000, // 24h for individual cards
+  SEARCH: 30 * 60 * 1000, // 30min for search results
+  SETS: 60 * 60 * 1000, // 1h for sets list
+  HIGH_VALUE: 30 * 60 * 1000, // 30min for high-value cards
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -62,6 +66,7 @@ export interface PtcgSet {
   id: string;
   name: string;
   series: string;
+  ptcgoCode?: string;
   printedTotal: number;
   total: number;
   releaseDate: string;
@@ -78,7 +83,13 @@ export interface PtcgCard {
   types?: string[];
   evolvesFrom?: string;
   abilities?: Array<{ name: string; text: string; type: string }>;
-  attacks?: Array<{ name: string; cost: string[]; convertedEnergyCost: number; damage: string; text: string }>;
+  attacks?: Array<{
+    name: string;
+    cost: string[];
+    convertedEnergyCost: number;
+    damage: string;
+    text: string;
+  }>;
   weaknesses?: Array<{ type: string; value: string }>;
   resistances?: Array<{ type: string; value: string }>;
   retreatCost?: string[];
@@ -154,7 +165,10 @@ async function apiFetch<T>(path: string): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25_000);
   try {
-    const res = await fetch(`${BASE_URL}${path}`, { headers, signal: controller.signal });
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers,
+      signal: controller.signal,
+    });
     if (!res.ok) throw new Error(`PokémonTCG API error ${res.status}: ${path}`);
     return (await res.json()) as T;
   } finally {
@@ -163,9 +177,12 @@ async function apiFetch<T>(path: string): Promise<T> {
 }
 
 /** Slim field set for card grids — cuts payload ~70% vs full card objects. */
-export const GRID_SELECT = "id,name,number,rarity,types,supertype,images,set,tcgplayer";
+export const GRID_SELECT =
+  "id,name,number,rarity,types,supertype,images,set,tcgplayer";
 
-export async function searchCards(params: SearchCardsParams): Promise<SearchCardsResult> {
+export async function searchCards(
+  params: SearchCardsParams
+): Promise<SearchCardsResult> {
   const qs = new URLSearchParams();
   if (params.q) qs.set("q", params.q);
   qs.set("page", String(params.page ?? 1));
@@ -192,14 +209,16 @@ export async function getCardById(id: string): Promise<PtcgCard | null> {
 
 export async function getCardsByIds(ids: string[]): Promise<PtcgCard[]> {
   if (!ids.length) return [];
-  const q = ids.map((id) => `id:${id}`).join(" OR ");
+  const q = ids.map(id => `id:${id}`).join(" OR ");
   const result = await searchCards({ q, pageSize: ids.length });
   return result.data;
 }
 
 export async function getSets(): Promise<PtcgSet[]> {
   return cached("sets:all", TTL.SETS, async () => {
-    const res = await apiFetch<{ data: PtcgSet[] }>("/sets?orderBy=-releaseDate&pageSize=500");
+    const res = await apiFetch<{ data: PtcgSet[] }>(
+      "/sets?orderBy=-releaseDate&pageSize=500"
+    );
     return res.data;
   });
 }
@@ -222,9 +241,15 @@ export async function getHighValueCards(page = 1): Promise<SearchCardsResult> {
     "Secret Rare",
     "Rainbow Rare",
   ];
-  const q = rarities.map((r) => `rarity:"${r}"`).join(" OR ");
+  const q = rarities.map(r => `rarity:"${r}"`).join(" OR ");
   return cached(`high-value:${page}`, TTL.HIGH_VALUE, () =>
-    searchCards({ q, page, pageSize: 20, orderBy: "-set.releaseDate", select: GRID_SELECT })
+    searchCards({
+      q,
+      page,
+      pageSize: 20,
+      orderBy: "-set.releaseDate",
+      select: GRID_SELECT,
+    })
   );
 }
 
@@ -234,7 +259,9 @@ export function getTcgPlayerUrl(cardName: string, setName?: string): string {
 }
 
 export function getEbayUrl(cardName: string, setName?: string): string {
-  const q = setName ? `Pokemon ${cardName} ${setName}` : `Pokemon ${cardName} card`;
+  const q = setName
+    ? `Pokemon ${cardName} ${setName}`
+    : `Pokemon ${cardName} card`;
   return `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&_sacat=183454`;
 }
 
@@ -269,5 +296,5 @@ export function isSpecialRare(rarity?: string): boolean {
     "Ultra Rare",
     "Illustration Rare",
   ];
-  return special.some((r) => rarity.toLowerCase().includes(r.toLowerCase()));
+  return special.some(r => rarity.toLowerCase().includes(r.toLowerCase()));
 }

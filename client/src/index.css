@@ -37,8 +37,8 @@
   --color-destructive: oklch(0.58 0.22 25);
   --color-destructive-foreground: oklch(1 0 0);
 
-  --color-border: oklch(0.90 0.005 240);
-  --color-input: oklch(0.90 0.005 240);
+  --color-border: oklch(0.9 0.005 240);
+  --color-input: oklch(0.9 0.005 240);
   --color-ring: oklch(0.54 0.25 293);
 
   /* Sidebar */
@@ -48,11 +48,11 @@
   --color-sidebar-primary-foreground: oklch(1 0 0);
   --color-sidebar-accent: oklch(0.94 0.01 240);
   --color-sidebar-accent-foreground: oklch(0.35 0.01 240);
-  --color-sidebar-border: oklch(0.90 0.005 240);
+  --color-sidebar-border: oklch(0.9 0.005 240);
   --color-sidebar-ring: oklch(0.54 0.25 293);
 
-  --font-sans: 'Inter', 'Nunito', system-ui, sans-serif;
-  --font-display: 'Nunito', 'Inter', system-ui, sans-serif;
+  --font-sans: "Inter", "Nunito", system-ui, sans-serif;
+  --font-display: "Nunito", "Inter", system-ui, sans-serif;
 }
 
 /* ─── Base Styles ──────────────────────────────────────────────────────────── */
@@ -74,7 +74,12 @@
     line-height: 1.6;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
     font-weight: 700;
     line-height: 1.25;
@@ -86,16 +91,31 @@
     text-decoration: none;
   }
 
+  :focus-visible {
+    outline: 3px solid oklch(0.54 0.25 293 / 0.5);
+    outline-offset: 3px;
+  }
+
   img {
     max-width: 100%;
     height: auto;
   }
 
   /* Custom scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: oklch(0.96 0.005 240); }
-  ::-webkit-scrollbar-thumb { background: oklch(0.75 0.01 240); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: oklch(0.54 0.25 293); }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: oklch(0.96 0.005 240);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.75 0.01 240);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.54 0.25 293);
+  }
 }
 
 /* ─── Container ────────────────────────────────────────────────────────────── */
@@ -110,60 +130,154 @@
   }
 
   @media (min-width: 640px) {
-    .container { padding-left: 1.5rem; padding-right: 1.5rem; }
+    .container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
   }
 
   @media (min-width: 1024px) {
-    .container { padding-left: 2rem; padding-right: 2rem; }
+    .container {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
   }
 }
 
 /* ─── Flex defaults ────────────────────────────────────────────────────────── */
 @layer base {
-  .flex { min-width: 0; min-height: 0; }
+  .flex {
+    min-width: 0;
+    min-height: 0;
+  }
 }
 
 /* ─── Pokémon Type Colors ──────────────────────────────────────────────────── */
 @layer utilities {
-  .type-normal    { background-color: #A8A878; color: white; }
-  .type-fire      { background-color: #F08030; color: white; }
-  .type-water     { background-color: #6890F0; color: white; }
-  .type-electric  { background-color: #F8D030; color: #333; }
-  .type-grass     { background-color: #78C850; color: white; }
-  .type-ice       { background-color: #98D8D8; color: #333; }
-  .type-fighting  { background-color: #C03028; color: white; }
-  .type-poison    { background-color: #A040A0; color: white; }
-  .type-ground    { background-color: #E0C068; color: #333; }
-  .type-flying    { background-color: #A890F0; color: white; }
-  .type-psychic   { background-color: #F85888; color: white; }
-  .type-bug       { background-color: #A8B820; color: white; }
-  .type-rock      { background-color: #B8A038; color: white; }
-  .type-ghost     { background-color: #705898; color: white; }
-  .type-dragon    { background-color: #7038F8; color: white; }
-  .type-dark      { background-color: #705848; color: white; }
-  .type-steel     { background-color: #B8B8D0; color: #333; }
-  .type-fairy     { background-color: #EE99AC; color: white; }
-  .type-colorless { background-color: #C8C8C8; color: #333; }
-  .type-lightning { background-color: #F8D030; color: #333; }
-  .type-metal     { background-color: #B8B8D0; color: #333; }
-  .type-darkness  { background-color: #705848; color: white; }
+  .type-normal {
+    background-color: #a8a878;
+    color: white;
+  }
+  .type-fire {
+    background-color: #f08030;
+    color: white;
+  }
+  .type-water {
+    background-color: #6890f0;
+    color: white;
+  }
+  .type-electric {
+    background-color: #f8d030;
+    color: #333;
+  }
+  .type-grass {
+    background-color: #78c850;
+    color: white;
+  }
+  .type-ice {
+    background-color: #98d8d8;
+    color: #333;
+  }
+  .type-fighting {
+    background-color: #c03028;
+    color: white;
+  }
+  .type-poison {
+    background-color: #a040a0;
+    color: white;
+  }
+  .type-ground {
+    background-color: #e0c068;
+    color: #333;
+  }
+  .type-flying {
+    background-color: #a890f0;
+    color: white;
+  }
+  .type-psychic {
+    background-color: #f85888;
+    color: white;
+  }
+  .type-bug {
+    background-color: #a8b820;
+    color: white;
+  }
+  .type-rock {
+    background-color: #b8a038;
+    color: white;
+  }
+  .type-ghost {
+    background-color: #705898;
+    color: white;
+  }
+  .type-dragon {
+    background-color: #7038f8;
+    color: white;
+  }
+  .type-dark {
+    background-color: #705848;
+    color: white;
+  }
+  .type-steel {
+    background-color: #b8b8d0;
+    color: #333;
+  }
+  .type-fairy {
+    background-color: #ee99ac;
+    color: white;
+  }
+  .type-colorless {
+    background-color: #c8c8c8;
+    color: #333;
+  }
+  .type-lightning {
+    background-color: #f8d030;
+    color: #333;
+  }
+  .type-metal {
+    background-color: #b8b8d0;
+    color: #333;
+  }
+  .type-darkness {
+    background-color: #705848;
+    color: white;
+  }
 }
 
 /* ─── Card Condition Badges ────────────────────────────────────────────────── */
 @layer utilities {
-  .condition-M  { background-color: #7C3AED; color: white; }
-  .condition-NM { background-color: #16A34A; color: white; }
-  .condition-SP { background-color: #2563EB; color: white; }
-  .condition-MP { background-color: #D97706; color: white; }
-  .condition-HP { background-color: #DC2626; color: white; }
-  .condition-D  { background-color: #6B7280; color: white; }
+  .condition-M {
+    background-color: #7c3aed;
+    color: white;
+  }
+  .condition-NM {
+    background-color: #16a34a;
+    color: white;
+  }
+  .condition-SP {
+    background-color: #2563eb;
+    color: white;
+  }
+  .condition-MP {
+    background-color: #d97706;
+    color: white;
+  }
+  .condition-HP {
+    background-color: #dc2626;
+    color: white;
+  }
+  .condition-D {
+    background-color: #6b7280;
+    color: white;
+  }
 }
 
 /* ─── Pokémon Card Hover Effect ────────────────────────────────────────────── */
 @layer utilities {
   .poke-card {
-    transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
-                box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition:
+      transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+      box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1);
     cursor: pointer;
   }
 
@@ -241,8 +355,12 @@
 
 /* ─── Marquee Animation ────────────────────────────────────────────────────── */
 @keyframes marquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 
 .marquee-track {
@@ -257,8 +375,12 @@
 
 /* ─── Shimmer Skeleton ─────────────────────────────────────────────────────── */
 @keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton {
@@ -297,7 +419,7 @@
 @layer utilities {
   .liga-tabs {
     display: flex;
-    border-bottom: 2px solid oklch(0.90 0.005 240);
+    border-bottom: 2px solid oklch(0.9 0.005 240);
     gap: 0;
   }
 
@@ -309,7 +431,9 @@
     border-bottom: 2px solid transparent;
     margin-bottom: -2px;
     cursor: pointer;
-    transition: color 150ms ease, border-color 150ms ease;
+    transition:
+      color 150ms ease,
+      border-color 150ms ease;
     white-space: nowrap;
   }
 
@@ -343,7 +467,7 @@
   }
 
   .section-title::before {
-    content: '';
+    content: "";
     display: inline-block;
     width: 4px;
     height: 1.25em;
@@ -373,7 +497,7 @@
 @layer utilities {
   .filter-sidebar {
     background: white;
-    border: 1px solid oklch(0.90 0.005 240);
+    border: 1px solid oklch(0.9 0.005 240);
     border-radius: 12px;
     padding: 1.25rem;
     position: sticky;
@@ -397,13 +521,23 @@
 
 /* ─── Animations ───────────────────────────────────────────────────────────── */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .animate-fade-in-up {
@@ -415,12 +549,24 @@
 }
 
 /* ─── Stagger children ─────────────────────────────────────────────────────── */
-.stagger > *:nth-child(1) { animation-delay: 0ms; }
-.stagger > *:nth-child(2) { animation-delay: 50ms; }
-.stagger > *:nth-child(3) { animation-delay: 100ms; }
-.stagger > *:nth-child(4) { animation-delay: 150ms; }
-.stagger > *:nth-child(5) { animation-delay: 200ms; }
-.stagger > *:nth-child(6) { animation-delay: 250ms; }
+.stagger > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 150ms;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 200ms;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 250ms;
+}
 
 /* ─── Responsive Grid ──────────────────────────────────────────────────────── */
 @layer utilities {
@@ -445,8 +591,14 @@
 
 /* ─── Reduced Motion ───────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }

@@ -2,20 +2,39 @@ import { useState } from "react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import {
-  ArrowLeft, BadgeCheck, Package, ShoppingCart, Star, Store, Tag,
+  ArrowLeft,
+  BadgeCheck,
+  Package,
+  ShoppingCart,
+  Star,
+  Store,
+  Tag,
+  ShieldCheck,
+  Truck,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CONDITIONS, ConditionPill } from "@/components/ConditionPill";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
-function SellDialog({ productId, productName }: { productId: number; productName: string }) {
+function SellDialog({
+  productId,
+  productName,
+}: {
+  productId: number;
+  productName: string;
+}) {
   const [open, setOpen] = useState(false);
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -27,38 +46,61 @@ function SellDialog({ productId, productName }: { productId: number; productName
     onSuccess: () => {
       toast.success("Listing published!");
       setOpen(false);
-      setPrice(""); setQuantity("1"); setNotes("");
+      setPrice("");
+      setQuantity("1");
+      setNotes("");
       utils.products.bySlug.invalidate();
     },
-    onError: (e) => toast.error(e.message),
+    onError: e => toast.error(e.message),
   });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2"><Tag className="w-4 h-4" />Sell yours</Button>
+        <Button variant="outline" className="gap-2">
+          <Tag className="w-4 h-4" />
+          Sell yours
+        </Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Sell: {productName}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Sell: {productName}</DialogTitle>
+        </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-semibold">Price (USD)</label>
-              <Input type="number" min="0.01" step="0.01" value={price}
-                onChange={e => setPrice(e.target.value)} placeholder="0.00" />
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={price}
+                onChange={e => setPrice(e.target.value)}
+                placeholder="0.00"
+              />
             </div>
             <div>
               <label className="text-sm font-semibold">Quantity</label>
-              <Input type="number" min="1" max="999" value={quantity}
-                onChange={e => setQuantity(e.target.value)} />
+              <Input
+                type="number"
+                min="1"
+                max="999"
+                value={quantity}
+                onChange={e => setQuantity(e.target.value)}
+              />
             </div>
           </div>
           <div>
             <label className="text-sm font-semibold">Condition</label>
             <div className="flex gap-1.5 mt-1 flex-wrap">
               {CONDITIONS.map(c => (
-                <button key={c} onClick={() => setCondition(c)}
-                  className={condition === c ? "ring-2 ring-blue-500 rounded-full" : ""}>
+                <button
+                  key={c}
+                  onClick={() => setCondition(c)}
+                  className={
+                    condition === c ? "ring-2 ring-blue-500 rounded-full" : ""
+                  }
+                >
                   <ConditionPill condition={c} />
                 </button>
               ))}
@@ -66,17 +108,26 @@ function SellDialog({ productId, productName }: { productId: number; productName
           </div>
           <div>
             <label className="text-sm font-semibold">Notes (optional)</label>
-            <Textarea value={notes} onChange={e => setNotes(e.target.value)}
-              placeholder="Sealed, ships in a box, etc." maxLength={1000} />
+            <Textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Sealed, ships in a box, etc."
+              maxLength={1000}
+            />
           </div>
-          <Button className="w-full" disabled={create.isPending || !price || Number(price) <= 0}
-            onClick={() => create.mutate({
-              productId,
-              priceUsd: Number(price),
-              quantity: Math.max(1, Number(quantity) || 1),
-              condition,
-              notes: notes.trim() || undefined,
-            })}>
+          <Button
+            className="w-full"
+            disabled={create.isPending || !price || Number(price) <= 0}
+            onClick={() =>
+              create.mutate({
+                productId,
+                priceUsd: Number(price),
+                quantity: Math.max(1, Number(quantity) || 1),
+                condition,
+                notes: notes.trim() || undefined,
+              })
+            }
+          >
             {create.isPending ? "Publishing…" : "Publish listing"}
           </Button>
         </div>
@@ -93,7 +144,12 @@ export default function ProductDetail() {
 
   const { data, isLoading, error } = trpc.products.bySlug.useQuery(
     { slug: slug ?? "" },
-    { enabled: !!slug, retry: false },
+    { enabled: !!slug, retry: false }
+  );
+  usePageMeta(
+    data?.product.name ?? "Product",
+    data?.product.description ??
+      "Pokémon TCG sealed product marketplace listing."
   );
 
   const addToCart = trpc.cart.add.useMutation({
@@ -102,7 +158,7 @@ export default function ProductDetail() {
       utils.cart.count.invalidate();
       utils.cart.get.invalidate();
     },
-    onError: (e) => toast.error(e.message),
+    onError: e => toast.error(e.message),
   });
 
   if (isLoading) {
@@ -112,7 +168,9 @@ export default function ProductDetail() {
         <div className="grid md:grid-cols-[320px_1fr] gap-8">
           <Skeleton className="h-64 rounded-xl" />
           <div className="space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 rounded-lg" />
+            ))}
           </div>
         </div>
       </div>
@@ -122,96 +180,164 @@ export default function ProductDetail() {
   if (error || !data) {
     return (
       <div className="container py-20 text-center">
-        <span className="text-6xl">📦</span>
+        <Package className="mx-auto h-14 w-14 text-gray-300" />
         <p className="mt-4 font-bold text-lg">Product not found</p>
-        <Link href="/shop" className="btn-primary mt-4 inline-flex">Back to Shop</Link>
+        <Link href="/shop" className="btn-primary mt-4 inline-flex">
+          Back to Shop
+        </Link>
       </div>
     );
   }
 
-  const { product, sellers } = data;
+  const { product, sellers, related } = data;
   const refPrice = product.avgPriceUsd ?? product.minPriceUsd;
 
   return (
-    <div className="min-h-screen" style={{ background: "oklch(0.97 0.005 240)" }}>
-      <div className="container py-6">
-        <Link href="/shop" className="inline-flex items-center gap-1.5 text-sm font-semibold mb-4"
-          style={{ color: "oklch(0.54 0.25 293)" }}>
-          <ArrowLeft className="w-4 h-4" />Shop
-        </Link>
+    <div className="min-h-screen bg-[#f6f7fb]">
+      <div className="border-b border-white/10 bg-[#0b1020] text-white">
+        <div className="container py-8">
+          <Link
+            href="/shop"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold mb-4"
+            style={{ color: "#c4b5fd" }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Shop
+          </Link>
 
-        <div className="grid md:grid-cols-[320px_1fr] gap-8">
-          {/* Product panel */}
-          <div>
-            <div className="bg-white border border-gray-200 rounded-xl p-6 flex items-center justify-center h-64">
+          <div className="grid gap-8 md:grid-cols-[360px_1fr] md:items-center">
+            <div className="flex h-80 items-center justify-center rounded-3xl bg-white p-8 shadow-2xl">
               {!imgError && product.imageUrl ? (
-                <img src={product.imageUrl} alt={product.name} className="max-h-full object-contain"
-                  onError={() => setImgError(true)} />
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  className="max-h-full object-contain"
+                  onError={() => setImgError(true)}
+                />
               ) : (
-                <Package className="w-16 h-16" style={{ color: "oklch(0.75 0.01 240)" }} />
+                <Package className="h-16 w-16 text-gray-300" />
               )}
             </div>
-            <h1 className="text-xl font-black mt-4" style={{ color: "oklch(0.18 0.02 240)" }}>{product.name}</h1>
-            {product.setName && (
-              <p className="text-sm mt-1" style={{ color: "oklch(0.52 0.015 240)" }}>{product.setName}</p>
-            )}
-            {product.description && (
-              <p className="text-sm mt-3" style={{ color: "oklch(0.35 0.02 240)" }}>{product.description}</p>
-            )}
-            {refPrice && (
-              <div className="bg-white border border-gray-200 rounded-xl p-4 mt-4">
-                <p className="text-xs font-bold uppercase" style={{ color: "oklch(0.52 0.015 240)" }}>Reference price</p>
-                <div className="flex items-baseline gap-3 mt-1">
-                  <span className="text-2xl font-black" style={{ color: "oklch(0.18 0.02 240)" }}>
-                    ${Number(refPrice).toFixed(2)}
-                  </span>
-                  {product.minPriceUsd && product.maxPriceUsd && (
-                    <span className="text-xs" style={{ color: "oklch(0.52 0.015 240)" }}>
-                      ${Number(product.minPriceUsd).toFixed(2)} – ${Number(product.maxPriceUsd).toFixed(2)}
-                    </span>
-                  )}
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-300">
+                {product.setName ?? product.category.replaceAll("_", " ")}
+              </p>
+              <h1 className="mt-3 text-3xl font-black leading-tight text-white md:text-5xl">
+                {product.name}
+              </h1>
+              {product.description && (
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+                  {product.description}
+                </p>
+              )}
+              <div className="mt-6 flex flex-wrap gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    Market reference
+                  </p>
+                  <p className="mt-1 text-2xl font-black text-white">
+                    {refPrice
+                      ? `$${Number(refPrice).toFixed(2)}`
+                      : "Unavailable"}
+                  </p>
                 </div>
+                {product.minPriceUsd && product.maxPriceUsd && (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Observed range
+                    </p>
+                    <p className="mt-1 text-lg font-black text-white">
+                      ${Number(product.minPriceUsd).toFixed(2)} – $
+                      {Number(product.maxPriceUsd).toFixed(2)}
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
+        </div>
+      </div>
 
-          {/* Sellers panel */}
+      <div className="container py-8">
+        <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
+          {/* Product panel */}
           <div>
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <h2 className="font-black text-lg" style={{ color: "oklch(0.18 0.02 240)" }}>
+              <h2
+                className="font-black text-lg"
+                style={{ color: "oklch(0.18 0.02 240)" }}
+              >
                 {sellers.length} {sellers.length === 1 ? "seller" : "sellers"}
               </h2>
               {isAuthenticated ? (
                 <SellDialog productId={product.id} productName={product.name} />
               ) : (
-                <a href="/login" className="btn-ghost text-sm">Sign in to sell</a>
+                <a href="/login" className="btn-ghost text-sm">
+                  Sign in to sell
+                </a>
               )}
             </div>
 
             {sellers.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
-                <Store className="w-10 h-10 mx-auto" style={{ color: "oklch(0.75 0.01 240)" }} />
-                <p className="mt-3 font-bold" style={{ color: "oklch(0.35 0.02 240)" }}>No active listings yet</p>
-                <p className="text-sm mt-1" style={{ color: "oklch(0.52 0.015 240)" }}>Be the first to sell this product.</p>
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center">
+                <Store
+                  className="w-10 h-10 mx-auto"
+                  style={{ color: "oklch(0.75 0.01 240)" }}
+                />
+                <p
+                  className="mt-3 font-bold"
+                  style={{ color: "oklch(0.35 0.02 240)" }}
+                >
+                  No active listings yet
+                </p>
+                <p
+                  className="text-sm mt-1"
+                  style={{ color: "oklch(0.52 0.015 240)" }}
+                >
+                  Be the first to sell this product.
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
-                {sellers.map((s) => (
-                  <div key={s.listing.id}
-                    className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 flex-wrap">
+                {sellers.map(s => (
+                  <div
+                    key={s.listing.id}
+                    className="flex flex-wrap items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-violet-300 hover:shadow-md"
+                  >
                     <div className="flex-1 min-w-[180px]">
                       <div className="flex items-center gap-1.5">
-                        <Link href={s.sellerUsername ? `/profile/${s.sellerUsername}` : "#"}
-                          className="font-bold text-sm hover:underline" style={{ color: "oklch(0.18 0.02 240)" }}>
+                        <Link
+                          href={
+                            s.sellerUsername
+                              ? `/profile/${s.sellerUsername}`
+                              : "#"
+                          }
+                          className="font-bold text-sm hover:underline"
+                          style={{ color: "oklch(0.18 0.02 240)" }}
+                        >
                           {s.sellerName ?? "Seller"}
                         </Link>
-                        {s.sellerIsVerified && <BadgeCheck className="w-4 h-4 text-blue-500" />}
-                        {s.sellerHasPhysicalStore && <Store className="w-3.5 h-3.5" style={{ color: "oklch(0.52 0.015 240)" }} />}
+                        {s.sellerIsVerified && (
+                          <BadgeCheck className="w-4 h-4 text-blue-500" />
+                        )}
+                        {s.sellerHasPhysicalStore && (
+                          <Store
+                            className="w-3.5 h-3.5"
+                            style={{ color: "oklch(0.52 0.015 240)" }}
+                          />
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs mt-0.5" style={{ color: "oklch(0.52 0.015 240)" }}>
+                      <div
+                        className="flex items-center gap-2 text-xs mt-0.5"
+                        style={{ color: "oklch(0.52 0.015 240)" }}
+                      >
                         {s.sellerRating != null && (
                           <span className="inline-flex items-center gap-0.5">
-                            <Star className="w-3 h-3" fill="#F59E0B" stroke="#F59E0B" />
+                            <Star
+                              className="w-3 h-3"
+                              fill="#F59E0B"
+                              stroke="#F59E0B"
+                            />
                             {Number(s.sellerRating).toFixed(1)}
                           </span>
                         )}
@@ -219,23 +345,47 @@ export default function ProductDetail() {
                         {s.sellerLocation && <span>· {s.sellerLocation}</span>}
                       </div>
                       {s.listing.notes && (
-                        <p className="text-xs mt-1 line-clamp-1" style={{ color: "oklch(0.52 0.015 240)" }}>{s.listing.notes}</p>
+                        <p
+                          className="text-xs mt-1 line-clamp-1"
+                          style={{ color: "oklch(0.52 0.015 240)" }}
+                        >
+                          {s.listing.notes}
+                        </p>
                       )}
                     </div>
                     <div className="flex items-center gap-3">
                       <ConditionPill condition={s.listing.condition} />
-                      <span className="text-xs" style={{ color: "oklch(0.52 0.015 240)" }}>×{s.listing.quantity}</span>
-                      <span className="font-black text-lg" style={{ color: "oklch(0.18 0.02 240)" }}>
+                      <span
+                        className="text-xs"
+                        style={{ color: "oklch(0.52 0.015 240)" }}
+                      >
+                        ×{s.listing.quantity}
+                      </span>
+                      <span
+                        className="font-black text-lg"
+                        style={{ color: "oklch(0.18 0.02 240)" }}
+                      >
                         ${Number(s.listing.priceUsd).toFixed(2)}
                       </span>
                       {isAuthenticated ? (
-                        <Button size="sm" className="gap-1.5"
+                        <Button
+                          size="sm"
+                          className="gap-1.5"
                           disabled={addToCart.isPending}
-                          onClick={() => addToCart.mutate({ productListingId: s.listing.id, quantity: 1 })}>
-                          <ShoppingCart className="w-4 h-4" />Add
+                          onClick={() =>
+                            addToCart.mutate({
+                              productListingId: s.listing.id,
+                              quantity: 1,
+                            })
+                          }
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          Add
                         </Button>
                       ) : (
-                        <a href="/login" className="btn-primary text-sm">Sign in</a>
+                        <a href="/login" className="btn-primary text-sm">
+                          Sign in
+                        </a>
                       )}
                     </div>
                   </div>
@@ -243,7 +393,83 @@ export default function ProductDetail() {
               </div>
             )}
           </div>
+
+          <aside className="space-y-3">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              <h3 className="mt-3 font-black text-gray-900">
+                Buyer protection
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-gray-500">
+                Payments are held securely and released according to the order
+                status.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <Truck className="h-5 w-5 text-violet-600" />
+              <h3 className="mt-3 font-black text-gray-900">
+                Seller-by-seller shipping
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-gray-500">
+                Review each listing's notes and seller profile before checkout.
+              </p>
+            </div>
+          </aside>
         </div>
+
+        {related.length > 0 && (
+          <section className="mt-12">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">
+                  Keep exploring
+                </p>
+                <h2 className="mt-1 text-2xl font-black text-gray-900">
+                  Related products
+                </h2>
+              </div>
+              <Link
+                href={
+                  product.setId
+                    ? `/shop?set=${product.setId}`
+                    : `/shop?cat=${product.category}`
+                }
+                className="text-sm font-black text-violet-700"
+              >
+                View all
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {related.map(item => (
+                <Link
+                  key={item.id}
+                  href={`/shop/${item.slug}`}
+                  className="group overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm transition hover:-translate-y-1 hover:border-violet-300"
+                >
+                  <div className="flex aspect-square items-center justify-center rounded-xl bg-gray-50 p-3">
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="h-full w-full object-contain transition group-hover:scale-105"
+                      />
+                    ) : (
+                      <Package className="h-8 w-8 text-gray-300" />
+                    )}
+                  </div>
+                  <p className="mt-3 line-clamp-2 text-sm font-black text-gray-900">
+                    {item.name}
+                  </p>
+                  <p className="mt-2 text-sm font-black text-emerald-700">
+                    {item.avgPriceUsd || item.minPriceUsd
+                      ? `$${Number(item.avgPriceUsd ?? item.minPriceUsd).toFixed(2)}`
+                      : "Price unavailable"}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

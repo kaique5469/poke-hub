@@ -10,6 +10,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { useState } from "react";
 import { toast } from "sonner";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import {
   Calendar,
   Eye,
@@ -58,7 +59,7 @@ function formatDate(iso: string | null) {
 function getInitials(name: string) {
   return name
     .split(" ")
-    .map((n) => n[0])
+    .map(n => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
@@ -87,13 +88,18 @@ function renderMarkdown(content: string) {
     // Handle fenced code blocks
     if (trimmed.startsWith("```")) {
       if (!inCodeBlock) {
-        if (inList) { html.push("</ul>"); inList = false; }
+        if (inList) {
+          html.push("</ul>");
+          inList = false;
+        }
         inCodeBlock = true;
         codeLines = [];
       } else {
         inCodeBlock = false;
         const code = escapeHtml(codeLines.join("\n"));
-        html.push(`<pre class="bg-gray-900 text-green-400 rounded-xl p-4 my-4 overflow-x-auto text-sm font-mono"><code>${code}</code></pre>`);
+        html.push(
+          `<pre class="bg-gray-900 text-green-400 rounded-xl p-4 my-4 overflow-x-auto text-sm font-mono"><code>${code}</code></pre>`
+        );
         codeLines = [];
       }
       continue;
@@ -105,35 +111,76 @@ function renderMarkdown(content: string) {
     }
 
     if (!trimmed) {
-      if (inList) { html.push("</ul>"); inList = false; }
-      html.push("<div class=\"my-2\"></div>");
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push('<div class="my-2"></div>');
       continue;
     }
 
     if (trimmed.startsWith("### ")) {
-      if (inList) { html.push("</ul>"); inList = false; }
-      html.push(`<h3 class="text-lg font-bold text-gray-900 mt-6 mb-2">${inlineMarkdown(trimmed.slice(4))}</h3>`);
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push(
+        `<h3 class="text-lg font-bold text-gray-900 mt-6 mb-2">${inlineMarkdown(trimmed.slice(4))}</h3>`
+      );
     } else if (trimmed.startsWith("## ")) {
-      if (inList) { html.push("</ul>"); inList = false; }
-      html.push(`<h2 class="text-xl font-bold text-gray-900 mt-8 mb-3">${inlineMarkdown(trimmed.slice(3))}</h2>`);
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push(
+        `<h2 class="text-xl font-bold text-gray-900 mt-8 mb-3">${inlineMarkdown(trimmed.slice(3))}</h2>`
+      );
     } else if (trimmed.startsWith("# ")) {
-      if (inList) { html.push("</ul>"); inList = false; }
-      html.push(`<h1 class="text-2xl font-bold text-gray-900 mt-8 mb-4">${inlineMarkdown(trimmed.slice(2))}</h1>`);
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push(
+        `<h1 class="text-2xl font-bold text-gray-900 mt-8 mb-4">${inlineMarkdown(trimmed.slice(2))}</h1>`
+      );
     } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-      if (!inList) { html.push('<ul class="list-disc pl-6 my-3 space-y-1">'); inList = true; }
-      html.push(`<li class="text-gray-700">${inlineMarkdown(trimmed.slice(2))}</li>`);
+      if (!inList) {
+        html.push('<ul class="list-disc pl-6 my-3 space-y-1">');
+        inList = true;
+      }
+      html.push(
+        `<li class="text-gray-700">${inlineMarkdown(trimmed.slice(2))}</li>`
+      );
     } else if (/^\d+\.\s/.test(trimmed)) {
-      if (inList) { html.push("</ul>"); inList = false; }
-      html.push(`<ol class="list-decimal pl-6 my-3"><li class="text-gray-700">${inlineMarkdown(trimmed.replace(/^\d+\.\s/, ""))}</li></ol>`);
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push(
+        `<ol class="list-decimal pl-6 my-3"><li class="text-gray-700">${inlineMarkdown(trimmed.replace(/^\d+\.\s/, ""))}</li></ol>`
+      );
     } else if (trimmed.startsWith("> ")) {
-      if (inList) { html.push("</ul>"); inList = false; }
-      html.push(`<blockquote class="border-l-4 border-blue-400 pl-4 py-1 my-4 bg-blue-50 rounded-r-lg text-gray-700 italic">${inlineMarkdown(trimmed.slice(2))}</blockquote>`);
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push(
+        `<blockquote class="border-l-4 border-blue-400 pl-4 py-1 my-4 bg-blue-50 rounded-r-lg text-gray-700 italic">${inlineMarkdown(trimmed.slice(2))}</blockquote>`
+      );
     } else if (trimmed.startsWith("---") || trimmed.startsWith("***")) {
-      if (inList) { html.push("</ul>"); inList = false; }
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
       html.push('<hr class="my-6 border-gray-200" />');
     } else {
-      if (inList) { html.push("</ul>"); inList = false; }
-      html.push(`<p class="text-gray-700 leading-relaxed my-3">${inlineMarkdown(trimmed)}</p>`);
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push(
+        `<p class="text-gray-700 leading-relaxed my-3">${inlineMarkdown(trimmed)}</p>`
+      );
     }
   }
 
@@ -141,7 +188,9 @@ function renderMarkdown(content: string) {
   if (inList) html.push("</ul>");
   if (inCodeBlock && codeLines.length > 0) {
     const code = escapeHtml(codeLines.join("\n"));
-    html.push(`<pre class="bg-gray-900 text-green-400 rounded-xl p-4 my-4 overflow-x-auto text-sm font-mono"><code>${code}</code></pre>`);
+    html.push(
+      `<pre class="bg-gray-900 text-green-400 rounded-xl p-4 my-4 overflow-x-auto text-sm font-mono"><code>${code}</code></pre>`
+    );
   }
 
   return html.join("\n");
@@ -151,12 +200,18 @@ function inlineMarkdown(text: string): string {
   return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/`(.*?)`/g, '<code class="bg-gray-100 text-red-600 px-1 rounded text-sm font-mono">$1</code>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, escapedUrl: string) => {
-      const url = escapedUrl.replace(/&amp;/g, "&");
-      if (!/^https?:\/\//i.test(url)) return label;
-      return `<a href="${escapeHtml(url)}" class="text-blue-600 underline hover:text-blue-700" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`;
-    });
+    .replace(
+      /`(.*?)`/g,
+      '<code class="bg-gray-100 text-red-600 px-1 rounded text-sm font-mono">$1</code>'
+    )
+    .replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      (_match, label: string, escapedUrl: string) => {
+        const url = escapedUrl.replace(/&amp;/g, "&");
+        if (!/^https?:\/\//i.test(url)) return label;
+        return `<a href="${escapeHtml(url)}" class="text-blue-600 underline hover:text-blue-700" target="_blank" rel="noopener noreferrer nofollow">${label}</a>`;
+      }
+    );
 }
 
 export default function ArticleDetail() {
@@ -165,9 +220,15 @@ export default function ArticleDetail() {
   const { user, isAuthenticated } = useAuth();
   const [comment, setComment] = useState("");
 
-  const { data: article, isLoading, error, refetch } = trpc.articles.getBySlug.useQuery(
-    { slug },
-    { enabled: !!slug }
+  const {
+    data: article,
+    isLoading,
+    error,
+    refetch,
+  } = trpc.articles.getBySlug.useQuery({ slug }, { enabled: !!slug });
+  usePageMeta(
+    article?.title ?? "Article",
+    article?.subtitle ?? "Pokémon TCG news, strategy and collector analysis."
   );
 
   const addCommentMutation = trpc.articles.addComment.useMutation({
@@ -176,7 +237,7 @@ export default function ArticleDetail() {
       setComment("");
       refetch();
     },
-    onError: (err) => toast.error(err.message),
+    onError: err => toast.error(err.message),
   });
 
   const handleShare = () => {
@@ -193,7 +254,9 @@ export default function ArticleDetail() {
           <Skeleton className="h-8 w-3/4" />
           <Skeleton className="h-4 w-1/2" />
           <div className="space-y-3 mt-8">
-            {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-4 w-full" />
+            ))}
           </div>
         </div>
       </div>
@@ -205,8 +268,12 @@ export default function ArticleDetail() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Article Not Found</h1>
-          <p className="text-gray-500 mb-6">This article doesn't exist or has been removed.</p>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+            Article Not Found
+          </h1>
+          <p className="text-gray-500 mb-6">
+            This article doesn't exist or has been removed.
+          </p>
           <Link href="/articles">
             <Button>Browse Articles</Button>
           </Link>
@@ -216,41 +283,68 @@ export default function ArticleDetail() {
   }
 
   // Author data from joined query
-  const authorName = (article as { authorName?: string | null }).authorName ?? "TCG Arena Staff";
-  const authorUsername = (article as { authorUsername?: string | null }).authorUsername;
-  const authorAvatarUrl = (article as { authorAvatarUrl?: string | null }).authorAvatarUrl;
+  const authorName =
+    (article as { authorName?: string | null }).authorName ?? "TCG Arena Staff";
+  const authorUsername = (article as { authorUsername?: string | null })
+    .authorUsername;
+  const authorAvatarUrl = (article as { authorAvatarUrl?: string | null })
+    .authorAvatarUrl;
 
   const readTime = estimateReadTime(article.content);
-  const categoryColor = CATEGORY_COLORS[article.category] ?? "bg-gray-100 text-gray-700";
+  const categoryColor =
+    CATEGORY_COLORS[article.category] ?? "bg-gray-100 text-gray-700";
   const categoryLabel = CATEGORY_LABELS[article.category] ?? article.category;
-  const tags = Array.isArray(article.tags) ? article.tags as string[] : [];
+  const tags = Array.isArray(article.tags) ? (article.tags as string[]) : [];
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-sm text-gray-500">
-          <Link href="/" className="hover:text-blue-600 transition-colors">Home</Link>
+          <Link href="/" className="hover:text-blue-600 transition-colors">
+            Home
+          </Link>
           <ChevronRight className="w-3.5 h-3.5" />
-          <Link href="/articles" className="hover:text-blue-600 transition-colors">Articles</Link>
+          <Link
+            href="/articles"
+            className="hover:text-blue-600 transition-colors"
+          >
+            Articles
+          </Link>
           <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-gray-800 font-medium truncate max-w-[200px]">{article.title}</span>
+          <span className="text-gray-800 font-medium truncate max-w-[200px]">
+            {article.title}
+          </span>
         </nav>
 
         {/* Cover Image */}
         {article.coverImageUrl && (
-          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 aspect-[21/9]"
-            style={/official-artwork|images\.pokemontcg\.io/.test(article.coverImageUrl)
-              ? { background: "linear-gradient(135deg, #0B1220 0%, #2b1a55 55%, #5B21B6 100%)" }
-              : undefined}>
+          <div
+            className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 aspect-[21/9]"
+            style={
+              /official-artwork|images\.pokemontcg\.io/.test(
+                article.coverImageUrl
+              )
+                ? {
+                    background:
+                      "linear-gradient(135deg, #0B1220 0%, #2b1a55 55%, #5B21B6 100%)",
+                  }
+                : undefined
+            }
+          >
             <img
               src={article.coverImageUrl}
               alt={article.title}
-              className={/official-artwork|images\.pokemontcg\.io/.test(article.coverImageUrl)
-                ? "w-full h-full object-contain p-6 drop-shadow-2xl"
-                : "w-full h-full object-cover"}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              className={
+                /official-artwork|images\.pokemontcg\.io/.test(
+                  article.coverImageUrl
+                )
+                  ? "w-full h-full object-contain p-6 drop-shadow-2xl"
+                  : "w-full h-full object-cover"
+              }
+              onError={e => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
             />
           </div>
         )}
@@ -259,11 +353,17 @@ export default function ArticleDetail() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
           {/* Category + Tags */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <Badge className={`${categoryColor} border-0 text-xs font-semibold`}>
+            <Badge
+              className={`${categoryColor} border-0 text-xs font-semibold`}
+            >
               {categoryLabel}
             </Badge>
-            {tags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs text-gray-500 border-gray-200">
+            {tags.map(tag => (
+              <Badge
+                key={tag}
+                variant="outline"
+                className="text-xs text-gray-500 border-gray-200"
+              >
                 <Tag className="w-2.5 h-2.5 mr-1" />
                 {tag}
               </Badge>
@@ -282,15 +382,21 @@ export default function ArticleDetail() {
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 pb-6 border-b border-gray-100">
             <div className="flex items-center gap-1.5">
               <Avatar className="w-8 h-8">
-                {authorAvatarUrl && <AvatarImage src={authorAvatarUrl} alt={authorName} />}
+                {authorAvatarUrl && (
+                  <AvatarImage src={authorAvatarUrl} alt={authorName} />
+                )}
                 <AvatarFallback className="bg-blue-600 text-white text-xs font-bold">
                   {getInitials(authorName)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <span className="font-medium text-gray-700 block leading-tight">{authorName}</span>
+                <span className="font-medium text-gray-700 block leading-tight">
+                  {authorName}
+                </span>
                 {authorUsername && (
-                  <span className="text-xs text-gray-400">@{authorUsername}</span>
+                  <span className="text-xs text-gray-400">
+                    @{authorUsername}
+                  </span>
                 )}
               </div>
             </div>
@@ -322,7 +428,9 @@ export default function ArticleDetail() {
           {/* Article Content */}
           <div
             className="prose prose-gray max-w-none mt-6"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }}
+            dangerouslySetInnerHTML={{
+              __html: renderMarkdown(article.content),
+            }}
           />
         </div>
 
@@ -330,8 +438,12 @@ export default function ArticleDetail() {
         {tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-gray-500">Tags:</span>
-            {tags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs text-gray-600 border-gray-200 hover:bg-gray-50 cursor-pointer">
+            {tags.map(tag => (
+              <Badge
+                key={tag}
+                variant="outline"
+                className="text-xs text-gray-600 border-gray-200 hover:bg-gray-50 cursor-pointer"
+              >
                 #{tag}
               </Badge>
             ))}
@@ -359,21 +471,30 @@ export default function ArticleDetail() {
                 <div className="flex-1 space-y-3">
                   <Textarea
                     value={comment}
-                    onChange={(e) => setComment(e.target.value)}
+                    onChange={e => setComment(e.target.value)}
                     placeholder="Share your thoughts on this article..."
                     className="resize-none border-gray-200 focus:border-blue-400 rounded-xl"
                     rows={3}
                     maxLength={2000}
                   />
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">{comment.length}/2000</span>
+                    <span className="text-xs text-gray-400">
+                      {comment.length}/2000
+                    </span>
                     <Button
                       size="sm"
                       disabled={!comment.trim() || addCommentMutation.isPending}
-                      onClick={() => addCommentMutation.mutate({ articleId: article.id, content: comment.trim() })}
+                      onClick={() =>
+                        addCommentMutation.mutate({
+                          articleId: article.id,
+                          content: comment.trim(),
+                        })
+                      }
                       className="bg-blue-600 hover:bg-blue-700"
                     >
-                      {addCommentMutation.isPending ? "Posting..." : "Post Comment"}
+                      {addCommentMutation.isPending
+                        ? "Posting..."
+                        : "Post Comment"}
                     </Button>
                   </div>
                 </div>
@@ -386,7 +507,9 @@ export default function ArticleDetail() {
                 <span>Sign in to leave a comment</span>
               </div>
               <a href={getLoginUrl()}>
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">Sign In</Button>
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                  Sign In
+                </Button>
               </a>
             </div>
           )}
@@ -395,7 +518,9 @@ export default function ArticleDetail() {
           {article.comments.length === 0 ? (
             <div className="text-center py-10">
               <MessageSquare className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-400 text-sm">No comments yet. Be the first to share your thoughts!</p>
+              <p className="text-gray-400 text-sm">
+                No comments yet. Be the first to share your thoughts!
+              </p>
             </div>
           ) : (
             <div className="space-y-5">
@@ -410,14 +535,20 @@ export default function ArticleDetail() {
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-gray-800">User #{c.userId}</span>
+                        <span className="text-sm font-semibold text-gray-800">
+                          User #{c.userId}
+                        </span>
                         <span className="text-xs text-gray-400">
                           {new Date(c.createdAt).toLocaleDateString("en-US", {
-                            month: "short", day: "numeric", year: "numeric"
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
                           })}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700 leading-relaxed">{c.content}</p>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {c.content}
+                      </p>
                     </div>
                   </div>
                 </div>

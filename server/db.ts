@@ -38,7 +38,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const values: InsertUser = { openId: user.openId };
   const updateSet: Record<string, unknown> = {};
 
-  const textFields = ["name", "email", "loginMethod", "avatarUrl", "passwordHash"] as const;
+  const textFields = [
+    "name",
+    "email",
+    "loginMethod",
+    "avatarUrl",
+    "passwordHash",
+  ] as const;
   for (const field of textFields) {
     const value = user[field];
     if (value === undefined) continue;
@@ -57,20 +63,31 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
 
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db
+    .insert(users)
+    .values(values)
+    .onDuplicateKeyUpdate({ set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
   return result[0];
 }
 
 export async function getUserByEmail(email: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
   return result[0];
 }
 
@@ -78,25 +95,40 @@ export async function createUser(data: InsertUser) {
   const db = await getDb();
   if (!db) return undefined;
   await db.insert(users).values(data);
-  const result = await db.select().from(users).where(eq(users.openId, data.openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, data.openId))
+    .limit(1);
   return result[0];
 }
 
 export async function getAdminUser() {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.role, "admin")).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.role, "admin"))
+    .limit(1);
   return result[0];
 }
 
 export async function getUserByUsername(username: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.username, username))
+    .limit(1);
   return result[0];
 }
 
-export async function updateUserProfile(userId: number, data: { username?: string; bio?: string; avatarUrl?: string }) {
+export async function updateUserProfile(
+  userId: number,
+  data: { username?: string; bio?: string; avatarUrl?: string }
+) {
   const db = await getDb();
   if (!db) return;
   await db.update(users).set(data).where(eq(users.id, userId));
@@ -107,7 +139,11 @@ export async function updateUserProfile(userId: number, data: { username?: strin
 export async function getBinderCards(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(binderCards).where(eq(binderCards.userId, userId)).orderBy(desc(binderCards.addedAt));
+  return db
+    .select()
+    .from(binderCards)
+    .where(eq(binderCards.userId, userId))
+    .orderBy(desc(binderCards.addedAt));
 }
 
 export async function addBinderCard(data: InsertBinderCard) {
@@ -117,22 +153,34 @@ export async function addBinderCard(data: InsertBinderCard) {
   return result;
 }
 
-export async function updateBinderCard(id: number, userId: number, data: Partial<InsertBinderCard>) {
+export async function updateBinderCard(
+  id: number,
+  userId: number,
+  data: Partial<InsertBinderCard>
+) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db.update(binderCards).set(data).where(and(eq(binderCards.id, id), eq(binderCards.userId, userId)));
+  await db
+    .update(binderCards)
+    .set(data)
+    .where(and(eq(binderCards.id, id), eq(binderCards.userId, userId)));
 }
 
 export async function removeBinderCard(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db.delete(binderCards).where(and(eq(binderCards.id, id), eq(binderCards.userId, userId)));
+  await db
+    .delete(binderCards)
+    .where(and(eq(binderCards.id, id), eq(binderCards.userId, userId)));
 }
 
 export async function getBinderStats(userId: number) {
   const db = await getDb();
   if (!db) return { totalCards: 0, totalValue: 0 };
-  const cards = await db.select().from(binderCards).where(eq(binderCards.userId, userId));
+  const cards = await db
+    .select()
+    .from(binderCards)
+    .where(eq(binderCards.userId, userId));
   const totalCards = cards.reduce((sum, c) => sum + c.quantity, 0);
   return { totalCards, cards };
 }
@@ -142,13 +190,22 @@ export async function getBinderStats(userId: number) {
 export async function getUserDecks(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(decks).where(eq(decks.userId, userId)).orderBy(desc(decks.updatedAt));
+  return db
+    .select()
+    .from(decks)
+    .where(eq(decks.userId, userId))
+    .orderBy(desc(decks.updatedAt));
 }
 
 export async function getPublicDecks(limit = 20) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(decks).where(eq(decks.isPublic, true)).orderBy(desc(decks.updatedAt)).limit(limit);
+  return db
+    .select()
+    .from(decks)
+    .where(eq(decks.isPublic, true))
+    .orderBy(desc(decks.updatedAt))
+    .limit(limit);
 }
 
 export async function getDeckById(id: number) {
@@ -165,10 +222,17 @@ export async function createDeck(data: InsertDeck) {
   return result;
 }
 
-export async function updateDeck(id: number, userId: number, data: Partial<InsertDeck>) {
+export async function updateDeck(
+  id: number,
+  userId: number,
+  data: Partial<InsertDeck>
+) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db.update(decks).set({ ...data, updatedAt: new Date() }).where(and(eq(decks.id, id), eq(decks.userId, userId)));
+  await db
+    .update(decks)
+    .set({ ...data, updatedAt: new Date() })
+    .where(and(eq(decks.id, id), eq(decks.userId, userId)));
 }
 
 export async function deleteDeck(id: number, userId: number) {
@@ -198,7 +262,11 @@ export async function upsertDeckCards(deckId: number, cards: InsertDeckCard[]) {
 export async function getUserAlerts(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(dropAlerts).where(eq(dropAlerts.userId, userId)).orderBy(desc(dropAlerts.createdAt));
+  return db
+    .select()
+    .from(dropAlerts)
+    .where(eq(dropAlerts.userId, userId))
+    .orderBy(desc(dropAlerts.createdAt));
 }
 
 export async function createAlert(data: InsertDropAlert) {
@@ -208,16 +276,25 @@ export async function createAlert(data: InsertDropAlert) {
   return result;
 }
 
-export async function updateAlert(id: number, userId: number, data: Partial<InsertDropAlert>) {
+export async function updateAlert(
+  id: number,
+  userId: number,
+  data: Partial<InsertDropAlert>
+) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db.update(dropAlerts).set(data).where(and(eq(dropAlerts.id, id), eq(dropAlerts.userId, userId)));
+  await db
+    .update(dropAlerts)
+    .set(data)
+    .where(and(eq(dropAlerts.id, id), eq(dropAlerts.userId, userId)));
 }
 
 export async function deleteAlert(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db.delete(dropAlerts).where(and(eq(dropAlerts.id, id), eq(dropAlerts.userId, userId)));
+  await db
+    .delete(dropAlerts)
+    .where(and(eq(dropAlerts.id, id), eq(dropAlerts.userId, userId)));
 }
 
 // ─── Price Cache ──────────────────────────────────────────────────────────────
@@ -228,15 +305,26 @@ export async function getPriceCacheByIds(cardIds: string[]) {
   // Fetch in batches to avoid huge IN clauses
   const results = [];
   for (const id of cardIds) {
-    const rows = await db.select().from(priceCache).where(eq(priceCache.cardId, id)).limit(1);
+    const rows = await db
+      .select()
+      .from(priceCache)
+      .where(eq(priceCache.cardId, id))
+      .limit(1);
     if (rows[0]) results.push(rows[0]);
   }
   return results;
 }
 
-export async function upsertPriceCache(cardId: string, prices: {
-  tcgLow?: number; tcgMid?: number; tcgHigh?: number; tcgMarket?: number; tcgDirectLow?: number;
-}) {
+export async function upsertPriceCache(
+  cardId: string,
+  prices: {
+    tcgLow?: number;
+    tcgMid?: number;
+    tcgHigh?: number;
+    tcgMarket?: number;
+    tcgDirectLow?: number;
+  }
+) {
   const db = await getDb();
   if (!db) return;
   const vals = {
@@ -247,13 +335,22 @@ export async function upsertPriceCache(cardId: string, prices: {
     tcgMarket: prices.tcgMarket ?? null,
     tcgDirectLow: prices.tcgDirectLow ?? null,
   };
-  await db.insert(priceCache).values(vals as never).onDuplicateKeyUpdate({
-    set: { ...vals, updatedAt: new Date() } as never,
-  });
+  await db
+    .insert(priceCache)
+    .values(vals as never)
+    .onDuplicateKeyUpdate({
+      set: { ...vals, updatedAt: new Date() } as never,
+    });
 }
 
 // ─── Auctions ─────────────────────────────────────────────────────────────────
-import { auctions, auctionBids, auctionWatches, articles, comments } from "../drizzle/schema";
+import {
+  auctions,
+  auctionBids,
+  auctionWatches,
+  articles,
+  comments,
+} from "../drizzle/schema";
 import type { InsertAuction } from "../drizzle/schema";
 
 export interface AuctionFilters {
@@ -273,22 +370,34 @@ export async function getActiveAuctions(filters: AuctionFilters = {}) {
   const priceCol = sql`COALESCE(${auctions.currentBidUsd}, ${auctions.startingBidUsd})`;
   const where = and(
     eq(auctions.status, "active"),
-    filters.conditions?.length ? inArray(auctions.condition, filters.conditions) : undefined,
+    filters.conditions?.length
+      ? inArray(auctions.condition, filters.conditions)
+      : undefined,
     filters.language ? eq(auctions.language, filters.language) : undefined,
     filters.foilOnly ? eq(auctions.isFoil, true) : undefined,
     filters.promoOnly ? eq(auctions.isPromo, true) : undefined,
-    filters.minPrice !== undefined ? sql`${priceCol} >= ${filters.minPrice}` : undefined,
-    filters.maxPrice !== undefined ? sql`${priceCol} <= ${filters.maxPrice}` : undefined,
+    filters.minPrice !== undefined
+      ? sql`${priceCol} >= ${filters.minPrice}`
+      : undefined,
+    filters.maxPrice !== undefined
+      ? sql`${priceCol} <= ${filters.maxPrice}`
+      : undefined
   );
 
   const orderBy =
-    filters.sort === "bids" ? desc(auctions.bidCount)
-    : filters.sort === "price_asc" ? sql`${priceCol} ASC`
-    : filters.sort === "price_desc" ? sql`${priceCol} DESC`
-    : filters.sort === "newest" ? desc(auctions.createdAt)
-    : auctions.endsAt; // ending_soon (default)
+    filters.sort === "bids"
+      ? desc(auctions.bidCount)
+      : filters.sort === "price_asc"
+        ? sql`${priceCol} ASC`
+        : filters.sort === "price_desc"
+          ? sql`${priceCol} DESC`
+          : filters.sort === "newest"
+            ? desc(auctions.createdAt)
+            : auctions.endsAt; // ending_soon (default)
 
-  return db.select().from(auctions)
+  return db
+    .select()
+    .from(auctions)
     .where(where)
     .orderBy(orderBy as never)
     .limit(Math.min(filters.limit ?? 60, 120));
@@ -297,7 +406,11 @@ export async function getActiveAuctions(filters: AuctionFilters = {}) {
 export async function getAuctionById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const rows = await db.select().from(auctions).where(eq(auctions.id, id)).limit(1);
+  const rows = await db
+    .select()
+    .from(auctions)
+    .where(eq(auctions.id, id))
+    .limit(1);
   return rows[0];
 }
 
@@ -311,7 +424,9 @@ export async function createAuction(data: InsertAuction) {
 export async function getAuctionBids(auctionId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(auctionBids)
+  return db
+    .select()
+    .from(auctionBids)
     .where(eq(auctionBids.auctionId, auctionId))
     .orderBy(auctionBids.createdAt);
 }
@@ -322,80 +437,131 @@ export async function getAuctionBids(auctionId: number) {
  * passing validation), then inserts the bid and updates the auction.
  * Returns the previous top bidder (for outbid notifications).
  */
-export async function placeBid(auctionId: number, bidderId: number, amountUsd: number) {
+export async function placeBid(
+  auctionId: number,
+  bidderId: number,
+  amountUsd: number
+) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
-  return db.transaction(async (tx) => {
-    const [auction] = await tx.select().from(auctions)
-      .where(eq(auctions.id, auctionId)).for("update");
+  return db.transaction(async tx => {
+    const [auction] = await tx
+      .select()
+      .from(auctions)
+      .where(eq(auctions.id, auctionId))
+      .for("update");
 
     if (!auction) throw new Error("Auction not found");
     if (auction.status !== "active") throw new Error("Auction is not active");
-    if (new Date(auction.endsAt) < new Date()) throw new Error("Auction has ended");
-    if (auction.sellerId === bidderId) throw new Error("You cannot bid on your own auction");
+    if (new Date(auction.endsAt) < new Date())
+      throw new Error("Auction has ended");
+    if (auction.sellerId === bidderId)
+      throw new Error("You cannot bid on your own auction");
 
     const currentBid = auction.currentBidUsd
       ? parseFloat(String(auction.currentBidUsd))
-      : auction.startingBidUsd ? parseFloat(String(auction.startingBidUsd)) : 0;
+      : auction.startingBidUsd
+        ? parseFloat(String(auction.startingBidUsd))
+        : 0;
     if (amountUsd <= currentBid) {
-      throw new Error(`Bid must be higher than current bid of $${currentBid.toFixed(2)}`);
+      throw new Error(
+        `Bid must be higher than current bid of $${currentBid.toFixed(2)}`
+      );
     }
 
-    const [previousTop] = await tx.select().from(auctionBids)
+    const [previousTop] = await tx
+      .select()
+      .from(auctionBids)
       .where(eq(auctionBids.auctionId, auctionId))
       .orderBy(desc(auctionBids.amountUsd))
       .limit(1);
 
-    await tx.insert(auctionBids).values({ auctionId, bidderId, amountUsd: amountUsd.toFixed(2) });
-    await tx.update(auctions)
-      .set({ currentBidUsd: amountUsd.toFixed(2), bidCount: sql`bidCount + 1` } as never)
+    await tx
+      .insert(auctionBids)
+      .values({ auctionId, bidderId, amountUsd: amountUsd.toFixed(2) });
+    await tx
+      .update(auctions)
+      .set({
+        currentBidUsd: amountUsd.toFixed(2),
+        bidCount: sql`bidCount + 1`,
+      } as never)
       .where(eq(auctions.id, auctionId));
 
-    return { previousTopBidderId: previousTop?.bidderId ?? null, newBid: amountUsd };
+    return {
+      previousTopBidderId: previousTop?.bidderId ?? null,
+      newBid: amountUsd,
+    };
   });
 }
 
 // ─── Auction watches ──────────────────────────────────────────────────────────
 
-export async function toggleAuctionWatch(auctionId: number, userId: number): Promise<{ watching: boolean }> {
+export async function toggleAuctionWatch(
+  auctionId: number,
+  userId: number
+): Promise<{ watching: boolean }> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  return db.transaction(async (tx) => {
-    const existing = await tx.select().from(auctionWatches)
-      .where(and(eq(auctionWatches.auctionId, auctionId), eq(auctionWatches.userId, userId)))
+  return db.transaction(async tx => {
+    const existing = await tx
+      .select()
+      .from(auctionWatches)
+      .where(
+        and(
+          eq(auctionWatches.auctionId, auctionId),
+          eq(auctionWatches.userId, userId)
+        )
+      )
       .limit(1);
     if (existing[0]) {
-      await tx.delete(auctionWatches).where(eq(auctionWatches.id, existing[0].id));
-      await tx.update(auctions)
+      await tx
+        .delete(auctionWatches)
+        .where(eq(auctionWatches.id, existing[0].id));
+      await tx
+        .update(auctions)
         .set({ watchCount: sql`GREATEST(watchCount - 1, 0)` } as never)
         .where(eq(auctions.id, auctionId));
       return { watching: false };
     }
     await tx.insert(auctionWatches).values({ auctionId, userId });
-    await tx.update(auctions)
+    await tx
+      .update(auctions)
       .set({ watchCount: sql`watchCount + 1` } as never)
       .where(eq(auctions.id, auctionId));
     return { watching: true };
   });
 }
 
-export async function getUserWatchedAuctionIds(userId: number): Promise<number[]> {
+export async function getUserWatchedAuctionIds(
+  userId: number
+): Promise<number[]> {
   const db = await getDb();
   if (!db) return [];
-  const rows = await db.select({ auctionId: auctionWatches.auctionId })
-    .from(auctionWatches).where(eq(auctionWatches.userId, userId));
+  const rows = await db
+    .select({ auctionId: auctionWatches.auctionId })
+    .from(auctionWatches)
+    .where(eq(auctionWatches.userId, userId));
   return rows.map(r => r.auctionId);
 }
 
 // ─── Articles ─────────────────────────────────────────────────────────────────
-import type { InsertArticle } from "../drizzle/schema";
+import type { Article, InsertArticle } from "../drizzle/schema";
 
 export async function getPublishedArticles(limit = 20, category?: string) {
   const db = await getDb();
   if (!db) return [];
-  const query = db.select().from(articles)
-    .where(eq(articles.isPublished, true))
+  const query = db
+    .select()
+    .from(articles)
+    .where(
+      and(
+        eq(articles.isPublished, true),
+        category
+          ? eq(articles.category, category as Article["category"])
+          : undefined
+      )
+    )
     .orderBy(desc(articles.publishedAt), desc(articles.createdAt))
     .limit(limit);
   return query;
@@ -430,7 +596,8 @@ export async function getArticleBySlug(slug: string) {
     .limit(1);
   // Increment view count
   if (rows[0]) {
-    await db.update(articles)
+    await db
+      .update(articles)
       .set({ viewCount: sql`viewCount + 1` } as never)
       .where(eq(articles.id, rows[0].id));
   }
@@ -448,11 +615,16 @@ export async function createArticle(data: InsertArticle) {
  * Idempotent upsert: inserts a new article or skips if slug already exists.
  * Returns { inserted: true } when created, { inserted: false } when duplicate.
  */
-export async function upsertArticleBySlug(data: InsertArticle): Promise<{ inserted: boolean }> {
+export async function upsertArticleBySlug(
+  data: InsertArticle
+): Promise<{ inserted: boolean }> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const existing = await db.select({ id: articles.id }).from(articles)
-    .where(eq(articles.slug, data.slug)).limit(1);
+  const existing = await db
+    .select({ id: articles.id })
+    .from(articles)
+    .where(eq(articles.slug, data.slug))
+    .limit(1);
   if (existing.length > 0) return { inserted: false };
   await db.insert(articles).values(data);
   return { inserted: true };
@@ -464,8 +636,15 @@ import type { InsertComment } from "../drizzle/schema";
 export async function getComments(entityType: string, entityId: string) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(comments)
-    .where(and(eq(comments.entityType, entityType as never), eq(comments.entityId, entityId)))
+  return db
+    .select()
+    .from(comments)
+    .where(
+      and(
+        eq(comments.entityType, entityType as never),
+        eq(comments.entityId, entityId)
+      )
+    )
     .orderBy(comments.createdAt);
 }
 
@@ -490,7 +669,9 @@ export async function createListing(data: InsertListing) {
 export async function getListingsByCard(cardId: string) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(listings)
+  return db
+    .select()
+    .from(listings)
     .where(and(eq(listings.cardId, cardId), eq(listings.status, "active")))
     .orderBy(listings.priceUsd)
     .limit(50);
@@ -499,7 +680,9 @@ export async function getListingsByCard(cardId: string) {
 export async function getUserListings(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(listings)
+  return db
+    .select()
+    .from(listings)
     .where(eq(listings.sellerId, userId))
     .orderBy(listings.createdAt);
 }
