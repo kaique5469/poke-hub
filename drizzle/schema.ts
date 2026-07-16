@@ -9,6 +9,8 @@ import {
   boolean,
   json,
   bigint,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -476,6 +478,113 @@ export const priceHistory = mysqlTable("price_history", {
 });
 
 export type PriceHistory = typeof priceHistory.$inferSelect;
+
+// ─── Collector Market Pulse ──────────────────────────────────────────────────
+
+/**
+ * First-party demand signals. These rows describe activity on TCG Arena only;
+ * they must never be presented as global Pokémon TCG search volume.
+ */
+export const marketEvents = mysqlTable(
+  "market_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    sessionId: varchar("sessionId", { length: 64 }).notNull(),
+    userId: int("userId"),
+    eventType: mysqlEnum("eventType", [
+      "search",
+      "card_view",
+      "watchlist_add",
+      "watchlist_remove",
+    ]).notNull(),
+    cardId: varchar("cardId", { length: 64 }),
+    cardName: varchar("cardName", { length: 256 }),
+    setId: varchar("setId", { length: 64 }),
+    setName: varchar("setName", { length: 256 }),
+    imageUrl: text("imageUrl"),
+    query: varchar("query", { length: 128 }),
+    metadata: json("metadata"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("market_events_type_created_idx").on(
+      table.eventType,
+      table.createdAt
+    ),
+    index("market_events_card_created_idx").on(table.cardId, table.createdAt),
+    index("market_events_session_type_created_idx").on(
+      table.sessionId,
+      table.eventType,
+      table.createdAt
+    ),
+  ]
+);
+
+export type MarketEvent = typeof marketEvents.$inferSelect;
+export type InsertMarketEvent = typeof marketEvents.$inferInsert;
+
+/** Daily/on-update market observations from explicitly named data sources. */
+export const marketPriceSnapshots = mysqlTable(
+  "market_price_snapshots",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    cardId: varchar("cardId", { length: 64 }).notNull(),
+    cardName: varchar("cardName", { length: 256 }).notNull(),
+    setId: varchar("setId", { length: 64 }),
+    setName: varchar("setName", { length: 256 }),
+    imageUrl: text("imageUrl"),
+    source: varchar("source", { length: 64 }).notNull(),
+    variant: varchar("variant", { length: 64 }).default("market").notNull(),
+    condition: varchar("condition", { length: 16 }).default("NM").notNull(),
+    currency: varchar("currency", { length: 8 }).default("USD").notNull(),
+    marketPriceUsd: decimal("marketPriceUsd", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    lowPriceUsd: decimal("lowPriceUsd", { precision: 12, scale: 2 }),
+    recordedAt: timestamp("recordedAt").defaultNow().notNull(),
+  },
+  table => [
+    index("market_snapshots_card_recorded_idx").on(
+      table.cardId,
+      table.recordedAt
+    ),
+    index("market_snapshots_recorded_idx").on(table.recordedAt),
+  ]
+);
+
+export type MarketPriceSnapshot = typeof marketPriceSnapshots.$inferSelect;
+export type InsertMarketPriceSnapshot =
+  typeof marketPriceSnapshots.$inferInsert;
+
+/** User watchlist and optional buy-price alert for a single card. */
+export const marketWatchlist = mysqlTable(
+  "market_watchlist",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    cardId: varchar("cardId", { length: 64 }).notNull(),
+    cardName: varchar("cardName", { length: 256 }).notNull(),
+    setId: varchar("setId", { length: 64 }),
+    setName: varchar("setName", { length: 256 }),
+    imageUrl: text("imageUrl"),
+    targetPriceUsd: decimal("targetPriceUsd", { precision: 12, scale: 2 }),
+    isActive: boolean("isActive").default(true).notNull(),
+    lastNotifiedAt: timestamp("lastNotifiedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("market_watchlist_user_card_unique").on(
+      table.userId,
+      table.cardId
+    ),
+    index("market_watchlist_card_active_idx").on(table.cardId, table.isActive),
+  ]
+);
+
+export type MarketWatch = typeof marketWatchlist.$inferSelect;
+export type InsertMarketWatch = typeof marketWatchlist.$inferInsert;
 
 // ─── Banner Slides ────────────────────────────────────────────────────────────
 

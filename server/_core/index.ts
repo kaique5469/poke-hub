@@ -12,6 +12,8 @@ import { serveStatic, setupVite } from "./vite";
 import { tcgNewsHandler } from "../scheduledTcgNews";
 import { autoReleaseHandler } from "../scheduledRelease";
 import { scrydexSyncHandler } from "../scheduledScrydex";
+import { marketSnapshotHandler } from "../scheduledMarket";
+import { ensureMarketPulseSchema } from "../marketSchema";
 import { verifyWebhook } from "../lib/stripe";
 import { markOrdersPaid, wasEventProcessed, recordEvent } from "../storeDb";
 
@@ -35,6 +37,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  await ensureMarketPulseSchema();
   const app = express();
   const server = createServer(app);
   // Stripe webhook needs the RAW body for signature verification — register
@@ -72,6 +75,7 @@ async function startServer() {
   app.post("/api/scheduled/tcg-news", tcgNewsHandler);
   app.post("/api/scheduled/auto-release", autoReleaseHandler);
   app.post("/api/scheduled/scrydex-sync", scrydexSyncHandler);
+  app.post("/api/scheduled/market-snapshot", marketSnapshotHandler);
   // tRPC API
   app.use(
     "/api/trpc",

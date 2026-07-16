@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PokéCard, { PokéCardSkeleton } from "@/components/PokeCard";
 import { cn } from "@/lib/utils";
+import { getMarketSessionId } from "@/lib/marketSession";
 
 const TYPES = ["Fire", "Water", "Grass", "Lightning", "Psychic", "Fighting", "Darkness", "Metal", "Dragon", "Colorless", "Fairy"];
 const RARITIES = [
@@ -25,7 +26,7 @@ const SPECIAL_RARITIES = new Set([
 ]);
 
 export default function Cards() {
-  usePageMeta("Cards", "Search every Pokémon TCG card ever printed with live prices from TCGPlayer and CardMarket.");
+  usePageMeta("Cards", "Search every Pokémon TCG card ever printed with current API prices from TCGPlayer and CardMarket.");
   const search = useSearch();
   const params = useMemo(() => new URLSearchParams(search), [search]);
 
@@ -35,6 +36,7 @@ export default function Cards() {
   const [rarity, setRarity] = useState(params.get("rarity") ?? "");
   const [supertype, setSupertype] = useState("");
   const [set, setSet] = useState(params.get("set") ?? "");
+  const recordMarketEvent = trpc.market.recordEvent.useMutation();
 
   // Keep filters in sync when the URL query changes (e.g. Home → set card)
   useEffect(() => {
@@ -111,7 +113,16 @@ export default function Cards() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setQ(inputQ);
+    const submitted = inputQ.trim();
+    setQ(submitted);
+    if (submitted.length >= 2) {
+      recordMarketEvent.mutate({
+        sessionId: getMarketSessionId(),
+        eventType: "search",
+        query: submitted,
+        metadata: { surface: "card_database" },
+      });
+    }
     resetFilters();
   };
 
@@ -130,7 +141,7 @@ export default function Cards() {
         <p className="text-muted-foreground">
           {totalCount > 0 ? (
             <span><span className="text-foreground font-semibold">{totalCount.toLocaleString()}</span> cards found</span>
-          ) : "Browse 15,000+ Pokémon TCG cards with live prices"}
+          ) : "Browse 15,000+ Pokémon TCG cards with current API prices"}
         </p>
       </div>
 

@@ -1,0 +1,20 @@
+# Captures real card-price observations for Market Pulse once per day.
+# Requires APP_URL and CRON_SECRET in repository Actions secrets.
+
+name: Daily Market Pulse
+
+on:
+  schedule:
+    - cron: "40 10 * * *" # after the sealed-catalog refresh
+  workflow_dispatch: {}
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Capture card prices and evaluate alerts
+        run: |
+          curl -sf -X POST "${{ secrets.APP_URL }}/api/scheduled/market-snapshot" \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -d '{}'

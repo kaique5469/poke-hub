@@ -53,6 +53,23 @@ export interface ScrydexSealedProduct {
   variants?: ScrydexVariant[];
 }
 
+export interface ScrydexCard {
+  id: string;
+  name: string;
+  number?: string | number;
+  rarity?: string | null;
+  images?: ScrydexImage[];
+  expansion?: ScrydexExpansion | null;
+  language?: string;
+  language_code?: string;
+  variants?: ScrydexVariant[];
+}
+
+export interface ScrydexPriceHistoryEntry {
+  date: string;
+  prices: Array<ScrydexPrice & { variant?: string }>;
+}
+
 export interface ScrydexPage<T> {
   status: string;
   data: T[];
@@ -77,7 +94,7 @@ function authHeaders(): Record<string, string> {
     Accept: "application/json",
     "X-Api-Key": apiKey,
     "X-Team-ID": teamId,
-    "User-Agent": "PokeHub/1.0 sealed-catalog-sync",
+    "User-Agent": "PokeHub/1.0 market-data",
   };
 }
 
@@ -108,6 +125,95 @@ export async function getSealedProductsPage(page = 1, pageSize = 100): Promise<S
     orderBy: "name,-expansion_sort_order",
   });
   return apiFetch<ScrydexPage<ScrydexSealedProduct>>(`/sealed?${qs.toString()}`);
+}
+
+/**
+ * Fetch current card metadata and raw prices in as few credits as possible.
+ * Scrydex accepts up to 100 cards per page, so the snapshot job batches IDs.
+ */
+export async function getScrydexCardsByIds(
+  cardIds: string[]
+): Promise<ScrydexCard[]> {
+  const ids = Array.from(
+    new Set(
+      cardIds
+        .map(id => id.trim())
+        .filter(id => /^[A-Za-z0-9._-]+$/.test(id))
+    )
+  ).slice(0, 100);
+  if (ids.length === 0) return [];
+  const qs = new URLSearchParams({
+    q: ids.map(id => `id:${id}`).join(" OR "),
+    page: "1",
+    page_size: "100",
+    include: "prices",
+  });
+  const result = await apiFetch<ScrydexPage<ScrydexCard>>(
+    `/cards?${qs.toString()}`
+  );
+  return Array.isArray(result.data) ? result.data : [];
+}
+
+/** Optional Growth-plan history. Callers should gracefully fall back to our snapshots. */
+export async function getScrydexCardPriceHistory(
+  cardId: string,
+  days = 90
+): Promise<ScrydexPriceHistoryEntry[]> {
+  const qs = new URLSearchParams({
+    days: String(Math.min(365, Math.max(1, days))),
+    condition: "NM",
+    page_size: "100",
+  });
+  const result = await apiFetch<ScrydexPage<ScrydexPriceHistoryEntry>>(
+    `/cards/${encodeURIComponent(cardId)}/price_history?${qs.toString()}`
+  );
+  return Array.isArray(result.data) ? result.data : [];
+}
+
+export function getScrydexCardMarketPrice(card: ScrydexCard): {
+  market: number;
+  low: number | null;
+  variant: string;
+  currency: "USD";
+} | null {
+  const candidates = (card.variants ?? []).flatMap((variant, variantIndex) =>
+    (variant.prices ?? [])
+      .filter(price => {
+        const currency = (price.currency ?? "USD").toUpperCase();
+        const condition = (price.condition ?? "NM").toUpperCase();
+        const type = (price.type ?? "raw").toLowerCase();
+        return currency === "USD" && condition === "NM" && type === "raw";
+      })
+      .map(price => ({
+        variant: variant.name || "market",
+        variantIndex,
+        market: Number(price.market ?? price.low ?? 0),
+        low: price.low == null ? null : Number(price.low),
+      }))
+      .filter(price => Number.isFinite(price.market) && price.market > 0)
+  );
+  if (candidates.length === 0) return null;
+
+  const priority = (name: string) => {
+    const normalized = name.toLowerCase();
+    if (normalized === "holofoil" || normalized === "normal") return 0;
+    if (normalized.includes("unlimited") && normalized.includes("holo"))
+      return 1;
+    if (normalized.includes("reverse")) return 3;
+    return 2;
+  };
+  candidates.sort(
+    (a, b) =>
+      priority(a.variant) - priority(b.variant) ||
+      a.variantIndex - b.variantIndex
+  );
+  const selected = candidates[0];
+  return {
+    market: selected.market,
+    low: selected.low,
+    variant: selected.variant,
+    currency: "USD",
+  };
 }
 
 /**
