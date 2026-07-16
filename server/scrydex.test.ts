@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAllSealedProducts } from "./lib/scrydex";
+import {
+  getAllSealedProducts,
+  getScrydexCardMarketPrice,
+  getScrydexCardsByIds,
+} from "./lib/scrydex";
 import { mapScrydexProduct } from "./scrydexSync";
 
 const sampleProduct = {
@@ -62,5 +66,66 @@ describe("Scrydex sealed catalog", () => {
     expect(headers["X-Api-Key"]).toBe("test-api-key");
     expect(headers["X-Team-ID"]).toBe("test-team");
   });
-});
 
+  it("selects a raw USD near-mint card price without mixing variants", () => {
+    const selected = getScrydexCardMarketPrice({
+      id: "sv8-238",
+      name: "Pikachu ex",
+      variants: [
+        {
+          name: "reverseHolofoil",
+          prices: [
+            { type: "raw", condition: "NM", currency: "USD", market: 25 },
+          ],
+        },
+        {
+          name: "holofoil",
+          prices: [
+            { type: "raw", condition: "LP", currency: "USD", market: 90 },
+            { type: "graded", condition: "NM", currency: "USD", market: 400 },
+            { type: "raw", condition: "NM", currency: "EUR", market: 75 },
+            { type: "raw", condition: "NM", currency: "USD", low: 68, market: 72 },
+          ],
+        },
+      ],
+    });
+
+    expect(selected).toEqual({
+      market: 72,
+      low: 68,
+      variant: "holofoil",
+      currency: "USD",
+    });
+  });
+
+  it("fetches up to 100 card IDs in one authenticated search request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: "success",
+          data: [{ id: "base1-4", name: "Charizard", variants: [] }],
+          page: 1,
+          pageSize: 1,
+          totalCount: 1,
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const cards = await getScrydexCardsByIds([
+      "base1-4",
+      "sv8-238",
+      "base1-4",
+      "* OR id:*",
+    ]);
+
+    expect(cards).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = new URL(fetchMock.mock.calls[0][0]);
+    expect(requestUrl.pathname).toBe("/pokemon/v1/cards");
+    expect(requestUrl.searchParams.get("include")).toBe("prices");
+    expect(requestUrl.searchParams.get("q")).toBe("id:base1-4 OR id:sv8-238");
+  });
+
+});

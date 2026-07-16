@@ -158,10 +158,10 @@ const navSections = [
         desc: "Open your store for free",
       },
       {
-        label: "Price Trends",
-        href: "/cards?tab=trends",
+        label: "Market Pulse",
+        href: "/market",
         icon: <TrendingUp size={16} />,
-        desc: "Market price history",
+        desc: "Movers, demand & alerts",
       },
       {
         label: "Want List",
@@ -405,6 +405,15 @@ export default function Navbar() {
             US Pokémon TCG market data · English cards · Prices in USD
           </span>
           <div className="flex items-center gap-4 opacity-80">
+            <Link
+              href="/market"
+              className="hover:opacity-100 transition-opacity flex items-center gap-1"
+            >
+              Market Pulse
+              <span className="text-[9px] font-black bg-emerald-400 text-emerald-950 rounded-full px-1.5 py-px leading-tight">
+                NEW
+              </span>
+            </Link>
             <Link
               href="/articles"
               className="hover:opacity-100 transition-opacity"

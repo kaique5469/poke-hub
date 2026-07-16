@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { getMarketSessionId } from "@/lib/marketSession";
 
 type GlobalSearchProps = {
   autoFocus?: boolean;
@@ -48,6 +49,7 @@ export default function GlobalSearch({
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const recordMarketEvent = trpc.market.recordEvent.useMutation();
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(query.trim()), 250);
@@ -75,6 +77,26 @@ export default function GlobalSearch({
   const navigate = () => {
     setOpen(false);
     onNavigate?.();
+  };
+  const navigateToCard = (card: {
+    id: string;
+    name: string;
+    setName?: string | null;
+    image?: string | null;
+  }) => {
+    recordMarketEvent.mutate({
+      sessionId: getMarketSessionId(),
+      eventType: "search",
+      query: query.trim(),
+      card: {
+        cardId: card.id,
+        cardName: card.name,
+        setName: card.setName ?? null,
+        imageUrl: card.image ?? null,
+      },
+      metadata: { surface: "global_search" },
+    });
+    navigate();
   };
 
   return (
@@ -131,7 +153,7 @@ export default function GlobalSearch({
                     <Link
                       key={card.id}
                       href={`/cards/${card.id}`}
-                      onClick={navigate}
+                      onClick={() => navigateToCard(card)}
                       className="flex items-center gap-3 rounded-xl p-2 hover:bg-violet-50"
                     >
                       <span className="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50">

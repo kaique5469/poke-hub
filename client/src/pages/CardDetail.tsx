@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -6,13 +6,16 @@ import { usePageMeta } from "@/hooks/usePageMeta";
 import {
   ShoppingCart, Heart, Star,
   TrendingUp, Package, ChevronRight,
-  Store, Tag, AlertCircle, ArrowUpDown, ExternalLink, RefreshCw
+  Store, Tag, AlertCircle, ArrowUpDown, ExternalLink, RefreshCw,
+  BellRing, Eye, Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { getMarketSessionId } from "@/lib/marketSession";
+import { cn } from "@/lib/utils";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
@@ -34,6 +37,25 @@ const conditionLabels: Record<string, { label: string; color: string }> = {
   D: { label: "Damaged", color: "#991b1b" },
 };
 
+function MarketChange({ value }: { value: number | null | undefined }) {
+  if (value == null)
+    return (
+      <span className="text-xs font-bold text-gray-400">Building history</span>
+    );
+  const positive = value >= 0;
+  return (
+    <span
+      className={cn(
+        "text-sm font-black",
+        positive ? "text-emerald-600" : "text-rose-600"
+      )}
+    >
+      {positive ? "+" : ""}
+      {value.toFixed(2)}%
+    </span>
+  );
+}
+
 // ─── Store Listing Data ───────────────────────────────────────────────────────
 interface StoreListing {
   id: string;
@@ -44,19 +66,17 @@ interface StoreListing {
   variant: string;
   tags: string[];
   condition: string;
-  qty: number;
+  qty: number | null;
   price: number;
   currency: string;
   originalPrice?: number;
   buyUrl: string;
   storeUrl: string;
   isFeatured?: boolean;
-  isReal?: boolean; // true = real API price, false = estimated
 }
 
 function buildStoreListings(
   cardName: string,
-  setName: string,
   tcgUrl: string,
   priceVariants: [string, any][],
   cmPrices?: {
@@ -72,7 +92,6 @@ function buildStoreListings(
     tcgplayer: { market_price: number | null; mid_price: number | null };
   } | null
 ): StoreListing[] {
-  const baseQPokemon = encodeURIComponent("Pokemon " + cardName + " " + setName);
   const listings: StoreListing[] = [];
 
   // ── CardMarket (real prices from API) ──
@@ -85,19 +104,24 @@ function buildStoreListings(
       storeBg: "#f0fdf4",
       cardName,
       variant: "Near Mint",
-      tags: ["EU", cm.available_items ? `${cm.available_items} avail.` : ""].filter(Boolean),
+      tags: [
+        "EU",
+        cm.available_items ? `${cm.available_items} avail.` : "",
+      ].filter(Boolean),
       condition: "NM",
-      qty: (cm.available_items ?? 1) as number,
+      qty: cm.available_items ?? null,
       price: cm.lowest_near_mint!,
       currency: "EUR",
       buyUrl: `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cardName)}`,
       storeUrl: "https://www.cardmarket.com",
-      isReal: true,
       isFeatured: !cmPrices?.tcgplayer?.market_price,
     });
 
     // DE seller
-    if (cm.lowest_near_mint_DE && cm.lowest_near_mint_DE !== cm.lowest_near_mint) {
+    if (
+      cm.lowest_near_mint_DE &&
+      cm.lowest_near_mint_DE !== cm.lowest_near_mint
+    ) {
       listings.push({
         id: "cardmarket-de",
         storeName: "CardMarket DE",
@@ -107,12 +131,11 @@ function buildStoreListings(
         variant: "Near Mint — DE",
         tags: ["EU", "DE"],
         condition: "NM",
-        qty: 1,
+        qty: null,
         price: cm.lowest_near_mint_DE,
         currency: "EUR",
         buyUrl: `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cardName)}&sellerCountry=3`,
         storeUrl: "https://www.cardmarket.com",
-        isReal: true,
       });
     }
 
@@ -127,18 +150,18 @@ function buildStoreListings(
         variant: "Near Mint — FR",
         tags: ["EU", "FR"],
         condition: "NM",
-        qty: 1,
+        qty: null,
         price: cm.lowest_near_mint_FR,
         currency: "EUR",
         buyUrl: `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cardName)}&sellerCountry=2`,
         storeUrl: "https://www.cardmarket.com",
-        isReal: true,
       });
     }
   }
 
   // ── TCGPlayer (real price from CardMarket API or pokemontcg.io) ──
-  const tcgMarket = cmPrices?.tcgplayer?.market_price ?? priceVariants[0]?.[1]?.market;
+  const tcgMarket =
+    cmPrices?.tcgplayer?.market_price ?? priceVariants[0]?.[1]?.market;
   const tcgMid = cmPrices?.tcgplayer?.mid_price ?? priceVariants[0]?.[1]?.mid;
   if (tcgMarket) {
     listings.push({
@@ -150,13 +173,12 @@ function buildStoreListings(
       variant: "Holofoil",
       tags: ["Market Price"],
       condition: "NM",
-      qty: 99,
+      qty: null,
       price: tcgMarket,
       currency: "USD",
       originalPrice: tcgMid && tcgMid > tcgMarket * 1.05 ? tcgMid : undefined,
       buyUrl: tcgUrl,
       storeUrl: "https://www.tcgplayer.com",
-      isReal: true,
       isFeatured: !cmPrices?.cardmarket?.lowest_near_mint,
     });
   }
@@ -180,35 +202,13 @@ function buildStoreListings(
       variant: variantLabel,
       tags,
       condition: "NM",
-      qty: 99,
+      qty: null,
       price,
       currency: "USD",
       buyUrl: tcgUrl,
       storeUrl: "https://www.tcgplayer.com",
-      isReal: true,
     });
   });
-
-  // ── eBay ──
-  const ebayBase = tcgMarket ?? cmPrices?.cardmarket?.lowest_near_mint;
-  if (ebayBase) {
-    listings.push({
-      id: "ebay",
-      storeName: "eBay",
-      storeColor: "#e53238",
-      storeBg: "#fff7ed",
-      cardName,
-      variant: "Holofoil",
-      tags: ["BIN"],
-      condition: "NM",
-      qty: 10,
-      price: +(ebayBase * 0.95).toFixed(2),
-      currency: "USD",
-      buyUrl: `https://www.ebay.com/sch/i.html?_nkw=${baseQPokemon}&_sacat=183454&LH_BIN=1&_sop=15`,
-      storeUrl: "https://www.ebay.com",
-      isReal: false,
-    });
-  }
 
   // TCGPlayer Direct
   const directLow = priceVariants[0]?.[1]?.directLow;
@@ -222,81 +222,18 @@ function buildStoreListings(
       variant: "Holofoil",
       tags: ["Direct", "Fast Ship"],
       condition: "NM",
-      qty: 5,
+      qty: null,
       price: directLow,
       currency: "USD",
       buyUrl: tcgUrl,
       storeUrl: "https://www.tcgplayer.com",
-      isReal: true,
     });
   }
 
-  // Troll & Toad
-  if (tcgMarket) {
-    listings.push({
-      id: "trollandtoad",
-      storeName: "Troll & Toad",
-      storeColor: "#7c3aed",
-      storeBg: "#f5f3ff",
-      cardName,
-      variant: "Holofoil",
-      tags: [],
-      condition: "NM",
-      qty: 3,
-      price: +(tcgMarket * 1.05).toFixed(2),
-      currency: "USD",
-      buyUrl: `https://www.trollandtoad.com/pokemon/${encodeURIComponent(cardName.toLowerCase().replace(/\s+/g, "-"))}/1`,
-      storeUrl: "https://www.trollandtoad.com",
-      isReal: false,
-    });
-  }
-
-  // CoolStuffInc
-  if (tcgMarket) {
-    listings.push({
-      id: "coolstuffinc",
-      storeName: "CoolStuffInc",
-      storeColor: "#0891b2",
-      storeBg: "#ecfeff",
-      cardName,
-      variant: "Holofoil",
-      tags: ["Price Match"],
-      condition: "NM",
-      qty: 2,
-      price: +(tcgMarket * 1.08).toFixed(2),
-      currency: "USD",
-      buyUrl: `https://www.coolstuffinc.com/main_search.php?q=${encodeURIComponent(cardName)}&search_category=Pokemon`,
-      storeUrl: "https://www.coolstuffinc.com",
-      isReal: false,
-    });
-  }
-
-  // Amazon
-  if (tcgMarket) {
-    listings.push({
-      id: "amazon",
-      storeName: "Amazon",
-      storeColor: "#ff9900",
-      storeBg: "#fffbeb",
-      cardName,
-      variant: "Sealed / Singles",
-      tags: ["Prime"],
-      condition: "NM",
-      qty: 8,
-      price: +(tcgMarket * 1.15).toFixed(2),
-      currency: "USD",
-      buyUrl: `https://www.amazon.com/s?k=${encodeURIComponent("Pokemon TCG " + cardName + " " + setName)}&i=toys-and-games`,
-      storeUrl: "https://www.amazon.com",
-      isReal: false,
-    });
-  }
-
-  return listings.filter((l) => l.price > 0).sort((a, b) => {
-    // Sort real prices first, then by price ascending
-    if (a.isReal && !b.isReal) return -1;
-    if (!a.isReal && b.isReal) return 1;
-    return a.price - b.price;
-  });
+  // This table contains only values returned by a named data source.
+  return listings
+    .filter(listing => listing.price > 0)
+    .sort((a, b) => a.price - b.price);
 }
 
 // ─── Store Row Component ──────────────────────────────────────────────────────
@@ -320,11 +257,7 @@ function StoreRow({ listing }: { listing: StoreListing }) {
               {listing.isFeatured && (
                 <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">Best Price</span>
               )}
-              {listing.isReal ? (
-                <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">Live</span>
-              ) : (
-                <span className="text-[9px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full">Est.</span>
-              )}
+              <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">API quote</span>
             </div>
           </div>
         </div>
@@ -377,8 +310,8 @@ function StoreRow({ listing }: { listing: StoreListing }) {
 
       {/* Qty */}
       <td className="px-4 py-3 text-center text-xs text-gray-500">
-        <span className="font-medium">{listing.qty > 50 ? "50+" : listing.qty}</span>
-        <span className="text-gray-300 ml-1">avail.</span>
+        <span className="font-medium">{listing.qty == null ? "—" : listing.qty > 50 ? "50+" : listing.qty}</span>
+        {listing.qty != null && <span className="text-gray-300 ml-1">avail.</span>}
       </td>
 
       {/* Actions */}
@@ -415,6 +348,7 @@ export default function CardDetail() {
   const { isAuthenticated } = useAuth();
   const [selectedCondition, setSelectedCondition] = useState("NM");
   const [sortAsc, setSortAsc] = useState(true);
+  const viewedCardRef = useRef<string | null>(null);
 
   const { data: card, isLoading } = trpc.cards.getById.useQuery(
     { id: id! },
@@ -422,9 +356,19 @@ export default function CardDetail() {
   );
 
   // Fetch real CardMarket API prices
-  const { data: externalPrices, isLoading: pricesLoading } = trpc.cards.getExternalPrices.useQuery(
-    { id: id! },
-    { enabled: !!id, retry: false, staleTime: 60 * 60 * 1000 }
+  const { data: externalPrices, isLoading: pricesLoading } =
+    trpc.cards.getExternalPrices.useQuery(
+      { id: id! },
+      { enabled: !!id, retry: false, staleTime: 60 * 60 * 1000 }
+    );
+
+  const { data: marketData } = trpc.market.card.useQuery(
+    { cardId: id!, days: 90 },
+    { enabled: !!id, retry: false, staleTime: 60_000 }
+  );
+  const { data: isWatched } = trpc.market.watchStatus.useQuery(
+    { cardId: id! },
+    { enabled: !!id && isAuthenticated, retry: false }
   );
 
   // TCG Arena marketplace listings (real sellers)
@@ -448,23 +392,54 @@ export default function CardDetail() {
     onSuccess: () => toast.success("Card added to your binder!"),
     onError: () => toast.error("Failed to add card. Please sign in."),
   });
+  const recordMarketEvent = trpc.market.recordEvent.useMutation();
+  const toggleWatch = trpc.market.toggleWatch.useMutation({
+    onSuccess: result => {
+      toast.success(
+        result.watching ? "Added to market watchlist" : "Removed from watchlist"
+      );
+      utils.market.watchStatus.invalidate({ cardId: id! });
+      utils.market.watchlist.invalidate();
+      utils.market.overview.invalidate();
+    },
+    onError: error => toast.error(error.message),
+  });
+
+  useEffect(() => {
+    if (!card?.id || viewedCardRef.current === card.id) return;
+    viewedCardRef.current = card.id;
+    recordMarketEvent.mutate({
+      sessionId: getMarketSessionId(),
+      eventType: "card_view",
+      card: {
+        cardId: card.id,
+        cardName: card.name,
+        setId: card.set?.id ?? null,
+        setName: card.set?.name ?? null,
+        imageUrl: card.images?.large ?? card.images?.small ?? null,
+      },
+      metadata: { surface: "card_detail" },
+    });
+  }, [card?.id]);
 
   // Compute derived values — must be before any early returns to satisfy Rules of Hooks
   const prices = card?.tcgplayer?.prices ?? {};
   const priceVariants = Object.entries(prices) as [string, any][];
 
-  // Best price: prefer real CardMarket API data, fallback to pokemontcg.io
+  // Best USD price: prefer TCGPlayer API data, then the Pokémon TCG API.
+  // Cardmarket quotes are denominated in EUR and stay in their labeled panel.
   const bestPrice = useMemo(() => {
     const tcgMarket = externalPrices?.prices?.tcgplayer?.market_price;
-    const cmLow = externalPrices?.prices?.cardmarket?.lowest_near_mint;
     const ptcgMarket = priceVariants.reduce((best, [, v]) => {
       const m = v?.market ?? 0;
       return m > best ? m : best;
     }, 0);
-    return tcgMarket ?? ptcgMarket ?? cmLow ?? 0;
+    return tcgMarket ?? ptcgMarket ?? 0;
   }, [externalPrices, priceVariants]);
 
-  const tcgplayerUrl = card?.tcgplayer?.url ?? `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent((card?.name ?? "") + " " + (card?.set?.name ?? ""))}&view=grid`;
+  const tcgplayerUrl =
+    card?.tcgplayer?.url ??
+    `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent((card?.name ?? "") + " " + (card?.set?.name ?? ""))}&view=grid`;
   const cardName = card?.name ?? "";
   const setName = card?.set?.name ?? "";
 
@@ -473,34 +448,56 @@ export default function CardDetail() {
     { name: cardName, page: 1, pageSize: 18 },
     { enabled: !!cardName, staleTime: 60 * 60 * 1000 }
   );
-  const otherPrintings = (printingsData?.cards ?? []).filter((c) => c.id !== id);
+  const otherPrintings = (printingsData?.cards ?? []).filter(c => c.id !== id);
 
   usePageMeta(
     cardName ? `${cardName} · ${setName}` : undefined,
-    cardName ? `${cardName} from ${setName} — live prices, sellers, price history and other printings on TCG Arena.` : undefined,
-    card?.images?.large ?? card?.images?.small,
+    cardName
+      ? `${cardName} from ${setName} — current API prices, sellers, verified price history and other printings on TCG Arena.`
+      : undefined,
+    card?.images?.large ?? card?.images?.small
   );
 
   // Build store listings with real CardMarket prices
   const storeListings = useMemo(() => {
     if (!card) return [];
-    const rows = buildStoreListings(cardName, setName, tcgplayerUrl, priceVariants, externalPrices?.prices ?? null);
+    const rows = buildStoreListings(
+      cardName,
+      tcgplayerUrl,
+      priceVariants,
+      externalPrices?.prices ?? null
+    );
     return sortAsc ? rows : [...rows].reverse();
-  }, [card, cardName, setName, tcgplayerUrl, priceVariants, externalPrices, sortAsc]);
+  }, [card, cardName, tcgplayerUrl, priceVariants, externalPrices, sortAsc]);
 
-  // Price history from CardMarket API. Never manufacture chart points.
+  // Price history from verified API observations. Never manufacture chart points.
   const priceHistory = useMemo(() => {
+    if (marketData?.history && marketData.history.length > 1) {
+      return marketData.history.map(point => ({
+        date: point.date
+          ? new Date(point.date).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })
+          : "",
+        "Market Pulse ($)": point.price,
+      }));
+    }
     if (externalPrices?.history && externalPrices.history.length > 0) {
-      return externalPrices.history.map((h) => ({
-        date: new Date(h.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      return externalPrices.history.map(h => ({
+        date: new Date(h.date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
         "CardMarket (€)": h.cm_low,
         "TCGPlayer ($)": h.tcg_market,
       }));
     }
     return [];
-  }, [externalPrices]);
+  }, [marketData, externalPrices]);
 
-  const hasRealHistory = externalPrices?.history && externalPrices.history.length > 0;
+  const hasRealHistory = priceHistory.length > 1;
+  const isTrackedHistory = (marketData?.history.length ?? 0) > 1;
 
   if (isLoading) {
     return (
@@ -563,13 +560,22 @@ export default function CardDetail() {
             </div>
 
             {/* Quick Actions */}
-            <div className="flex gap-2 w-full max-w-xs">
+            <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
               <Button
                 variant="outline"
                 className="flex-1 gap-2 text-sm font-semibold"
                 onClick={() => {
-                  if (!isAuthenticated) { toast.error("Please sign in to add to binder"); return; }
-                  addToBinder.mutate({ cardId: card.id, cardName: card.name, imageUrl: card.images?.small ?? "", quantity: 1, condition: selectedCondition as any });
+                  if (!isAuthenticated) {
+                    toast.error("Please sign in to add to binder");
+                    return;
+                  }
+                  addToBinder.mutate({
+                    cardId: card.id,
+                    cardName: card.name,
+                    imageUrl: card.images?.small ?? "",
+                    quantity: 1,
+                    condition: selectedCondition as any,
+                  });
                 }}
               >
                 <Heart size={16} /> Add to Binder
@@ -580,6 +586,34 @@ export default function CardDetail() {
                 onClick={() => window.open(tcgplayerUrl, "_blank")}
               >
                 <ShoppingCart size={16} /> Buy
+              </Button>
+              <Button
+                variant="outline"
+                className={cn(
+                  "col-span-2 gap-2 text-sm font-semibold",
+                  isWatched && "border-violet-300 bg-violet-50 text-violet-700"
+                )}
+                disabled={toggleWatch.isPending}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    toast.error("Please sign in to follow market prices");
+                    return;
+                  }
+                  toggleWatch.mutate({
+                    sessionId: getMarketSessionId(),
+                    card: {
+                      cardId: card.id,
+                      cardName: card.name,
+                      setId: card.set?.id ?? null,
+                      setName: card.set?.name ?? null,
+                      imageUrl:
+                        card.images?.large ?? card.images?.small ?? null,
+                    },
+                  });
+                }}
+              >
+                <BellRing size={16} />{" "}
+                {isWatched ? "Watching market" : "Watch price & set alert"}
               </Button>
             </div>
 
@@ -600,7 +634,7 @@ export default function CardDetail() {
                 <>
                   <div className="text-3xl font-black text-blue-600 mb-1">${bestPrice.toFixed(2)}</div>
                   <div className="text-xs text-gray-400 mb-3">
-                    {tcgData?.market_price ? "via TCGPlayer · Live" : "via pokemontcg.io"}
+                    {tcgData?.market_price ? "via TCGPlayer API" : "via Pokémon TCG API"}
                   </div>
                 </>
               ) : (
@@ -678,6 +712,75 @@ export default function CardDetail() {
               </div>
             </div>
 
+            {/* Verified collector market signals */}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950 text-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-4 py-3">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-black text-white">
+                    <Activity size={15} className="text-violet-300" /> Market
+                    Pulse
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-slate-500">
+                    Prices, demand and sales are tracked separately by source.
+                  </p>
+                </div>
+                <Link
+                  href="/market"
+                  className="text-xs font-bold text-violet-300 hover:text-white"
+                >
+                  Open collector dashboard →
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 divide-x divide-y divide-slate-800 sm:grid-cols-4 sm:divide-y-0">
+                <div className="p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    Tracked price
+                  </p>
+                  <p className="mt-1 text-lg font-black text-white">
+                    {marketData?.current
+                      ? `$${marketData.current.price.toFixed(2)}`
+                      : "Collecting"}
+                  </p>
+                  {marketData?.current?.source && (
+                    <p className="text-[9px] text-slate-600">
+                      {marketData.current.source}
+                    </p>
+                  )}
+                </div>
+                <div className="p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    7-day move
+                  </p>
+                  <p className="mt-1">
+                    <MarketChange value={marketData?.changes.week} />
+                  </p>
+                </div>
+                <div className="p-4">
+                  <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    <Eye size={10} /> Arena demand
+                  </p>
+                  <p className="mt-1 text-lg font-black text-white">
+                    {(marketData?.demand.searches ?? 0) +
+                      (marketData?.demand.views ?? 0)}
+                  </p>
+                  <p className="text-[9px] text-slate-600">
+                    searches + views · 30d
+                  </p>
+                </div>
+                <div className="p-4">
+                  <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    <BellRing size={10} /> Watchers
+                  </p>
+                  <p className="mt-1 text-lg font-black text-white">
+                    {marketData?.demand.watchers ?? 0}
+                  </p>
+                  <p className="text-[9px] text-slate-600">
+                    TCG Arena collectors
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Tabs */}
             <Tabs defaultValue="buy">
               <TabsList className="bg-gray-100 p-1 rounded-xl flex-wrap h-auto gap-1">
@@ -704,7 +807,7 @@ export default function CardDetail() {
                       <span className="text-xs font-semibold text-gray-600">
                         {storeListings.length} listings found for <strong>{card.name}</strong>
                         {externalPrices?.prices && (
-                          <span className="ml-2 text-green-600 font-normal">· Live prices from CardMarket API</span>
+                          <span className="ml-2 text-green-600 font-normal">· Current quotes from CardMarket API</span>
                         )}
                       </span>
                     </div>
@@ -789,9 +892,9 @@ export default function CardDetail() {
                     <div className="px-4 py-3 bg-green-50 border-b border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Package size={14} className="text-green-600" />
-                        <h3 className="font-bold text-sm text-gray-700">CardMarket Live Prices (EUR)</h3>
+                        <h3 className="font-bold text-sm text-gray-700">CardMarket API Prices (EUR)</h3>
                       </div>
-                      <span className="text-[10px] text-green-600 font-semibold bg-green-100 px-2 py-0.5 rounded-full">Live</span>
+                      <span className="text-[10px] text-green-600 font-semibold bg-green-100 px-2 py-0.5 rounded-full">API quote</span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
                       {[
@@ -872,18 +975,18 @@ export default function CardDetail() {
                   ) : tcgData?.market_price ? (
                     <div>
                       <div className="px-4 py-3 bg-blue-50 border-b border-gray-100 flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-gray-700">TCGPlayer Market Price (via CardMarket API)</h3>
-                        <span className="text-[10px] text-blue-600 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">Live</span>
+                        <h3 className="font-bold text-sm text-gray-700">TCGPlayer Market Price (USD API quote)</h3>
+                        <span className="text-[10px] text-blue-600 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">API quote</span>
                       </div>
                       <div className="grid grid-cols-2 gap-3 p-4">
                         <div className="bg-blue-50 rounded-lg p-3 text-center">
                           <div className="text-xs text-gray-400 mb-1">Market Price</div>
-                          <div className="font-black text-blue-600 text-lg">€{tcgData.market_price.toFixed(2)}</div>
+                          <div className="font-black text-blue-600 text-lg">${tcgData.market_price.toFixed(2)}</div>
                         </div>
                         {tcgData.mid_price && (
                           <div className="bg-gray-50 rounded-lg p-3 text-center">
                             <div className="text-xs text-gray-400 mb-1">Mid Price</div>
-                            <div className="font-black text-gray-700 text-lg">€{tcgData.mid_price.toFixed(2)}</div>
+                            <div className="font-black text-gray-700 text-lg">${tcgData.mid_price.toFixed(2)}</div>
                           </div>
                         )}
                       </div>
@@ -1003,10 +1106,16 @@ export default function CardDetail() {
                 <div className="bg-white rounded-xl border border-gray-100 p-4">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-sm text-gray-700">
-                      {hasRealHistory ? "90-Day Price History" : "Price History"}
+                      {hasRealHistory
+                        ? "Verified Price History"
+                        : "Price History"}
                     </h3>
                     {hasRealHistory && (
-                      <span className="text-[10px] text-green-600 font-semibold bg-green-50 px-2 py-0.5 rounded-full">Live from CardMarket</span>
+                      <span className="text-[10px] text-green-600 font-semibold bg-green-50 px-2 py-0.5 rounded-full">
+                        {isTrackedHistory
+                          ? "Market Pulse snapshots"
+                          : "CardMarket API history"}
+                      </span>
                     )}
                   </div>
                   {pricesLoading ? (
@@ -1015,11 +1124,44 @@ export default function CardDetail() {
                     <ResponsiveContainer width="100%" height={240}>
                       <LineChart data={priceHistory}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval={Math.floor(priceHistory.length / 6)} />
-                        <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}`} />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 10 }}
+                          tickLine={false}
+                          axisLine={false}
+                          interval={Math.floor(priceHistory.length / 6)}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 10 }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={v => `${v}`}
+                        />
                         <Tooltip />
-                        <Line type="monotone" dataKey="CardMarket (€)" stroke="#16a34a" strokeWidth={2} dot={false} connectNulls />
-                        <Line type="monotone" dataKey="TCGPlayer ($)" stroke="#4f8ef7" strokeWidth={2} dot={false} connectNulls />
+                        <Line
+                          type="monotone"
+                          dataKey="CardMarket (€)"
+                          stroke="#16a34a"
+                          strokeWidth={2}
+                          dot={false}
+                          connectNulls
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="TCGPlayer ($)"
+                          stroke="#4f8ef7"
+                          strokeWidth={2}
+                          dot={false}
+                          connectNulls
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="Market Pulse ($)"
+                          stroke="#7c3aed"
+                          strokeWidth={2.5}
+                          dot={false}
+                          connectNulls
+                        />
                         <Legend />
                       </LineChart>
                     </ResponsiveContainer>

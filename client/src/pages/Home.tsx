@@ -106,6 +106,12 @@ export default function Home() {
               >
                 Explore sealed products <ArrowRight className="h-4 w-4" />
               </Link>
+              <Link
+                href="/market"
+                className="inline-flex items-center gap-2 rounded-full border border-violet-300/30 bg-violet-300/10 px-5 py-3 text-sm font-black text-violet-100 transition hover:bg-violet-300/20"
+              >
+                Open Market Pulse <BarChart3 className="h-4 w-4" />
+              </Link>
             </div>
           </div>
           <div className="relative mx-auto min-h-[380px] w-full max-w-xl">
@@ -175,7 +181,11 @@ export default function Home() {
               "Real marketplace data",
               "No fictional sealed catalog",
             ],
-            [BarChart3, "Prices in USD", "Market references and seller offers"],
+            [
+              BarChart3,
+              "Verified market signals",
+              "Sources shown beside every metric",
+            ],
             [BookOpen, "Fresh editorial", "Newest reporting shown first"],
           ].map(([Icon, title, text]) => (
             <div
@@ -310,8 +320,8 @@ export default function Home() {
             <SectionHeading
               eyebrow="Market watch"
               title="Cards collectors are watching"
-              href="/cards?tab=trends"
-              link="Explore prices"
+              href="/market"
+              link="Open Market Pulse"
             />
             {cards.isLoading ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

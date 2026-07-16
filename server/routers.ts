@@ -118,9 +118,11 @@ import {
   ordersRouter,
   productsRouter,
 } from "./marketplaceRouter";
+import { marketRouter } from "./marketRouter";
 
 export const appRouter = router({
   system: systemRouter,
+  market: marketRouter,
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
   auth: router({

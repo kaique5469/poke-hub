@@ -78,6 +78,18 @@ em USD para o MySQL; as chaves nunca são enviadas ao navegador.
 - O workflow `.github/workflows/daily-catalog.yml` executa a atualização diariamente.
 - Produtos antigos gerados automaticamente são ocultados após a primeira sincronização real; produtos com anúncios de vendedores são preservados.
 
+## Market Pulse para colecionadores
+
+A rota `/market` reúne sinais reais e separa claramente a origem de cada dado:
+
+- snapshots de preços raw/NM em USD da Scrydex, com fallback nomeado do TCGPlayer via Pokémon TCG API;
+- variações e índice calculados apenas entre observações da mesma fonte, variante, condição e moeda;
+- buscas, visualizações e watchlists identificadas como atividade interna do TCG Arena;
+- ranking e feed de vendas baseados somente em pedidos de cartas com pagamento confirmado;
+- valor estimado da coleção, watchlist e alerta único de preço-alvo para usuários autenticados.
+
+`POST /api/scheduled/market-snapshot` captura as observações e processa alertas. O endpoint usa o mesmo header `x-cron-secret` dos demais jobs, e o workflow `.github/workflows/daily-market.yml` executa a coleta diariamente. As tabelas também são criadas de forma idempotente no startup para manter o deploy do Railway compatível com instalações que ainda não executam migrações automaticamente.
+
 ## Scripts
 
 | Comando | Descrição |

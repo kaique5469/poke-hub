@@ -208,9 +208,16 @@ export async function getCardById(id: string): Promise<PtcgCard | null> {
 }
 
 export async function getCardsByIds(ids: string[]): Promise<PtcgCard[]> {
-  if (!ids.length) return [];
-  const q = ids.map(id => `id:${id}`).join(" OR ");
-  const result = await searchCards({ q, pageSize: ids.length });
+  const safeIds = Array.from(
+    new Set(
+      ids
+        .map(id => id.trim())
+        .filter(id => /^[A-Za-z0-9._-]+$/.test(id))
+    )
+  ).slice(0, 250);
+  if (!safeIds.length) return [];
+  const q = safeIds.map(id => `id:${id}`).join(" OR ");
+  const result = await searchCards({ q, pageSize: safeIds.length });
   return result.data;
 }
 

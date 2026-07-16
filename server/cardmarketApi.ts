@@ -173,7 +173,7 @@ function buildPrices(card: any): CMCardPrices {
       graded_cgc10: cm.graded?.cgc?.cgc10 ?? null,
     },
     tcgplayer: {
-      currency: tcg.currency ?? "EUR",
+      currency: tcg.currency ?? "USD",
       market_price: tcg.market_price ?? null,
       mid_price: tcg.mid_price ?? null,
     },
