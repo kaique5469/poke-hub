@@ -121,7 +121,7 @@ describe("Scrydex sealed catalog", () => {
     expect(headers["X-Api-Key"]).toBe("test-api-key");
     expect(headers["X-Team-ID"]).toBe("test-team");
     const requestUrl = new URL(fetchMock.mock.calls[0][0]);
-    expect(requestUrl.searchParams.get("q")).toBeNull();
+    expect(requestUrl.searchParams.get("q")).toBe("expansion.language_code:EN");
     expect(requestUrl.searchParams.get("page_size")).toBe("100");
   });
 
