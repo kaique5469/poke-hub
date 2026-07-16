@@ -250,12 +250,20 @@ export function getScrydexCardMarketPrice(card: ScrydexCard): {
  * Fetch the complete sealed catalog. The safety limit prevents an upstream
  * pagination bug from burning through the account's credit cap.
  */
-export async function getAllSealedProducts(maxPages = 20): Promise<{
+export interface ScrydexSealedPageBatch {
+  page: number;
   products: ScrydexSealedProduct[];
+  receivedCount: number;
+  totalCount: number;
+}
+
+export async function forEachEnglishSealedProductPage(
+  onPage: (batch: ScrydexSealedPageBatch) => void | Promise<void>,
+  maxPages = 20
+): Promise<{
   requests: number;
   totalCount: number;
 }> {
-  const products: ScrydexSealedProduct[] = [];
   let page = 1;
   let totalCount = 0;
   let receivedCount = 0;
@@ -265,7 +273,12 @@ export async function getAllSealedProducts(maxPages = 20): Promise<{
     totalCount = Number(result.totalCount ?? result.total_count ?? 0);
     const pageProducts = Array.isArray(result.data) ? result.data : [];
     receivedCount += pageProducts.length;
-    products.push(...pageProducts.filter(isEnglishSealedProduct));
+    await onPage({
+      page,
+      products: pageProducts.filter(isEnglishSealedProduct),
+      receivedCount,
+      totalCount,
+    });
     if (receivedCount >= totalCount || pageProducts.length === 0) break;
     page += 1;
   }
@@ -276,5 +289,17 @@ export async function getAllSealedProducts(maxPages = 20): Promise<{
     );
   }
 
-  return { products, requests: page, totalCount };
+  return { requests: page, totalCount };
+}
+
+export async function getAllSealedProducts(maxPages = 20): Promise<{
+  products: ScrydexSealedProduct[];
+  requests: number;
+  totalCount: number;
+}> {
+  const products: ScrydexSealedProduct[] = [];
+  const result = await forEachEnglishSealedProductPage(batch => {
+    products.push(...batch.products);
+  }, maxPages);
+  return { products, ...result };
 }
