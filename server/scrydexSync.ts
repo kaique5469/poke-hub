@@ -4,7 +4,7 @@ import {
   upsertProductBySlug,
 } from "./marketplaceDb";
 import {
-  getAllSealedProducts,
+  forEachEnglishSealedProductPage,
   scrydexConfigured,
   type ScrydexPrice,
   type ScrydexSealedProduct,
@@ -134,6 +134,14 @@ let syncPromise: Promise<ScrydexSyncResult> | null = null;
 let lastSuccessfulSyncAt = 0;
 let lastAttemptAt = 0;
 let lastError: string | null = null;
+let progress = {
+  stage: "idle" as
+    "idle" | "preparing" | "fetching" | "saving" | "ready" | "error",
+  page: 0,
+  fetched: 0,
+  upserted: 0,
+  totalCount: 0,
+};
 
 export async function syncScrydexSealedProducts(
   force = false
@@ -188,16 +196,46 @@ export async function syncScrydexSealedProducts(
   }
 
   lastAttemptAt = Date.now();
-  const result = await getAllSealedProducts();
-  if (result.products.length === 0) {
-    lastError = "empty_catalog";
-    throw new Error("Scrydex returned no English sealed products");
-  }
+  progress = {
+    stage: "fetching",
+    page: 0,
+    fetched: 0,
+    upserted: 0,
+    totalCount: 0,
+  };
+  let fetched = 0;
   let upserted = 0;
-  for (const product of result.products) {
-    if (!product.id || !product.name || !product.type) continue;
-    await upsertProductBySlug(mapScrydexProduct(product));
-    upserted += 1;
+  const result = await forEachEnglishSealedProductPage(async batch => {
+    fetched += batch.products.length;
+    progress = {
+      stage: "saving",
+      page: batch.page,
+      fetched,
+      upserted,
+      totalCount: batch.totalCount,
+    };
+
+    // Keep below the default MySQL pool size while avoiding one network round
+    // trip at a time for hundreds of catalog rows.
+    for (let index = 0; index < batch.products.length; index += 8) {
+      const chunk = batch.products.slice(index, index + 8);
+      await Promise.all(
+        chunk.map(product => {
+          if (!product.id || !product.name || !product.type) return undefined;
+          return upsertProductBySlug(mapScrydexProduct(product)).then(() => {
+            upserted += 1;
+            progress = { ...progress, upserted };
+          });
+        })
+      );
+    }
+
+    progress = { ...progress, stage: "fetching" };
+  });
+  if (upserted === 0) {
+    lastError = "empty_catalog";
+    progress = { ...progress, stage: "error" };
+    throw new Error("Scrydex returned no English sealed products");
   }
 
   // Only hide synthetic/legacy rows after a successful, non-empty real sync.
@@ -205,10 +243,11 @@ export async function syncScrydexSealedProducts(
     hiddenLegacy + (upserted > 0 ? await deactivateLegacyCatalogProducts() : 0);
   lastSuccessfulSyncAt = Date.now();
   lastError = null;
+  progress = { ...progress, stage: "ready" };
   return {
     ok: true,
     skipped: false,
-    fetched: result.products.length,
+    fetched,
     upserted,
     deactivated,
     requests: result.requests,
@@ -224,6 +263,7 @@ export function ensureProductsSynced(): Promise<ScrydexSyncResult> {
         console.error("[scrydex] sealed catalog sync failed:", error);
         lastAttemptAt = Date.now();
         lastError = error instanceof Error ? error.message : "error";
+        progress = { ...progress, stage: "error" };
         return {
           ok: false,
           skipped: false,
@@ -251,6 +291,7 @@ export function getCatalogSyncStatus() {
       ? new Date(lastSuccessfulSyncAt).toISOString()
       : null,
     healthy: Boolean(lastSuccessfulSyncAt && !lastError),
+    progress,
     state: !scrydexConfigured()
       ? "not_configured"
       : syncPromise
