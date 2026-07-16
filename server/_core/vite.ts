@@ -58,10 +58,41 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(
+    "/assets",
+    express.static(path.resolve(distPath, "assets"), {
+      maxAge: "1y",
+      immutable: true,
+      etag: true,
+    })
+  );
+  app.use(
+    express.static(distPath, {
+      maxAge: "1h",
+      etag: true,
+      setHeaders(res, filePath) {
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
+    })
+  );
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  const knownRoutes = [
+    /^\/$/,
+    /^\/(?:login|cards|market|sets|game|pokedex|metagame|decks|deck-builder|community|tournaments|binder|drops|shop|marketplace|cart|orders|auctions|bazaar|articles|sell|sell-card|open-store|dashboard|account|privacy|terms|contact|404)\/?$/,
+    /^\/(?:cards|sets|pokedex|shop|articles|store|profile)\/[^/]+\/?$/,
+    /^\/admin\/escrow\/?$/,
+    /^\/decks\/builder\/?$/,
+  ];
+
+  // Serve the SPA for known client routes and return a genuine 404 for unknown
+  // paths, avoiding search-engine soft 404s.
+  app.use("*", (req, res) => {
+    const pathname = new URL(req.originalUrl, "http://localhost").pathname;
+    const known = knownRoutes.some(pattern => pattern.test(pathname));
+    res
+      .status(known ? 200 : 404)
+      .sendFile(path.resolve(distPath, "index.html"));
   });
 }

@@ -162,18 +162,28 @@ export interface SearchCardsResult {
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25_000);
-  try {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      headers,
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`PokémonTCG API error ${res.status}: ${path}`);
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(timer);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        headers,
+        signal: controller.signal,
+      });
+      if (!res.ok)
+        throw new Error(`PokémonTCG API error ${res.status}: ${path}`);
+      return (await res.json()) as T;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 250));
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("PokémonTCG API request failed");
 }
 
 /** Slim field set for card grids — cuts payload ~70% vs full card objects. */
@@ -209,11 +219,7 @@ export async function getCardById(id: string): Promise<PtcgCard | null> {
 
 export async function getCardsByIds(ids: string[]): Promise<PtcgCard[]> {
   const safeIds = Array.from(
-    new Set(
-      ids
-        .map(id => id.trim())
-        .filter(id => /^[A-Za-z0-9._-]+$/.test(id))
-    )
+    new Set(ids.map(id => id.trim()).filter(id => /^[A-Za-z0-9._-]+$/.test(id)))
   ).slice(0, 250);
   if (!safeIds.length) return [];
   const q = safeIds.map(id => `id:${id}`).join(" OR ");

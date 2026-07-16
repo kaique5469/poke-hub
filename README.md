@@ -33,6 +33,7 @@ Requisitos: Node 20+, pnpm, um MySQL acessível (local ou o do Railway).
    - `JWT_SECRET` → string longa aleatória (`openssl rand -hex 32`)
    - `APP_URL` → a URL pública gerada pelo Railway (Settings → Networking → Generate Domain)
    - `OWNER_EMAIL` → seu email (quem se registrar com ele vira admin)
+   - `SUPPORT_EMAIL` → email público exibido na página de contato
    - `CRON_SECRET` → outra string aleatória
    - `SCRYDEX_API_KEY` → Primary API Key da Scrydex (somente no serviço do app)
    - `SCRYDEX_TEAM_ID` → Team ID da Scrydex
@@ -62,7 +63,7 @@ Cada `git push` na branch main faz deploy automático.
 
 O endpoint `POST /api/scheduled/tcg-news` (protegido pelo header `x-cron-secret`) publica até 5 artigos por dia:
 
-- **Com `OPENAI_API_KEY`**: gera 2 artigos + capas automaticamente.
+- **Com `OPENAI_API_KEY`**: pesquisa e gera artigos usando fontes verificáveis; as capas usam somente arte oficial, logos de sets ou uma URL fornecida.
 - **Sem a chave**: aceita artigos pré-escritos no body (`{"articles": [...]}`).
 
 O workflow `.github/workflows/daily-articles.yml` chama o endpoint todo dia às 9h (Brasília). Configure os secrets `APP_URL` e `CRON_SECRET` no GitHub (Settings → Secrets → Actions). Artigos com `"featured": true` aparecem no banner da homepage.
@@ -73,10 +74,11 @@ O catálogo de booster boxes, ETBs, bundles, tins, packs e coleções vem da
 Scrydex. O backend importa imagens reais, expansão, idioma e preços de mercado
 em USD para o MySQL; as chaves nunca são enviadas ao navegador.
 
-- A primeira visita ao marketplace sincroniza o catálogo se ele estiver desatualizado.
+- A primeira visita dispara a sincronização em segundo plano, sem bloquear a página.
 - `POST /api/scheduled/scrydex-sync` atualiza o catálogo e é protegido por `x-cron-secret`.
 - O workflow `.github/workflows/daily-catalog.yml` executa a atualização diariamente.
-- Produtos antigos gerados automaticamente são ocultados após a primeira sincronização real; produtos com anúncios de vendedores são preservados.
+- Produtos antigos gerados automaticamente são ocultados mesmo quando a fonte está indisponível; produtos ligados a anúncios reais de vendedores são preservados.
+- Se a fonte falhar, a interface apresenta um estado transparente e links de busca no Pokémon Center, TCGplayer, Target e eBay — nunca inventa produtos ou preços.
 
 ## Market Pulse para colecionadores
 
@@ -88,7 +90,7 @@ A rota `/market` reúne sinais reais e separa claramente a origem de cada dado:
 - ranking e feed de vendas baseados somente em pedidos de cartas com pagamento confirmado;
 - valor estimado da coleção, watchlist e alerta único de preço-alvo para usuários autenticados.
 
-`POST /api/scheduled/market-snapshot` captura as observações e processa alertas. O endpoint usa o mesmo header `x-cron-secret` dos demais jobs, e o workflow `.github/workflows/daily-market.yml` executa a coleta diariamente. As tabelas também são criadas de forma idempotente no startup para manter o deploy do Railway compatível com instalações que ainda não executam migrações automaticamente.
+`POST /api/scheduled/market-snapshot` captura as observações e processa alertas. O endpoint usa o mesmo header `x-cron-secret` dos demais jobs, e o workflow `.github/workflows/daily-market.yml` executa a coleta a cada 6 horas. As tabelas também são criadas de forma idempotente no startup para manter o deploy do Railway compatível com instalações que ainda não executam migrações automaticamente.
 
 ## Scripts
 

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /account
+Disallow: /dashboard
+Disallow: /orders
+Disallow: /cart
+
+Sitemap: https://lucid-vision-production-fca0.up.railway.app/sitemap.xml

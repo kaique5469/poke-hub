@@ -12,8 +12,9 @@
 
 import type { Request, Response } from "express";
 import { invokeLLMWithWebSearch } from "./_core/llm";
-import { upsertArticleBySlug, getAdminUser } from "./db";
+import { upsertArticleBySlug, getAdminUser, getPublishedArticles } from "./db";
 import { ENV } from "./_core/env";
+import { areArticleTitlesNearDuplicate } from "./lib/articleQuality";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface IncomingArticle {
@@ -21,7 +22,13 @@ interface IncomingArticle {
   subtitle?: string;
   slug: string;
   content: string;
-  category?: "strategy" | "deck_guide" | "set_review" | "tournament" | "collector" | "news";
+  category?:
+    | "strategy"
+    | "deck_guide"
+    | "set_review"
+    | "tournament"
+    | "collector"
+    | "news";
   tags?: string[];
   /** true only for MAJOR news (new set release, big ban list, major tournament) → shows in homepage hero banner */
   featured?: boolean;
@@ -58,22 +65,37 @@ export async function tcgNewsHandler(req: Request, res: Response) {
   try {
     // 1. Authenticate — must present the cron secret
     if (!ENV.cronSecret || req.headers["x-cron-secret"] !== ENV.cronSecret) {
-      return res.status(403).json({ error: "cron-only endpoint (x-cron-secret inválido)" });
+      return res
+        .status(403)
+        .json({ error: "cron-only endpoint (x-cron-secret inválido)" });
     }
 
     // 2. Resolve the admin user as article author
     const adminUser = await getAdminUser();
     if (!adminUser) {
-      return res.status(500).json({ error: "Admin user not found — register with the OWNER_EMAIL first." });
+      return res
+        .status(500)
+        .json({
+          error: "Admin user not found — register with the OWNER_EMAIL first.",
+        });
     }
     const authorId = adminUser.id;
 
     // 3. Respond immediately — generation takes minutes and the proxy would
     //    kill the connection. Processing continues in the background.
     const body = req.body as { articles?: IncomingArticle[]; topic?: string };
-    res.status(202).json({ ok: true, accepted: true, message: "Generating articles in background — check /articles in ~2 min." });
+    res
+      .status(202)
+      .json({
+        ok: true,
+        accepted: true,
+        message:
+          "Generating articles in background — check /articles in ~2 min.",
+      });
 
-    processArticles(body, authorId).catch(err => console.error("[tcg-news] Background error:", err));
+    processArticles(body, authorId).catch(err =>
+      console.error("[tcg-news] Background error:", err)
+    );
   } catch (err: any) {
     console.error("[tcg-news] Handler error:", err);
     if (!res.headersSent) {
@@ -82,7 +104,10 @@ export async function tcgNewsHandler(req: Request, res: Response) {
   }
 }
 
-async function processArticles(body: { articles?: IncomingArticle[]; topic?: string }, authorId: number) {
+async function processArticles(
+  body: { articles?: IncomingArticle[]; topic?: string },
+  authorId: number
+) {
   {
     // Accept pre-written articles from the agent body, or generate via LLM
     let articlesToPublish: IncomingArticle[] = [];
@@ -93,9 +118,14 @@ async function processArticles(body: { articles?: IncomingArticle[]; topic?: str
     } else {
       // Research and generate today's TCG news digest
       const today = new Date().toLocaleDateString("en-US", {
-        weekday: "long", year: "numeric", month: "long", day: "numeric",
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       });
-      const topic = body?.topic ?? "latest Pokémon TCG news, new set releases, tournament results, and card market trends";
+      const topic =
+        body?.topic ??
+        "latest Pokémon TCG news, new set releases, tournament results, and card market trends";
 
       const jsonShape = `[
   {
@@ -131,22 +161,34 @@ ${jsonShape}`
       } catch (searchErr) {
         // Never publish an unresearched fallback. A missed day is preferable
         // to invented news appearing on a marketplace homepage.
-        console.error("[tcg-news] Web research failed; nothing was published:", searchErr);
+        console.error(
+          "[tcg-news] Web research failed; nothing was published:",
+          searchErr
+        );
         return;
       }
 
       // Strip fences and any stray text around the JSON array
-      const noFences = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      const noFences = raw
+        .replace(/```json\s*/gi, "")
+        .replace(/```\s*/g, "")
+        .trim();
       const aStart = noFences.indexOf("[");
       const aEnd = noFences.lastIndexOf("]");
-      const cleaned = aStart >= 0 && aEnd > aStart ? noFences.slice(aStart, aEnd + 1) : noFences;
+      const cleaned =
+        aStart >= 0 && aEnd > aStart
+          ? noFences.slice(aStart, aEnd + 1)
+          : noFences;
       try {
         const parsed = JSON.parse(cleaned);
         if (Array.isArray(parsed)) {
           articlesToPublish = parsed.slice(0, 3);
         }
       } catch {
-        console.error("[tcg-news] Failed to parse LLM JSON:", cleaned.slice(0, 200));
+        console.error(
+          "[tcg-news] Failed to parse LLM JSON:",
+          cleaned.slice(0, 200)
+        );
         return;
       }
     }
@@ -154,15 +196,32 @@ ${jsonShape}`
     // 4. Persist each article (idempotent by slug)
     const results: { slug: string; inserted: boolean }[] = [];
     const prefix = todayPrefix();
+    const recentTitles = (await getPublishedArticles(30)).map(
+      article => article.title
+    );
 
     for (const art of articlesToPublish) {
       if (!art.title || !art.content) continue;
 
-      const sources = (art.sources ?? []).filter((source) =>
-        source?.title && /^https:\/\//i.test(source.url ?? "")
-      ).slice(0, 5);
-      if (!Array.isArray(body?.articles) && sources.length === 0) {
-        console.warn(`[tcg-news] Skipping ${art.title}: no verifiable sources.`);
+      const sources = (art.sources ?? [])
+        .filter(
+          source => source?.title && /^https:\/\//i.test(source.url ?? "")
+        )
+        .slice(0, 5);
+      if (sources.length === 0) {
+        console.warn(
+          `[tcg-news] Skipping ${art.title}: no verifiable sources.`
+        );
+        continue;
+      }
+      if (
+        recentTitles.some(title =>
+          areArticleTitlesNearDuplicate(title, art.title)
+        )
+      ) {
+        console.warn(
+          `[tcg-news] Skipping ${art.title}: recent article covers the same topic.`
+        );
         continue;
       }
 
@@ -172,21 +231,29 @@ ${jsonShape}`
 
       // Cover art: real official images only — explicit URL > set logo > Pokémon artwork
       let coverImageUrl: string | null = art.coverImageUrl ?? null;
-      if (!coverImageUrl && art.coverSetId && /^[a-z0-9pt.]{2,12}$/i.test(art.coverSetId)) {
+      if (
+        !coverImageUrl &&
+        art.coverSetId &&
+        /^[a-z0-9pt.]{2,12}$/i.test(art.coverSetId)
+      ) {
         coverImageUrl = `https://images.pokemontcg.io/${art.coverSetId.toLowerCase()}/logo.png`;
       }
       if (!coverImageUrl) {
         const dexId = Number(art.coverPokemonId);
-        const safeId = Number.isInteger(dexId) && dexId >= 1 && dexId <= 1025 ? dexId : 25;
+        const safeId =
+          Number.isInteger(dexId) && dexId >= 1 && dexId <= 1025 ? dexId : 25;
         coverImageUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${safeId}.png`;
       }
 
       // "featured" travels as a tag — featured articles power the homepage hero banner
-      const tags = Array.from(new Set([...(art.featured ? ["featured"] : []), ...(art.tags ?? [])]));
+      const tags = Array.from(
+        new Set([...(art.featured ? ["featured"] : []), ...(art.tags ?? [])])
+      );
 
-      const sourceSection = sources.length > 0
-        ? `\n\n## Sources\n${sources.map((source) => `- [${source.title}](${source.url})`).join("\n")}`
-        : "";
+      const sourceSection =
+        sources.length > 0
+          ? `\n\n## Sources\n${sources.map(source => `- [${source.title}](${source.url})`).join("\n")}`
+          : "";
 
       const { inserted } = await upsertArticleBySlug({
         authorId,
@@ -203,11 +270,14 @@ ${jsonShape}`
       });
 
       results.push({ slug, inserted });
+      recentTitles.unshift(art.title);
     }
 
     const inserted = results.filter(r => r.inserted).length;
     const skipped = results.filter(r => !r.inserted).length;
 
-    console.log(`[tcg-news] Published ${inserted} new articles, skipped ${skipped} duplicates.`);
+    console.log(
+      `[tcg-news] Published ${inserted} new articles, skipped ${skipped} duplicates.`
+    );
   }
 }

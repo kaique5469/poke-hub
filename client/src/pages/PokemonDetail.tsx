@@ -133,7 +133,7 @@ function TCGCardItem({ card }: { card: {
           alt={card.name}
           className="h-full object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
-          onError={(e) => { (e.target as HTMLImageElement).src = "https://via.placeholder.com/200x280?text=No+Image"; }}
+          onError={(e) => { (e.target as HTMLImageElement).src = "/card-placeholder.svg"; }}
         />
       </div>
       <div className="p-3">
@@ -230,7 +230,7 @@ function FeaturedCardsCarousel({ cards, pokemonName, typeStyle }: {
                   src={active.image}
                   alt={active.name}
                   className="h-full object-contain drop-shadow-xl group-hover:scale-105 transition-transform duration-300"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "https://via.placeholder.com/200x280?text=No+Image"; }}
+                  onError={(e) => { (e.target as HTMLImageElement).src = "/card-placeholder.svg"; }}
                 />
               </div>
               <div className="px-3 pb-3">
@@ -284,7 +284,7 @@ function FeaturedCardsCarousel({ cards, pokemonName, typeStyle }: {
                       src={card.image}
                       alt={card.name}
                       className="h-full object-contain"
-                      onError={(e) => { (e.target as HTMLImageElement).src = "https://via.placeholder.com/80x112?text=?"; }}
+                      onError={(e) => { (e.target as HTMLImageElement).src = "/card-placeholder.svg"; }}
                     />
                   </div>
                   {card.price?.market && (
@@ -624,7 +624,7 @@ export default function PokemonDetail() {
                                 src={evo.sprite}
                                 alt={evo.name}
                                 className="w-full h-full object-contain drop-shadow-md"
-                                onError={(e) => { (e.target as HTMLImageElement).src = "https://via.placeholder.com/96?text=?"; }}
+                                onError={(e) => { (e.target as HTMLImageElement).src = "/card-placeholder.svg"; }}
                               />
                               {isActive && (
                                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full border-2 border-white" />

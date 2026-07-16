@@ -9,6 +9,7 @@ interface CacheEntry<T> {
 }
 
 const store = new Map<string, CacheEntry<unknown>>();
+const inflight = new Map<string, Promise<unknown>>();
 
 export function getCache<T>(key: string): T | null {
   const entry = store.get(key) as CacheEntry<T> | undefined;
@@ -30,11 +31,32 @@ export async function cached<T>(
   ttlMs: number,
   fn: () => Promise<T>
 ): Promise<T> {
-  const hit = getCache<T>(key);
-  if (hit !== null) return hit;
-  const result = await fn();
-  setCache(key, result, ttlMs);
-  return result;
+  const entry = store.get(key) as CacheEntry<T> | undefined;
+  const now = Date.now();
+  if (entry && entry.expiresAt > now) return entry.data;
+
+  const running = inflight.get(key) as Promise<T> | undefined;
+  if (running) return entry ? entry.data : running;
+
+  const request = fn()
+    .then(result => {
+      setCache(key, result, ttlMs);
+      return result;
+    })
+    .catch(error => {
+      if (entry) return entry.data;
+      throw error;
+    })
+    .finally(() => inflight.delete(key));
+  inflight.set(key, request);
+
+  // Expired data is still more useful than a slow or broken page. Refresh it
+  // in the background and immediately serve the last verified response.
+  if (entry) {
+    void request.catch(() => {});
+    return entry.data;
+  }
+  return request;
 }
 
 // TTL constants

@@ -81,14 +81,18 @@ export interface ScrydexPage<T> {
 }
 
 export function scrydexConfigured(): boolean {
-  return Boolean(process.env.SCRYDEX_API_KEY?.trim() && process.env.SCRYDEX_TEAM_ID?.trim());
+  return Boolean(
+    process.env.SCRYDEX_API_KEY?.trim() && process.env.SCRYDEX_TEAM_ID?.trim()
+  );
 }
 
 function authHeaders(): Record<string, string> {
   const apiKey = process.env.SCRYDEX_API_KEY?.trim();
   const teamId = process.env.SCRYDEX_TEAM_ID?.trim();
   if (!apiKey || !teamId) {
-    throw new Error("Scrydex is not configured (SCRYDEX_API_KEY / SCRYDEX_TEAM_ID)");
+    throw new Error(
+      "Scrydex is not configured (SCRYDEX_API_KEY / SCRYDEX_TEAM_ID)"
+    );
   }
   return {
     Accept: "application/json",
@@ -100,7 +104,10 @@ function authHeaders(): Record<string, string> {
 
 async function apiFetch<T>(path: string): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  // Sealed responses with prices are larger than card lookups. Railway cold
+  // starts regularly need more than 20 seconds, so scheduled imports get a
+  // realistic timeout without blocking visitor requests.
+  const timeout = setTimeout(() => controller.abort(), 45_000);
   try {
     const response = await fetch(`${BASE_URL}${path}`, {
       headers: authHeaders(),
@@ -109,7 +116,9 @@ async function apiFetch<T>(path: string): Promise<T> {
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       const detail = body.slice(0, 240).replace(/\s+/g, " ");
-      throw new Error(`Scrydex API ${response.status}${detail ? `: ${detail}` : ""}`);
+      throw new Error(
+        `Scrydex API ${response.status}${detail ? `: ${detail}` : ""}`
+      );
     }
     return (await response.json()) as T;
   } finally {
@@ -117,14 +126,20 @@ async function apiFetch<T>(path: string): Promise<T> {
   }
 }
 
-export async function getSealedProductsPage(page = 1, pageSize = 100): Promise<ScrydexPage<ScrydexSealedProduct>> {
+export async function getSealedProductsPage(
+  page = 1,
+  pageSize = 50
+): Promise<ScrydexPage<ScrydexSealedProduct>> {
   const qs = new URLSearchParams({
     page: String(Math.max(1, page)),
     page_size: String(Math.min(100, Math.max(1, pageSize))),
+    q: 'language:"English"',
     include: "prices",
     orderBy: "name,-expansion_sort_order",
   });
-  return apiFetch<ScrydexPage<ScrydexSealedProduct>>(`/sealed?${qs.toString()}`);
+  return apiFetch<ScrydexPage<ScrydexSealedProduct>>(
+    `/sealed?${qs.toString()}`
+  );
 }
 
 /**
@@ -136,9 +151,7 @@ export async function getScrydexCardsByIds(
 ): Promise<ScrydexCard[]> {
   const ids = Array.from(
     new Set(
-      cardIds
-        .map(id => id.trim())
-        .filter(id => /^[A-Za-z0-9._-]+$/.test(id))
+      cardIds.map(id => id.trim()).filter(id => /^[A-Za-z0-9._-]+$/.test(id))
     )
   ).slice(0, 100);
   if (ids.length === 0) return [];
@@ -230,7 +243,7 @@ export async function getAllSealedProducts(maxPages = 20): Promise<{
   let totalCount = 0;
 
   while (page <= maxPages) {
-    const result = await getSealedProductsPage(page, 100);
+    const result = await getSealedProductsPage(page, 50);
     totalCount = Number(result.totalCount ?? result.total_count ?? 0);
     products.push(...(Array.isArray(result.data) ? result.data : []));
     if (products.length >= totalCount || result.data.length === 0) break;
@@ -238,7 +251,9 @@ export async function getAllSealedProducts(maxPages = 20): Promise<{
   }
 
   if (totalCount > products.length && page >= maxPages) {
-    throw new Error(`Scrydex pagination safety limit reached (${products.length}/${totalCount})`);
+    throw new Error(
+      `Scrydex pagination safety limit reached (${products.length}/${totalCount})`
+    );
   }
 
   return { products, requests: page, totalCount };

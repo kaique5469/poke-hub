@@ -119,10 +119,18 @@ import {
   productsRouter,
 } from "./marketplaceRouter";
 import { marketRouter } from "./marketRouter";
+import { ENV } from "./_core/env";
+import { dedupeArticlesByTitle } from "./lib/articleQuality";
 
 export const appRouter = router({
   system: systemRouter,
   market: marketRouter,
+  site: router({
+    info: publicProcedure.query(() => ({
+      contactEmail: ENV.supportEmail || null,
+      marketplaceName: "TCG Arena",
+    })),
+  }),
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
   auth: router({
@@ -359,30 +367,9 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return cached(`sets:recent:${input.limit}`, TTL.ONE_HOUR, async () => {
           const sets = await getSets();
-          // Already sorted by -releaseDate from the API
-          const recent = sets.slice(0, input.limit);
-          // Fetch a featured card (Special Illustration Rare or Hyper Rare) for each set
-          const withCards = await Promise.all(
-            recent.map(async set => {
-              try {
-                const rare = await searchCards({
-                  q: `set.id:${set.id} (rarity:"Special Illustration Rare" OR rarity:"Hyper Rare" OR rarity:"Ultra Rare")`,
-                  pageSize: 4,
-                  orderBy: "-set.releaseDate",
-                });
-                const featuredCards = rare.data.slice(0, 4).map(c => ({
-                  id: c.id,
-                  name: c.name,
-                  image: c.images.large ?? c.images.small,
-                  rarity: c.rarity ?? "",
-                }));
-                return { ...set, featuredCards };
-              } catch {
-                return { ...set, featuredCards: [] };
-              }
-            })
-          );
-          return withCards;
+          // This endpoint is used above the fold. Returning set metadata only
+          // avoids eight upstream card searches on every cold server instance.
+          return sets.slice(0, input.limit);
         }); // end cached
       }),
   }),
@@ -906,19 +893,24 @@ export const appRouter = router({
       .input(
         z.object({
           category: z.string().optional(),
-          limit: z.number().default(20),
+          limit: z.number().int().min(1).max(50).default(20),
         })
       )
       .query(async ({ input }) => {
         const cacheKey = `articles:list:${input.limit}:${input.category ?? "all"}`;
         return cached(cacheKey, TTL.FIVE_MIN, async () => {
-          const rows = await getPublishedArticles(input.limit, input.category);
-          return rows.map(a => ({
-            ...a,
-            tags: Array.isArray(a.tags) ? a.tags : [],
-            publishedAt: a.publishedAt?.toISOString() ?? null,
-            createdAt: a.createdAt.toISOString(),
-          }));
+          const rows = await getPublishedArticles(
+            input.limit * 3,
+            input.category
+          );
+          return dedupeArticlesByTitle(rows)
+            .slice(0, input.limit)
+            .map(a => ({
+              ...a,
+              tags: Array.isArray(a.tags) ? a.tags : [],
+              publishedAt: a.publishedAt?.toISOString() ?? null,
+              createdAt: a.createdAt.toISOString(),
+            }));
         });
       }),
     getBySlug: publicProcedure
