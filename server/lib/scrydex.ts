@@ -82,8 +82,8 @@ export interface ScrydexPage<T> {
 
 /**
  * Scrydex models language primarily on the expansion for sealed products.
- * Keep this check local instead of relying on a search field that may not be
- * indexed for every historical product.
+ * Keep this local check as a second layer even though the request also uses
+ * the documented nested expansion.language_code field.
  */
 export function isEnglishSealedProduct(product: ScrydexSealedProduct): boolean {
   const codes = [product.language_code, product.expansion?.language_code]
@@ -150,6 +150,7 @@ export async function getSealedProductsPage(
   const qs = new URLSearchParams({
     page: String(Math.max(1, page)),
     page_size: String(Math.min(100, Math.max(1, pageSize))),
+    q: "expansion.language_code:EN",
     include: "prices",
     orderBy: "name,-expansion_sort_order",
   });
