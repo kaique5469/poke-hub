@@ -366,7 +366,7 @@ export default function MarketPulse() {
                   <Activity size={12} className="mr-1" /> Collector intelligence
                 </Badge>
                 <span className="text-xs text-slate-500">
-                  Prices scheduled daily · Arena activity refreshes every minute
+                  Prices scheduled every 6 hours · Arena activity refreshes every minute
                 </span>
               </div>
               <h1 className="max-w-3xl text-4xl font-black tracking-tight text-white md:text-6xl">
@@ -502,7 +502,7 @@ export default function MarketPulse() {
                   First verified baseline captured
                 </p>
                 <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">
-                  The index and movers will activate after the next daily
+                  The index and movers will activate after the next scheduled
                   observation. No synthetic chart points are used.
                 </p>
               </div>

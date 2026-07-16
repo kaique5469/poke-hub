@@ -14,6 +14,8 @@ export const ENV = {
   cronSecret: process.env.CRON_SECRET ?? "",
   /** Email of the site owner — this account becomes admin on registration. */
   ownerEmail: process.env.OWNER_EMAIL ?? "",
+  /** Public support address. Falls back to the owner while the brand inbox is set up. */
+  supportEmail: process.env.SUPPORT_EMAIL ?? process.env.OWNER_EMAIL ?? "",
   /** Directory for uploaded/generated files (mount a Railway volume here). */
   dataDir: process.env.DATA_DIR ?? "./data",
   /** Optional key for CardMarket price API via RapidAPI. */
@@ -26,6 +28,9 @@ export const ENV = {
 
 // Hard-fail: never run production with a missing/default JWT secret —
 // anyone could forge session tokens (including admin).
-if (ENV.isProduction && (!process.env.JWT_SECRET || process.env.JWT_SECRET === "dev-secret-change-me")) {
+if (
+  ENV.isProduction &&
+  (!process.env.JWT_SECRET || process.env.JWT_SECRET === "dev-secret-change-me")
+) {
   throw new Error("JWT_SECRET é obrigatório em produção (defina no Railway).");
 }

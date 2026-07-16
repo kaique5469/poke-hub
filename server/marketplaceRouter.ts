@@ -46,7 +46,8 @@ import {
   refundOrderMoney,
 } from "./storeDb";
 import { createCheckoutSession, stripeEnabled } from "./lib/stripe";
-import { ensureProductsSynced } from "./scrydexSync";
+import { ensureProductsSynced, getCatalogSyncStatus } from "./scrydexSync";
+import { getRetailerLinks } from "./lib/retailerLinks";
 
 const conditionEnum = z.enum(["M", "NM", "SP", "MP", "HP", "D"]);
 
@@ -82,14 +83,19 @@ export const productsRouter = router({
         .default({ page: 1, pageSize: 24 })
     )
     .query(async ({ input }) => {
-      await ensureProductsSynced();
+      void ensureProductsSynced();
       return listProducts(input);
     }),
+
+  status: publicProcedure.query(async () => {
+    void ensureProductsSynced();
+    return getCatalogSyncStatus();
+  }),
 
   bySlug: publicProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ input }) => {
-      await ensureProductsSynced();
+      void ensureProductsSynced();
       const product = await getProductBySlug(input.slug);
       if (!product)
         throw new TRPCError({
@@ -110,7 +116,12 @@ export const productsRouter = router({
       const related = relatedResult.items
         .filter(item => item.id !== product.id)
         .slice(0, 4);
-      return { product, sellers, related };
+      return {
+        product,
+        sellers,
+        related,
+        retailerLinks: getRetailerLinks(product.name),
+      };
     }),
 
   createListing: protectedProcedure

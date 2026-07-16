@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft,
   BadgeCheck,
+  ExternalLink,
   Package,
   ShoppingCart,
   Star,
@@ -189,7 +190,7 @@ export default function ProductDetail() {
     );
   }
 
-  const { product, sellers, related } = data;
+  const { product, sellers, related, retailerLinks } = data;
   const refPrice = product.avgPriceUsd ?? product.minPriceUsd;
 
   return (
@@ -395,6 +396,41 @@ export default function ProductDetail() {
           </div>
 
           <aside className="space-y-3">
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5">
+              <ExternalLink className="h-5 w-5 text-violet-700" />
+              <h3 className="mt-3 font-black text-gray-900">
+                Check trusted retailers
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-gray-600">
+                No community listing yet? Compare current availability directly
+                with established stores and marketplaces.
+              </p>
+              <div className="mt-4 space-y-2">
+                {retailerLinks.map(link => (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm font-black text-violet-800 transition hover:border-violet-400"
+                  >
+                    <span>
+                      {link.name}
+                      {link.official ? (
+                        <span className="ml-2 text-[9px] uppercase tracking-wider text-emerald-700">
+                          Official
+                        </span>
+                      ) : null}
+                    </span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                ))}
+              </div>
+              <p className="mt-3 text-[10px] leading-4 text-gray-500">
+                Availability and checkout are handled by the selected retailer.
+                TCG Arena does not guarantee third-party stock or prices.
+              </p>
+            </div>
             <div className="rounded-2xl border border-gray-200 bg-white p-5">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
               <h3 className="mt-3 font-black text-gray-900">

@@ -45,6 +45,7 @@ const UserDashboard = lazy(() => import("./pages/UserDashboard"));
 const AdminEscrow = lazy(() => import("./pages/AdminEscrow"));
 const Login = lazy(() => import("./pages/Login"));
 const MarketPulse = lazy(() => import("./pages/MarketPulse"));
+const Legal = lazy(() => import("./pages/Legal"));
 
 function PageLoader() {
   return (
@@ -112,6 +113,9 @@ function Router() {
           <Route path="/dashboard" component={UserDashboard} />
           <Route path="/admin/escrow" component={AdminEscrow} />
           <Route path="/account" component={UserDashboard} />
+          <Route path="/privacy" component={Legal} />
+          <Route path="/terms" component={Legal} />
+          <Route path="/contact" component={Legal} />
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>

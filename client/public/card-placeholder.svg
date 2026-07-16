@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 336" role="img" aria-labelledby="title">
+  <title id="title">Card image unavailable</title>
+  <rect width="240" height="336" rx="18" fill="#f3f4f6"/>
+  <rect x="12" y="12" width="216" height="312" rx="13" fill="none" stroke="#d1d5db" stroke-width="3"/>
+  <circle cx="120" cy="146" r="48" fill="none" stroke="#9ca3af" stroke-width="8"/>
+  <path d="M74 146h92" stroke="#9ca3af" stroke-width="8"/>
+  <circle cx="120" cy="146" r="15" fill="#f3f4f6" stroke="#9ca3af" stroke-width="7"/>
+  <text x="120" y="226" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#6b7280">IMAGE UNAVAILABLE</text>
+</svg>

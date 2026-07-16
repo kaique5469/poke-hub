@@ -4,7 +4,6 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
-  Boxes,
   CalendarDays,
   Package,
   Search,
@@ -69,7 +68,6 @@ export default function Home() {
     { staleTime: 300_000, retry: false }
   );
   const newestSet: any = sets.data?.[0];
-  const heroCards = newestSet?.featuredCards?.slice(0, 3) ?? [];
   const highCards: any[] = (cards.data as any)?.data?.slice(0, 8) ?? [];
   const productRows: any[] = products.data?.items ?? [];
   const articleRows: any[] = articles.data ?? [];
@@ -90,8 +88,8 @@ export default function Home() {
               <span className="text-violet-300">Know the market.</span>
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 md:text-lg">
-              Search English cards, compare live market references and discover
-              every official sealed product connected to a set.
+              Search English cards, compare market references and discover
+              source-verified sealed products connected to each set.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
@@ -116,29 +114,20 @@ export default function Home() {
           </div>
           <div className="relative mx-auto min-h-[380px] w-full max-w-xl">
             <div className="absolute inset-x-10 bottom-0 top-12 rotate-2 rounded-[36px] border border-white/10 bg-white/5 backdrop-blur" />
-            {heroCards.length ? (
-              heroCards.map((card: any, index: number) => (
-                <Link
-                  key={card.id}
-                  href={`/cards/${card.id}`}
-                  className="absolute top-1/2 block w-[34%] -translate-y-1/2 transition hover:z-20 hover:-translate-y-[54%]"
-                  style={{
-                    left: `${8 + index * 27}%`,
-                    transform: `translateY(-50%) rotate(${(index - 1) * 7}deg)`,
-                    zIndex: index === 1 ? 3 : 2,
-                  }}
-                >
-                  <img
-                    src={card.image}
-                    alt={card.name}
-                    className="w-full drop-shadow-[0_28px_35px_rgba(0,0,0,.55)]"
-                  />
-                </Link>
-              ))
+            {newestSet?.images?.logo ? (
+              <Link
+                href={`/sets/${newestSet.id}`}
+                className="absolute inset-x-16 top-16 bottom-24 flex items-center justify-center rounded-[30px] border border-white/10 bg-gradient-to-br from-white/10 to-violet-500/10 p-10 shadow-2xl transition hover:border-violet-300/40"
+              >
+                <img
+                  src={newestSet.images.logo}
+                  alt={`${newestSet.name} logo`}
+                  fetchPriority="high"
+                  className="max-h-44 w-full object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.45)]"
+                />
+              </Link>
             ) : (
-              <div className="absolute inset-10 flex items-center justify-center rounded-3xl border border-white/10 bg-white/5">
-                <Boxes className="h-20 w-20 text-white/20" />
-              </div>
+              <Skeleton className="absolute inset-x-16 top-16 bottom-24 rounded-[30px] bg-white/10" />
             )}
             {newestSet && (
               <Link
@@ -178,8 +167,8 @@ export default function Home() {
           {[
             [
               ShieldCheck,
-              "Real marketplace data",
-              "No fictional sealed catalog",
+              "Verified-source catalog",
+              "Unverified products remain hidden",
             ],
             [
               BarChart3,
@@ -223,26 +212,11 @@ export default function Home() {
                   className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-xl"
                 >
                   <div className="relative flex h-40 items-center justify-center overflow-hidden bg-gradient-to-br from-[#111827] to-[#312e81] p-4">
-                    {set.featuredCards?.[0]?.image ? (
-                      <img
-                        src={set.featuredCards[0].image}
-                        alt={set.featuredCards[0].name}
-                        className="h-36 -rotate-3 object-contain drop-shadow-xl transition group-hover:rotate-0 group-hover:scale-105"
-                      />
-                    ) : (
-                      <SafeImage
-                        src={set.images?.logo}
-                        alt={set.name}
-                        className="max-h-20 w-full object-contain"
-                      />
-                    )}
-                    {set.images?.logo && (
-                      <img
-                        src={set.images.logo}
-                        alt=""
-                        className="absolute bottom-2 right-2 h-7 w-20 object-contain"
-                      />
-                    )}
+                    <SafeImage
+                      src={set.images?.logo}
+                      alt={set.name}
+                      className="max-h-24 w-full object-contain transition group-hover:scale-105"
+                    />
                   </div>
                   <div className="p-4">
                     <p className="text-[10px] font-black uppercase tracking-wider text-violet-600">
@@ -274,7 +248,7 @@ export default function Home() {
           />
           {products.isLoading ? (
             <GridSkeleton />
-          ) : (
+          ) : productRows.length ? (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               {productRows.map(product => (
                 <Link
@@ -312,6 +286,24 @@ export default function Home() {
                 </Link>
               ))}
             </div>
+          ) : (
+            <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-12 text-center">
+              <ShieldCheck className="mx-auto h-8 w-8 text-amber-600" />
+              <h3 className="mt-3 text-lg font-black text-gray-900">
+                Verified sealed catalog is being refreshed
+              </h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-gray-600">
+                We hide unverified products instead of showing generated boxes
+                or prices. Trusted retailer shopping remains available in the
+                shop.
+              </p>
+              <Link
+                href="/shop"
+                className="mt-5 inline-flex rounded-full bg-gray-950 px-5 py-2.5 text-sm font-black text-white"
+              >
+                Open trusted shopping links
+              </Link>
+            </div>
           )}
         </section>
 
@@ -344,6 +336,7 @@ export default function Home() {
                       <img
                         src={card.images?.small}
                         alt={card.name}
+                        loading="lazy"
                         className="w-full rounded-lg transition group-hover:scale-[1.03]"
                       />
                       <p className="mt-3 truncate text-xs font-black text-gray-900">
