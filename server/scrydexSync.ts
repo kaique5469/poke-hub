@@ -189,6 +189,10 @@ export async function syncScrydexSealedProducts(
 
   lastAttemptAt = Date.now();
   const result = await getAllSealedProducts();
+  if (result.products.length === 0) {
+    lastError = "empty_catalog";
+    throw new Error("Scrydex returned no English sealed products");
+  }
   let upserted = 0;
   for (const product of result.products) {
     if (!product.id || !product.name || !product.type) continue;
