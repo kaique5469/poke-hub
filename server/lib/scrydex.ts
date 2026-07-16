@@ -80,6 +80,23 @@ export interface ScrydexPage<T> {
   total_count?: number;
 }
 
+/**
+ * Scrydex models language primarily on the expansion for sealed products.
+ * Keep this check local instead of relying on a search field that may not be
+ * indexed for every historical product.
+ */
+export function isEnglishSealedProduct(product: ScrydexSealedProduct): boolean {
+  const codes = [product.language_code, product.expansion?.language_code]
+    .filter((value): value is string => Boolean(value))
+    .map(value => value.trim().toUpperCase());
+  if (codes.includes("EN")) return true;
+
+  const languages = [product.language, product.expansion?.language]
+    .filter((value): value is string => Boolean(value))
+    .map(value => value.trim().toLowerCase());
+  return languages.includes("english");
+}
+
 export function scrydexConfigured(): boolean {
   return Boolean(
     process.env.SCRYDEX_API_KEY?.trim() && process.env.SCRYDEX_TEAM_ID?.trim()
@@ -133,7 +150,6 @@ export async function getSealedProductsPage(
   const qs = new URLSearchParams({
     page: String(Math.max(1, page)),
     page_size: String(Math.min(100, Math.max(1, pageSize))),
-    q: 'language:"English"',
     include: "prices",
     orderBy: "name,-expansion_sort_order",
   });
@@ -241,18 +257,21 @@ export async function getAllSealedProducts(maxPages = 20): Promise<{
   const products: ScrydexSealedProduct[] = [];
   let page = 1;
   let totalCount = 0;
+  let receivedCount = 0;
 
   while (page <= maxPages) {
-    const result = await getSealedProductsPage(page, 50);
+    const result = await getSealedProductsPage(page, 100);
     totalCount = Number(result.totalCount ?? result.total_count ?? 0);
-    products.push(...(Array.isArray(result.data) ? result.data : []));
-    if (products.length >= totalCount || result.data.length === 0) break;
+    const pageProducts = Array.isArray(result.data) ? result.data : [];
+    receivedCount += pageProducts.length;
+    products.push(...pageProducts.filter(isEnglishSealedProduct));
+    if (receivedCount >= totalCount || pageProducts.length === 0) break;
     page += 1;
   }
 
-  if (totalCount > products.length && page >= maxPages) {
+  if (totalCount > receivedCount && page >= maxPages) {
     throw new Error(
-      `Scrydex pagination safety limit reached (${products.length}/${totalCount})`
+      `Scrydex pagination safety limit reached (${receivedCount}/${totalCount})`
     );
   }
 
