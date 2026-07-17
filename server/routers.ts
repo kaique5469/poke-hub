@@ -71,16 +71,18 @@ import {
 } from "./lib/limitless";
 import { getPokedexTypeCounts, queryPokedex } from "./lib/pokedex";
 import {
+  calculateRoundScore,
   evaluateGuess,
+  getDifficultyConfig,
   getDexEntry,
   pickRandomTarget,
-  MAX_ATTEMPTS,
-  POINTS_PER_ATTEMPT,
   REGION_BY_GEN,
+  type GameDifficulty,
   type GuessFeedback,
 } from "./lib/guessGame";
 import {
   createRound,
+  decodeRoundState,
   getActiveRound,
   getLeaderboard,
   getStats,
@@ -1216,24 +1218,32 @@ export const appRouter = router({
 
   game: router({
     /** Start a new round (abandons any active one). Target stays server-side. */
-    start: protectedProcedure.mutation(async ({ ctx }) => {
-      const user = await getUserByOpenId(ctx.user.openId);
-      if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
-      const targetId = await pickRandomTarget();
-      const round = await createRound(user.id, targetId);
-      if (!round)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Could not start game",
-        });
-      return {
-        roundId: round.id,
-        attemptsRemaining: MAX_ATTEMPTS,
-        maxAttempts: MAX_ATTEMPTS,
-        guesses: [] as GuessFeedback[],
-        status: "active" as const,
-      };
-    }),
+    start: protectedProcedure
+      .input(z.object({ difficulty: z.enum(["easy", "medium", "hard"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const difficulty = input.difficulty as GameDifficulty;
+        const config = getDifficultyConfig(difficulty);
+        const targetId = await pickRandomTarget(difficulty);
+        const round = await createRound(user.id, targetId, difficulty);
+        if (!round)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Could not start game",
+          });
+        return {
+          roundId: round.id,
+          difficulty,
+          difficultyLabel: config.label,
+          attemptsRemaining: config.maxAttempts,
+          maxAttempts: config.maxAttempts,
+          pointsPerAttempt: config.pointsPerAttempt,
+          maxScore: config.maxScore,
+          guesses: [] as GuessFeedback[],
+          status: "active" as const,
+        };
+      }),
 
     /** Resume the active round after a refresh (never reveals the target). */
     current: protectedProcedure.query(async ({ ctx }) => {
@@ -1241,12 +1251,17 @@ export const appRouter = router({
       if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
       const round = await getActiveRound(user.id);
       if (!round) return null;
-      const guesses = (round.guesses as GuessFeedback[] | null) ?? [];
+      const state = decodeRoundState(round.guesses);
+      const config = getDifficultyConfig(state.difficulty);
       return {
         roundId: round.id,
-        attemptsRemaining: MAX_ATTEMPTS - round.attemptsUsed,
-        maxAttempts: MAX_ATTEMPTS,
-        guesses,
+        difficulty: state.difficulty,
+        difficultyLabel: config.label,
+        attemptsRemaining: config.maxAttempts - round.attemptsUsed,
+        maxAttempts: config.maxAttempts,
+        pointsPerAttempt: config.pointsPerAttempt,
+        maxScore: config.maxScore,
+        guesses: state.guesses,
         status: round.status,
       };
     }),
@@ -1270,7 +1285,9 @@ export const appRouter = router({
           });
         }
 
-        const prev = (round.guesses as GuessFeedback[] | null) ?? [];
+        const state = decodeRoundState(round.guesses);
+        const config = getDifficultyConfig(state.difficulty);
+        const prev = state.guesses;
         if (prev.some(g => g.guess.id === input.pokemonId)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -1287,14 +1304,15 @@ export const appRouter = router({
         const guesses = [feedback, ...prev];
 
         const won = feedback.tier === "win";
-        const outOfAttempts = !won && attempt >= MAX_ATTEMPTS;
+        const outOfAttempts = !won && attempt >= config.maxAttempts;
         const roundScore = won
-          ? (MAX_ATTEMPTS - attempt) * POINTS_PER_ATTEMPT + POINTS_PER_ATTEMPT
+          ? calculateRoundScore(state.difficulty, attempt)
           : 0;
 
         await saveRoundProgress(round.id, {
           attemptsUsed: attempt,
           guesses,
+          difficulty: state.difficulty,
           status: won ? "won" : outOfAttempts ? "lost" : "active",
           roundScore,
         });
@@ -1325,7 +1343,12 @@ export const appRouter = router({
         return {
           feedback,
           guesses,
-          attemptsRemaining: MAX_ATTEMPTS - attempt,
+          difficulty: state.difficulty,
+          difficultyLabel: config.label,
+          attemptsRemaining: config.maxAttempts - attempt,
+          maxAttempts: config.maxAttempts,
+          pointsPerAttempt: config.pointsPerAttempt,
+          maxScore: config.maxScore,
           status: won
             ? ("won" as const)
             : outOfAttempts

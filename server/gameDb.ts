@@ -1,10 +1,62 @@
 /** DB helpers for the Guess the Pokémon game. */
 import { and, desc, eq, sql } from "drizzle-orm";
-import { gameRounds, gameStats, users, type GameRound } from "../drizzle/schema";
+import {
+  gameRounds,
+  gameStats,
+  users,
+  type GameRound,
+} from "../drizzle/schema";
 import { getDb } from "./db";
-import type { GuessFeedback } from "./lib/guessGame";
+import {
+  DEFAULT_DIFFICULTY,
+  isGameDifficulty,
+  type GameDifficulty,
+  type GuessFeedback,
+} from "./lib/guessGame";
 
-export async function getActiveRound(userId: number): Promise<GameRound | null> {
+export interface StoredRoundState {
+  version: 2;
+  difficulty: GameDifficulty;
+  guesses: GuessFeedback[];
+}
+
+/**
+ * Difficulty is stored in the existing JSON column to keep deployment
+ * backward-compatible and avoid a database migration for live installations.
+ */
+export function decodeRoundState(value: unknown): {
+  difficulty: GameDifficulty;
+  guesses: GuessFeedback[];
+} {
+  if (Array.isArray(value)) {
+    return {
+      // Legacy rounds used 15 attempts, which matches the new easy mode.
+      difficulty: "easy",
+      guesses: value as GuessFeedback[],
+    };
+  }
+  if (value && typeof value === "object") {
+    const state = value as Partial<StoredRoundState>;
+    return {
+      difficulty: isGameDifficulty(state.difficulty)
+        ? state.difficulty
+        : DEFAULT_DIFFICULTY,
+      guesses: Array.isArray(state.guesses) ? state.guesses : [],
+    };
+  }
+  return { difficulty: DEFAULT_DIFFICULTY, guesses: [] };
+}
+
+function encodeRoundState(
+  difficulty: GameDifficulty,
+  guesses: GuessFeedback[]
+): StoredRoundState {
+  return { version: 2, difficulty, guesses };
+}
+
+export async function getActiveRound(
+  userId: number
+): Promise<GameRound | null> {
   const db = await getDb();
   if (!db) return null;
   const rows = await db
@@ -16,7 +68,11 @@ export async function getActiveRound(userId: number): Promise<GameRound | null> 
   return rows[0] ?? null;
 }
 
-export async function createRound(userId: number, targetId: number): Promise<GameRound | null> {
+export async function createRound(
+  userId: number,
+  targetId: number,
+  difficulty: GameDifficulty
+): Promise<GameRound | null> {
   const db = await getDb();
   if (!db) return null;
   // Abandon any previous active round
@@ -24,7 +80,9 @@ export async function createRound(userId: number, targetId: number): Promise<Gam
     .update(gameRounds)
     .set({ status: "lost", endedAt: new Date() })
     .where(and(eq(gameRounds.userId, userId), eq(gameRounds.status, "active")));
-  await db.insert(gameRounds).values({ userId, targetId, guesses: [] });
+  await db
+    .insert(gameRounds)
+    .values({ userId, targetId, guesses: encodeRoundState(difficulty, []) });
   return getActiveRound(userId);
 }
 
@@ -33,9 +91,10 @@ export async function saveRoundProgress(
   data: {
     attemptsUsed: number;
     guesses: GuessFeedback[];
+    difficulty: GameDifficulty;
     status?: "active" | "won" | "lost";
     roundScore?: number;
-  },
+  }
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -43,10 +102,12 @@ export async function saveRoundProgress(
     .update(gameRounds)
     .set({
       attemptsUsed: data.attemptsUsed,
-      guesses: data.guesses,
+      guesses: encodeRoundState(data.difficulty, data.guesses),
       ...(data.status ? { status: data.status } : {}),
       ...(data.roundScore != null ? { roundScore: data.roundScore } : {}),
-      ...(data.status && data.status !== "active" ? { endedAt: new Date() } : {}),
+      ...(data.status && data.status !== "active"
+        ? { endedAt: new Date() }
+        : {}),
     })
     .where(eq(gameRounds.id, roundId));
 }
@@ -55,7 +116,7 @@ export async function recordResult(
   userId: number,
   won: boolean,
   roundScore: number,
-  attemptsUsed: number,
+  attemptsUsed: number
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -76,7 +137,9 @@ export async function recordResult(
         losses: sql`losses + ${won ? 0 : 1}`,
         streak: won ? sql`streak + 1` : 0,
         ...(won
-          ? { bestAttempts: sql`LEAST(COALESCE(bestAttempts, 99), ${attemptsUsed})` }
+          ? {
+              bestAttempts: sql`LEAST(COALESCE(bestAttempts, 99), ${attemptsUsed})`,
+            }
           : {}),
       },
     });
@@ -85,7 +148,11 @@ export async function recordResult(
 export async function getStats(userId: number) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(gameStats).where(eq(gameStats.userId, userId)).limit(1);
+  const rows = await db
+    .select()
+    .from(gameStats)
+    .where(eq(gameStats.userId, userId))
+    .limit(1);
   return rows[0] ?? null;
 }
 
