@@ -73,25 +73,20 @@ export async function tcgNewsHandler(req: Request, res: Response) {
     // 2. Resolve the admin user as article author
     const adminUser = await getAdminUser();
     if (!adminUser) {
-      return res
-        .status(500)
-        .json({
-          error: "Admin user not found — register with the OWNER_EMAIL first.",
-        });
+      return res.status(500).json({
+        error: "Admin user not found — register with the OWNER_EMAIL first.",
+      });
     }
     const authorId = adminUser.id;
 
     // 3. Respond immediately — generation takes minutes and the proxy would
     //    kill the connection. Processing continues in the background.
     const body = req.body as { articles?: IncomingArticle[]; topic?: string };
-    res
-      .status(202)
-      .json({
-        ok: true,
-        accepted: true,
-        message:
-          "Generating articles in background — check /articles in ~2 min.",
-      });
+    res.status(202).json({
+      ok: true,
+      accepted: true,
+      message: "Generating articles in background — check /articles in ~2 min.",
+    });
 
     processArticles(body, authorId).catch(err =>
       console.error("[tcg-news] Background error:", err)
@@ -151,7 +146,7 @@ Set "featured": true ONLY for major news that deserves the homepage hero banner 
       try {
         // Primary path: real-time web search → articles based on actual news
         raw = await invokeLLMWithWebSearch(
-          `You are a Pokémon TCG journalist writing for TCG Arena, a US marketplace for collectors and competitive players. Today is ${today}.
+          `You are a Pokémon TCG journalist writing for RarityGrid, a US marketplace for collectors and competitive players. Today is ${today}.
 First, SEARCH THE WEB for real Pokémon TCG news from the LAST 7 DAYS: ${topic}. Prioritize official Pokémon announcements, major tournament results, new set releases/reveals, and notable card price movements.
 Then write 2 news articles based ONLY on real facts you found (include real names, dates and numbers).
 Return ONLY a valid JSON array — no markdown, no code fences, no citations or annotations, no text before or after the JSON — with this exact shape:

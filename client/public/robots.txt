@@ -2,8 +2,12 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /account
-Disallow: /dashboard
-Disallow: /orders
+Disallow: /binder
 Disallow: /cart
+Disallow: /dashboard
+Disallow: /login
+Disallow: /orders
+Disallow: /profile/edit
+Disallow: /sell
 
-Sitemap: https://lucid-vision-production-fca0.up.railway.app/sitemap.xml
+Sitemap: https://raritygrid.com/sitemap.xml

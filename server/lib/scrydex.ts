@@ -115,7 +115,7 @@ function authHeaders(): Record<string, string> {
     Accept: "application/json",
     "X-Api-Key": apiKey,
     "X-Team-ID": teamId,
-    "User-Agent": "PokeHub/1.0 market-data",
+    "User-Agent": "RarityGrid/1.0 market-data",
   };
 }
 

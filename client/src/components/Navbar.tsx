@@ -152,7 +152,7 @@ const navSections = [
         desc: "Buy & sell products",
       },
       {
-        label: "Sell on TCG Arena",
+        label: "Sell on RarityGrid",
         href: "/sell",
         icon: <TrendingUp size={16} />,
         desc: "Open your store for free",

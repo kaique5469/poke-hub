@@ -120,7 +120,7 @@ export default function Articles() {
         <div className="container grid gap-8 py-12 md:grid-cols-[1fr_360px] md:items-end">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-violet-300">
-              TCG Arena editorial
+              RarityGrid editorial
             </p>
             <h1 className="mt-3 text-4xl font-black tracking-tight text-white md:text-5xl">
               Know the cards. Understand the market.

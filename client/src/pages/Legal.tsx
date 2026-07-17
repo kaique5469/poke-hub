@@ -16,11 +16,11 @@ const privacySections = [
   ],
   [
     "Payments",
-    "Payment details are handled by Stripe. TCG Arena does not store full card numbers.",
+    "Payment details are handled by Stripe. RarityGrid does not store full card numbers.",
   ],
   [
     "Third-party services",
-    "Card and market data may come from Scrydex, Pokémon TCG API and linked retailers. Their own privacy terms apply when you leave TCG Arena.",
+    "Card and market data may come from Scrydex, Pokémon TCG API and linked retailers. Their own privacy terms apply when you leave RarityGrid.",
   ],
   [
     "Your choices",
@@ -31,7 +31,7 @@ const privacySections = [
 const termsSections = [
   [
     "Marketplace role",
-    "TCG Arena provides tools that connect independent buyers and sellers. Sellers are responsible for accurate descriptions, authenticity, condition, fulfillment and applicable taxes.",
+    "RarityGrid provides tools that connect independent buyers and sellers. Sellers are responsible for accurate descriptions, authenticity, condition, fulfillment and applicable taxes.",
   ],
   [
     "Pricing data",
@@ -51,7 +51,7 @@ const termsSections = [
   ],
   [
     "Pokémon trademarks",
-    "Pokémon and related names belong to Nintendo, Creatures Inc. and GAME FREAK. TCG Arena is not endorsed by The Pokémon Company.",
+    "Pokémon and related names belong to Nintendo, Creatures Inc. and GAME FREAK. RarityGrid is not endorsed by The Pokémon Company.",
   ],
 ];
 
@@ -65,7 +65,7 @@ export default function Legal() {
     : isTerms
       ? "Terms of Use"
       : "Contact";
-  usePageMeta(title, `${title} for TCG Arena.`);
+  usePageMeta(title, `${title} for RarityGrid.`);
 
   if (!isPrivacy && !isTerms) {
     return (
@@ -75,7 +75,7 @@ export default function Legal() {
             Support
           </p>
           <h1 className="mt-3 text-4xl font-black text-gray-950">
-            Contact TCG Arena
+            Contact RarityGrid
           </h1>
           <p className="mt-4 text-base leading-7 text-gray-600">
             For account access, seller onboarding, order disputes or data

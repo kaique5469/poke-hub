@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
+import { injectSeoMetadata, isKnownClientRoute, isPrivatePath } from "../seo";
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -38,8 +39,17 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`
       );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      const pathname = new URL(url, "http://localhost").pathname;
+      const known = isKnownClientRoute(pathname);
+      const transformed = await vite.transformIndexHtml(url, template);
+      const page = injectSeoMetadata(transformed, pathname, known ? 200 : 404);
+      if (!known || isPrivatePath(pathname)) {
+        res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      }
+      res
+        .status(known ? 200 : 404)
+        .set({ "Content-Type": "text/html", "Cache-Control": "no-cache" })
+        .end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -68,31 +78,29 @@ export function serveStatic(app: Express) {
   );
   app.use(
     express.static(distPath, {
+      index: false,
       maxAge: "1h",
       etag: true,
-      setHeaders(res, filePath) {
-        if (filePath.endsWith("index.html")) {
-          res.setHeader("Cache-Control", "no-cache");
-        }
-      },
     })
   );
 
-  const knownRoutes = [
-    /^\/$/,
-    /^\/(?:login|cards|market|sets|game|pokedex|metagame|decks|deck-builder|community|tournaments|binder|drops|shop|marketplace|cart|orders|auctions|bazaar|articles|sell|sell-card|open-store|dashboard|account|privacy|terms|contact|404)\/?$/,
-    /^\/(?:cards|sets|pokedex|shop|articles|store|profile)\/[^/]+\/?$/,
-    /^\/admin\/escrow\/?$/,
-    /^\/decks\/builder\/?$/,
-  ];
+  const indexHtml = fs.readFileSync(
+    path.resolve(distPath, "index.html"),
+    "utf-8"
+  );
 
   // Serve the SPA for known client routes and return a genuine 404 for unknown
   // paths, avoiding search-engine soft 404s.
   app.use("*", (req, res) => {
     const pathname = new URL(req.originalUrl, "http://localhost").pathname;
-    const known = knownRoutes.some(pattern => pattern.test(pathname));
+    const known = isKnownClientRoute(pathname);
+    if (!known || isPrivatePath(pathname)) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
     res
       .status(known ? 200 : 404)
-      .sendFile(path.resolve(distPath, "index.html"));
+      .type("html")
+      .set("Cache-Control", "no-cache")
+      .send(injectSeoMetadata(indexHtml, pathname, known ? 200 : 404));
   });
 }

@@ -440,8 +440,8 @@ export async function getMarketOverview(periodDays: 1 | 7 | 30) {
       marketIndex: [],
       methodology: {
         price: "Scrydex raw NM market price with TCGPlayer fallback",
-        demand: "TCG Arena searches and card views",
-        sales: "Completed TCG Arena marketplace orders",
+        demand: "RarityGrid searches and card views",
+        sales: "Completed RarityGrid marketplace orders",
       },
     };
   }
@@ -684,8 +684,8 @@ export async function getMarketOverview(periodDays: 1 | 7 | 30) {
     marketIndex: marketIndexFrom(grouped),
     methodology: {
       price: "Scrydex raw NM market price with TCGPlayer fallback",
-      demand: "TCG Arena searches and card views",
-      sales: "Paid TCG Arena marketplace orders",
+      demand: "RarityGrid searches and card views",
+      sales: "Paid RarityGrid marketplace orders",
     },
   };
 }

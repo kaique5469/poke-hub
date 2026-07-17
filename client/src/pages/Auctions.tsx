@@ -488,7 +488,7 @@ export default function Auctions() {
                 Have rare cards to sell?
               </h3>
               <p className="text-sm text-gray-500">
-                Create an auction and reach collectors using the TCG Arena
+                Create an auction and reach collectors using the RarityGrid
                 marketplace.
               </p>
             </div>

@@ -1,5 +1,5 @@
 /**
- * Sell on TCG Arena — seller landing page.
+ * Sell on RarityGrid — seller landing page.
  * Patterned after TCGplayer / Cardmarket seller pages: value prop, how it
  * works, transparent fees, payments, trust & safety, FAQ, single strong CTA.
  */
@@ -138,7 +138,7 @@ export default function Sell() {
         />
         <div className="relative max-w-6xl mx-auto px-4 py-16 md:py-24 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 text-white text-xs font-bold uppercase tracking-widest rounded-full px-4 py-1.5 mb-6">
-            <Store size={14} /> Sell on TCG Arena
+            <Store size={14} /> Sell on RarityGrid
           </div>
           <h1
             className="text-3xl md:text-5xl font-black text-white leading-tight max-w-3xl mx-auto"
@@ -319,7 +319,7 @@ export default function Sell() {
             <Feature
               icon={<LockKeyhole size={20} />}
               title="Secure checkout"
-              desc="Card payments run on Stripe with PCI-DSS compliance. TCG Arena never stores card numbers."
+              desc="Card payments run on Stripe with PCI-DSS compliance. RarityGrid never stores card numbers."
             />
             <Feature
               icon={<ShieldCheck size={20} />}
@@ -354,7 +354,7 @@ export default function Sell() {
           />
           <Faq
             q="What do I need to open a store?"
-            a="A TCG Arena account, a store name and at least one accepted payment method. To receive card payments you also connect a free Stripe account for direct payouts. Shipping and return policies are strongly recommended."
+            a="A RarityGrid account, a store name and at least one accepted payment method. To receive card payments you also connect a free Stripe account for direct payouts. Shipping and return policies are strongly recommended."
           />
           <Faq
             q="How is the card condition handled?"
@@ -386,7 +386,7 @@ export default function Sell() {
             Ready to open your store?
           </h2>
           <p className="text-white/80 mt-2 text-sm md:text-base">
-            Join TCG Arena sellers today. Free to start, 5 minutes to set up.
+            Join RarityGrid sellers today. Free to start, 5 minutes to set up.
           </p>
           <a
             href={ctaHref}

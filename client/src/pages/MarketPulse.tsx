@@ -366,7 +366,8 @@ export default function MarketPulse() {
                   <Activity size={12} className="mr-1" /> Collector intelligence
                 </Badge>
                 <span className="text-xs text-slate-500">
-                  Prices scheduled every 6 hours · Arena activity refreshes every minute
+                  Prices scheduled every 6 hours · RarityGrid activity refreshes
+                  every minute
                 </span>
               </div>
               <h1 className="max-w-3xl text-4xl font-black tracking-tight text-white md:text-6xl">
@@ -374,7 +375,7 @@ export default function MarketPulse() {
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400 md:text-base">
                 Verified price snapshots, first-party collector activity and
-                completed TCG Arena sales—clearly separated by source.
+                completed RarityGrid sales—clearly separated by source.
               </p>
             </div>
             <div className="flex rounded-xl border border-slate-800 bg-slate-900 p-1">
@@ -407,19 +408,19 @@ export default function MarketPulse() {
               icon={Search}
               label="Search activity"
               value={compact(data?.summary.searches24h ?? 0)}
-              note="Search selections on TCG Arena · 24h"
+              note="Search selections on RarityGrid · 24h"
             />
             <SummaryCard
               icon={ShoppingBag}
               label="Completed sales"
               value={compact(data?.summary.sales30d ?? 0)}
-              note="Paid card units on TCG Arena · 30d"
+              note="Paid card units on RarityGrid · 30d"
             />
             <SummaryCard
               icon={Activity}
-              label="Arena volume"
+              label="RarityGrid volume"
               value={money(data?.summary.volume30d ?? 0)}
-              note="Paid card volume on TCG Arena · 30d"
+              note="Paid card volume on RarityGrid · 30d"
             />
           </div>
           {data?.summary.lastUpdated && (
@@ -646,7 +647,7 @@ export default function MarketPulse() {
                 Collector attention
               </h2>
               <p className="mt-1 text-xs text-slate-500">
-                First-party TCG Arena demand signals—not global market claims.
+                First-party RarityGrid demand signals—not global market claims.
               </p>
             </div>
           </div>
@@ -692,7 +693,7 @@ export default function MarketPulse() {
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="mb-2 flex items-center gap-2 font-black text-slate-900">
                 <ShoppingBag size={16} className="text-emerald-600" /> Most sold
-                on Arena
+                on RarityGrid
               </h3>
               {(data?.topSales.length ?? 0) > 0 ? (
                 data?.topSales
@@ -706,7 +707,7 @@ export default function MarketPulse() {
                     />
                   ))
               ) : (
-                <EmptySignal text="Only paid TCG Arena orders are counted here." />
+                <EmptySignal text="Only paid RarityGrid orders are counted here." />
               )}
             </div>
           </div>
@@ -720,7 +721,7 @@ export default function MarketPulse() {
                 completed card sales
               </h2>
               <p className="mt-1 text-xs text-slate-500">
-                Paid TCG Arena orders only. This is first-party marketplace
+                Paid RarityGrid orders only. This is first-party marketplace
                 activity, not global sales data.
               </p>
             </div>

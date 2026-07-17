@@ -42,7 +42,7 @@ const destinations = [
 export default function Community() {
   usePageMeta(
     "Community",
-    "TCG Arena community tools for Pokémon TCG collectors, players and sellers."
+    "RarityGrid community tools for Pokémon TCG collectors, players and sellers."
   );
   const { isAuthenticated } = useAuth();
 
@@ -60,7 +60,7 @@ export default function Community() {
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
               Public posting is being opened gradually with moderation, verified
               profiles and reporting. Until then, every visible count and
-              listing on TCG Arena comes from an actual account or data source.
+              listing on RarityGrid comes from an actual account or data source.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               {isAuthenticated ? (

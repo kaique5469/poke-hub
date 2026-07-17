@@ -353,7 +353,7 @@ export default function Home() {
           </div>
           <div>
             <SectionHeading
-              eyebrow="TCG Arena editorial"
+              eyebrow="RarityGrid editorial"
               title="Latest stories and analysis"
               href="/articles"
               link="Read all articles"

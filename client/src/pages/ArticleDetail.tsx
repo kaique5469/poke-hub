@@ -228,7 +228,36 @@ export default function ArticleDetail() {
   } = trpc.articles.getBySlug.useQuery({ slug }, { enabled: !!slug });
   usePageMeta(
     article?.title ?? "Article",
-    article?.subtitle ?? "Pokémon TCG news, strategy and collector analysis."
+    article?.subtitle ?? "Pokémon TCG news, strategy and collector analysis.",
+    article?.coverImageUrl ?? undefined,
+    {
+      type: "article",
+      structuredData: article
+        ? {
+            "@context": "https://schema.org",
+            "@type": "Article",
+            mainEntityOfPage: `https://raritygrid.com/articles/${slug}`,
+            headline: article.title,
+            description:
+              article.subtitle ??
+              "Pokémon TCG news, strategy and collector analysis.",
+            image: article.coverImageUrl || undefined,
+            datePublished: article.publishedAt,
+            dateModified: article.updatedAt,
+            author: {
+              "@type": "Person",
+              name:
+                (article as { authorName?: string | null }).authorName ??
+                "RarityGrid Staff",
+            },
+            publisher: {
+              "@type": "Organization",
+              name: "RarityGrid",
+              url: "https://raritygrid.com/",
+            },
+          }
+        : undefined,
+    }
   );
 
   const addCommentMutation = trpc.articles.addComment.useMutation({
@@ -284,7 +313,8 @@ export default function ArticleDetail() {
 
   // Author data from joined query
   const authorName =
-    (article as { authorName?: string | null }).authorName ?? "TCG Arena Staff";
+    (article as { authorName?: string | null }).authorName ??
+    "RarityGrid Staff";
   const authorUsername = (article as { authorUsername?: string | null })
     .authorUsername;
   const authorAvatarUrl = (article as { authorAvatarUrl?: string | null })

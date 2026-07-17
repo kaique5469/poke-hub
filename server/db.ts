@@ -567,6 +567,22 @@ export async function getPublishedArticles(limit = 20, category?: string) {
   return query;
 }
 
+/** Lightweight article rows used to build the public XML sitemap. */
+export async function getPublishedArticleSitemapRows(limit = 1_000) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      slug: articles.slug,
+      publishedAt: articles.publishedAt,
+      updatedAt: articles.updatedAt,
+    })
+    .from(articles)
+    .where(eq(articles.isPublished, true))
+    .orderBy(desc(articles.publishedAt), desc(articles.updatedAt))
+    .limit(limit);
+}
+
 export async function getArticleBySlug(slug: string) {
   const db = await getDb();
   if (!db) return undefined;

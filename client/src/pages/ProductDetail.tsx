@@ -150,7 +150,43 @@ export default function ProductDetail() {
   usePageMeta(
     data?.product.name ?? "Product",
     data?.product.description ??
-      "Pokémon TCG sealed product marketplace listing."
+      "Pokémon TCG sealed product marketplace listing.",
+    data?.product.imageUrl ?? undefined,
+    {
+      type: "product",
+      structuredData: data
+        ? {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            url: `https://raritygrid.com/shop/${slug}`,
+            name: data.product.name,
+            description:
+              data.product.description ??
+              "Pokémon TCG sealed product marketplace listing.",
+            image: data.product.imageUrl || undefined,
+            category: data.product.category,
+            brand: { "@type": "Brand", name: "Pokémon" },
+            offers: data.sellers.length
+              ? {
+                  "@type": "AggregateOffer",
+                  priceCurrency: "USD",
+                  lowPrice: Math.min(
+                    ...data.sellers.map(seller =>
+                      Number(seller.listing.priceUsd)
+                    )
+                  ),
+                  highPrice: Math.max(
+                    ...data.sellers.map(seller =>
+                      Number(seller.listing.priceUsd)
+                    )
+                  ),
+                  offerCount: data.sellers.length,
+                  availability: "https://schema.org/InStock",
+                }
+              : undefined,
+          }
+        : undefined,
+    }
   );
 
   const addToCart = trpc.cart.add.useMutation({
@@ -428,7 +464,7 @@ export default function ProductDetail() {
               </div>
               <p className="mt-3 text-[10px] leading-4 text-gray-500">
                 Availability and checkout are handled by the selected retailer.
-                TCG Arena does not guarantee third-party stock or prices.
+                RarityGrid does not guarantee third-party stock or prices.
               </p>
             </div>
             <div className="rounded-2xl border border-gray-200 bg-white p-5">
