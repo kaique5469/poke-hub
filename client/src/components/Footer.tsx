@@ -14,7 +14,7 @@ export default function Footer() {
                 className="font-black text-lg text-white"
                 style={{ fontFamily: "Nunito, sans-serif" }}
               >
-                TCG&nbsp;ARENA
+                RARITYGRID
               </span>
             </div>
             <p
@@ -110,7 +110,7 @@ export default function Footer() {
               className="text-xs text-center md:text-left"
               style={{ color: "oklch(0.52 0.015 240)" }}
             >
-              © 2026 TCG Arena. Pokémon and all related names are trademarks of
+              © 2026 RarityGrid. Pokémon and all related names are trademarks of
               Nintendo, Game Freak & Creatures Inc. This site is not affiliated
               with or endorsed by The Pokémon Company.
             </p>

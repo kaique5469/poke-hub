@@ -130,7 +130,7 @@ export const appRouter = router({
   site: router({
     info: publicProcedure.query(() => ({
       contactEmail: ENV.supportEmail || null,
-      marketplaceName: "TCG Arena",
+      marketplaceName: "RarityGrid",
     })),
   }),
 

@@ -31,7 +31,7 @@ Requisitos: Node 20+, pnpm, um MySQL acessível (local ou o do Railway).
 3. **Variáveis de ambiente** (no serviço do app → Variables)
    - `DATABASE_URL` → use a referência `${{ MySQL.MYSQL_URL }}`
    - `JWT_SECRET` → string longa aleatória (`openssl rand -hex 32`)
-   - `APP_URL` → a URL pública gerada pelo Railway (Settings → Networking → Generate Domain)
+   - `APP_URL` → `https://raritygrid.com` (domínio público canônico)
    - `OWNER_EMAIL` → seu email (quem se registrar com ele vira admin)
    - `SUPPORT_EMAIL` → email público exibido na página de contato
    - `CRON_SECRET` → outra string aleatória

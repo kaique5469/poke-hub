@@ -65,7 +65,7 @@ function PayoutsCard() {
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h3 className="font-black text-gray-950">
-              Start selling on TCG Arena
+              Start selling on RarityGrid
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               Open a store before publishing marketplace inventory.

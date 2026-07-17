@@ -208,6 +208,18 @@ export async function listProducts(input: ListProductsInput) {
   return { items, total: Number(totalRows[0]?.count ?? 0) };
 }
 
+/** Lightweight product rows used to build the public XML sitemap. */
+export async function getIndexableProductSitemapRows(limit = 10_000) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ slug: products.slug, updatedAt: products.updatedAt })
+    .from(products)
+    .where(and(eq(products.isActive, true), verifiedOrSellerListedProduct()))
+    .orderBy(desc(products.updatedAt))
+    .limit(limit);
+}
+
 export async function getProductBySlug(slug: string) {
   const db = await getDb();
   if (!db) return undefined;

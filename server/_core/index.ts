@@ -16,6 +16,7 @@ import { marketSnapshotHandler } from "../scheduledMarket";
 import { ensureMarketPulseSchema } from "../marketSchema";
 import { verifyWebhook } from "../lib/stripe";
 import { markOrdersPaid, wasEventProcessed, recordEvent } from "../storeDb";
+import { registerSeoRoutes } from "../seo";
 
 const apiBuckets = new Map<
   string,
@@ -145,6 +146,7 @@ async function startServer() {
   // instead of making every endpoint accept an excessive request body.
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ limit: "1mb", extended: true }));
+  registerSeoRoutes(app);
   registerAuthRoutes(app);
   // Uploaded files (covers, etc.) — persist DATA_DIR on a Railway volume
   app.use(

@@ -276,7 +276,7 @@ export const cartRouter = router({
       const origin = `${proto}://${ctx.req.get("host")}`;
       const session = await createCheckoutSession({
         amountUsd: result.totalUsd,
-        description: `TCG Arena order (${result.orderIds.length} item${result.orderIds.length > 1 ? "s" : ""})`,
+        description: `RarityGrid order (${result.orderIds.length} item${result.orderIds.length > 1 ? "s" : ""})`,
         orderIds: result.orderIds,
         buyerEmail: ctx.user.email,
         origin,
