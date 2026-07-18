@@ -347,6 +347,9 @@ const navSections = [
 export default function Navbar() {
   const [location] = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+  const myProfileHref = user?.username
+    ? `/profile/${encodeURIComponent(user.username)}`
+    : "/profile/edit";
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -636,7 +639,7 @@ export default function Navbar() {
                         </div>
                         {[
                           {
-                            href: "/profile",
+                            href: myProfileHref,
                             icon: <User size={15} />,
                             label: "My Profile",
                           },
