@@ -46,6 +46,7 @@ const AdminEscrow = lazy(() => import("./pages/AdminEscrow"));
 const Login = lazy(() => import("./pages/Login"));
 const MarketPulse = lazy(() => import("./pages/MarketPulse"));
 const Legal = lazy(() => import("./pages/Legal"));
+const CardScanner = lazy(() => import("./pages/CardScanner"));
 
 function PageLoader() {
   return (
@@ -81,6 +82,7 @@ function Router() {
           <Route path="/login" component={Login} />
           <Route path="/cards" component={Cards} />
           <Route path="/cards/:id" component={CardDetail} />
+          <Route path="/scanner" component={CardScanner} />
           <Route path="/market" component={MarketPulse} />
           <Route path="/sets" component={Sets} />
           <Route path="/sets/:id" component={SetDetail} />

@@ -9,6 +9,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -250,6 +251,12 @@ export default function Binder() {
             <Button variant="outline" onClick={() => fileRef.current?.click()}>
               <FileUp className="mr-2 h-4 w-4" />
               Import CSV
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/scanner">
+                <Camera className="mr-2 h-4 w-4" />
+                Scan card
+              </Link>
             </Button>
             <Button
               variant="outline"

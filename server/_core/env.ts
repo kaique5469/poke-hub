@@ -8,8 +8,10 @@ export const ENV = {
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   /** Public URL of the app (for OAuth callbacks), e.g. https://pokehub.up.railway.app */
   appUrl: process.env.APP_URL ?? "",
-  /** OpenAI API key — optional. Enables daily AI articles + cover generation. */
+  /** OpenAI API key — optional. Enables AI articles, covers, and card scans. */
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  /** Cost-controlled multimodal model used only by the card scanner. */
+  openaiScannerModel: process.env.OPENAI_SCANNER_MODEL ?? "gpt-5-mini",
   /** Secret required by scheduled endpoints (x-cron-secret header). */
   cronSecret: process.env.CRON_SECRET ?? "",
   /** Email of the site owner — this account becomes admin on registration. */

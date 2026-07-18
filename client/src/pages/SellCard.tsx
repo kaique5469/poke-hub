@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useCallback } from "react";
-import { Link, useLocation } from "wouter";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Link, useSearch } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,9 @@ interface SelectedCard {
 
 export default function SellCard() {
   const { isAuthenticated } = useAuth();
-  const [, navigate] = useLocation();
+  const search = useSearch();
+  const scannedCardId = new URLSearchParams(search).get("card")?.trim() ?? "";
+  const preselectedRef = useRef("");
 
   // Step state
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -95,6 +97,10 @@ export default function SellCard() {
       { q: searchQuery, page: 1, pageSize: 12 },
       { enabled: searchQuery.length >= 2 }
     );
+  const scannedCard = trpc.cards.getById.useQuery(
+    { id: scannedCardId },
+    { enabled: isAuthenticated && Boolean(scannedCardId), retry: false }
+  );
   const sellerStatus = trpc.store.connectStatus.useQuery(undefined, {
     enabled: isAuthenticated,
   });
@@ -139,6 +145,12 @@ export default function SellCard() {
     },
     []
   );
+
+  useEffect(() => {
+    if (!scannedCard.data || preselectedRef.current === scannedCardId) return;
+    preselectedRef.current = scannedCardId;
+    handleSelectCard(scannedCard.data);
+  }, [handleSelectCard, scannedCard.data, scannedCardId]);
 
   const handleSubmit = () => {
     if (!selectedCard) return;
@@ -188,7 +200,8 @@ export default function SellCard() {
     (!sellerStatus.data.payoutsEnabled || !sellerStatus.data.termsAccepted)
   ) {
     const needsStore = !sellerStatus.data.hasStore;
-    const needsTerms = sellerStatus.data.hasStore && !sellerStatus.data.termsAccepted;
+    const needsTerms =
+      sellerStatus.data.hasStore && !sellerStatus.data.termsAccepted;
     return (
       <div className="min-h-[65vh] bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
@@ -201,7 +214,8 @@ export default function SellCard() {
                 : "Complete payout verification"}
           </h1>
           <p className="mt-2 text-sm leading-6 text-gray-500">
-            Sellers must accept the marketplace terms and verify Stripe payouts before inventory can appear to buyers.
+            Sellers must accept the marketplace terms and verify Stripe payouts
+            before inventory can appear to buyers.
           </p>
           <Link href={needsStore ? "/open-store" : "/dashboard"}>
             <Button className="mt-6 w-full">

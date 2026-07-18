@@ -15,13 +15,14 @@ const PRIVATE_PATHS = [
   /^\/dashboard(?:\/|$)/,
   /^\/open-store(?:\/|$)/,
   /^\/orders(?:\/|$)/,
+  /^\/scanner(?:\/|$)/,
   /^\/profile\/edit\/?$/,
   /^\/sell(?:-card)?\/?$/,
 ];
 
 const CLIENT_ROUTES = [
   /^\/$/,
-  /^\/(?:login|cards|market|sets|game|pokedex|metagame|decks|deck-builder|community|tournaments|binder|drops|shop|marketplace|cart|orders|auctions|bazaar|articles|sell|sell-card|open-store|dashboard|account|privacy|terms|contact|404)\/?$/,
+  /^\/(?:login|cards|scanner|market|sets|game|pokedex|metagame|decks|deck-builder|community|tournaments|binder|drops|shop|marketplace|cart|orders|auctions|bazaar|articles|sell|sell-card|open-store|dashboard|account|privacy|terms|contact|404)\/?$/,
   /^\/(?:cards|sets|pokedex|shop|articles|store|profile)\/[^/]+\/?$/,
   /^\/admin\/escrow\/?$/,
   /^\/decks\/builder\/?$/,
