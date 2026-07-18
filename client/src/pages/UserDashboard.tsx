@@ -59,7 +59,9 @@ function PayoutsCard() {
   });
   const acceptTerms = trpc.store.acceptTerms.useMutation({
     onSuccess: () => {
-      toast.success("Seller terms accepted. Your store can publish after payout verification.");
+      toast.success(
+        "Seller terms accepted. Your store can publish after payout verification."
+      );
       void utils.store.connectStatus.invalidate();
       void utils.store.mine.invalidate();
     },
@@ -92,9 +94,13 @@ function PayoutsCard() {
           <div>
             <h3 className="font-black text-gray-950">Updated seller terms</h3>
             <p className="mt-1 max-w-xl text-sm text-gray-500">
-              Review the current marketplace, tracked-shipping, escrow and buyer-protection rules before publishing inventory.
+              Review the current marketplace, tracked-shipping, escrow and
+              buyer-protection rules before publishing inventory.
             </p>
-            <Link href="/terms" className="mt-2 inline-block text-sm font-bold text-violet-700 hover:underline">
+            <Link
+              href="/terms"
+              className="mt-2 inline-block text-sm font-bold text-violet-700 hover:underline"
+            >
               Read Marketplace Terms
             </Link>
           </div>
@@ -146,6 +152,19 @@ function PayoutsCard() {
   );
 }
 
+function Checklist({ done, label }: { done: boolean; label: string }) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-xl border p-3 text-sm font-bold ${done ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-gray-200 bg-gray-50 text-gray-500"}`}
+    >
+      <CheckCircle2
+        className={`h-4 w-4 ${done ? "text-emerald-600" : "text-gray-300"}`}
+      />
+      {label}
+    </div>
+  );
+}
+
 export default function UserDashboard() {
   const { user, isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
@@ -170,6 +189,14 @@ export default function UserDashboard() {
     retry: false,
   });
   const productListings = trpc.products.myListings.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const sellerStatus = trpc.store.connectStatus.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const store = trpc.store.mine.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
   });
@@ -465,6 +492,40 @@ export default function UserDashboard() {
           {activeTab === "selling" && (
             <div className="space-y-5">
               <PayoutsCard />
+              <Panel>
+                <Header title="Seller launch checklist" />
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <Checklist
+                    done={Boolean(sellerStatus.data?.hasStore)}
+                    label="Store created"
+                  />
+                  <Checklist
+                    done={Boolean(sellerStatus.data?.termsAccepted)}
+                    label="Seller terms accepted"
+                  />
+                  <Checklist
+                    done={Boolean(sellerStatus.data?.payoutsEnabled)}
+                    label="Payouts verified"
+                  />
+                  <Checklist
+                    done={Boolean(store.data?.shippingPolicy)}
+                    label="Shipping policy added"
+                  />
+                  <Checklist
+                    done={Boolean(store.data?.returnPolicy)}
+                    label="Return policy added"
+                  />
+                  <Checklist
+                    done={activeListings > 0}
+                    label="First listing published"
+                  />
+                </div>
+                <p className="mt-4 text-xs leading-5 text-gray-500">
+                  Complete every item before promoting your store. Buyers see
+                  only inventory from payout-ready sellers who accepted the
+                  current marketplace terms.
+                </p>
+              </Panel>
               <div className="grid grid-cols-3 gap-3">
                 <Stat
                   label="Gross orders"

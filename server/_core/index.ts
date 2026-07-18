@@ -15,6 +15,7 @@ import { scrydexSyncHandler } from "../scheduledScrydex";
 import { marketSnapshotHandler } from "../scheduledMarket";
 import { ensureMarketPulseSchema } from "../marketSchema";
 import { ensureMarketplaceSchema } from "../marketplaceSchema";
+import { ensureGrowthSchema } from "../growthSchema";
 import { verifyWebhook } from "../lib/stripe";
 import {
   cancelCheckoutSessionOrders,
@@ -80,6 +81,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 async function startServer() {
   await ensureMarketplaceSchema();
+  await ensureGrowthSchema();
   await ensureMarketPulseSchema();
   const app = express();
   const server = createServer(app);
@@ -94,10 +96,7 @@ async function startServer() {
       "Permissions-Policy",
       "camera=(), microphone=(), geolocation=(), payment=(self)"
     );
-    res.setHeader(
-      "Content-Security-Policy",
-      CONTENT_SECURITY_POLICY
-    );
+    res.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
     if (ENV.isProduction) {
       res.setHeader(
         "Strict-Transport-Security",

@@ -7,6 +7,7 @@ import {
   marketWatchlist,
   notifications,
   orders,
+  portfolioSnapshots,
   type InsertMarketPriceSnapshot,
 } from "../drizzle/schema";
 import { getDb } from "./db";
@@ -846,9 +847,14 @@ export async function getCollectorPortfolio(userId: number) {
       totalCards: 0,
       uniqueCards: 0,
       currentValue: 0,
+      totalCost: 0,
+      unrealizedGain: 0,
+      gainPercent: null,
       pricedCards: 0,
+      costedCards: 0,
       change7d: null,
       positions: [],
+      history: [],
     };
   const collection = await db
     .select()
@@ -859,9 +865,14 @@ export async function getCollectorPortfolio(userId: number) {
       totalCards: 0,
       uniqueCards: 0,
       currentValue: 0,
+      totalCost: 0,
+      unrealizedGain: 0,
+      gainPercent: null,
       pricedCards: 0,
+      costedCards: 0,
       change7d: null,
       positions: [],
+      history: [],
     };
   const rows = await db
     .select()
@@ -881,6 +892,10 @@ export async function getCollectorPortfolio(userId: number) {
   let previousValue = 0;
   let comparableValue = 0;
   let pricedCards = 0;
+  let totalCost = 0;
+  let costedCurrentValue = 0;
+  let comparableCost = 0;
+  let costedCards = 0;
   const positions = collection.map(card => {
     const history = selectComparableMarketSeries(
       grouped.get(card.cardId) ?? []
@@ -890,6 +905,18 @@ export async function getCollectorPortfolio(userId: number) {
     const stored = card.priceUsd == null ? null : money(card.priceUsd);
     const currentPrice = latest ? money(latest.marketPriceUsd) : stored;
     const value = (currentPrice ?? 0) * card.quantity;
+    const unitCost =
+      card.purchasePriceUsd == null ? null : money(card.purchasePriceUsd);
+    const cost = (unitCost ?? 0) * card.quantity;
+    const gain = unitCost == null || currentPrice == null ? null : value - cost;
+    totalCost += cost;
+    if (unitCost != null) {
+      costedCards += 1;
+      if (currentPrice != null) {
+        costedCurrentValue += value;
+        comparableCost += cost;
+      }
+    }
     currentValue += value;
     if (currentPrice != null) pricedCards += 1;
     if (baseline) {
@@ -898,6 +925,7 @@ export async function getCollectorPortfolio(userId: number) {
       comparableValue += value;
     }
     return {
+      id: card.id,
       cardId: card.cardId,
       cardName: card.cardName,
       setName: card.setName,
@@ -905,6 +933,13 @@ export async function getCollectorPortfolio(userId: number) {
       quantity: card.quantity,
       currentPrice,
       value,
+      unitCost,
+      cost,
+      gain,
+      gainPercent: gain != null && cost > 0 ? (gain / cost) * 100 : null,
+      condition: card.condition,
+      gradingCompany: card.gradingCompany,
+      grade: card.grade == null ? null : Number(card.grade),
       source: latest?.source ?? (stored != null ? "Saved binder price" : null),
       change7d:
         baseline && currentPrice != null
@@ -912,13 +947,56 @@ export async function getCollectorPortfolio(userId: number) {
           : null,
     };
   });
+  const totalCards = collection.reduce((sum, row) => sum + row.quantity, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const existingToday = await db
+    .select({ id: portfolioSnapshots.id })
+    .from(portfolioSnapshots)
+    .where(
+      and(
+        eq(portfolioSnapshots.userId, userId),
+        gte(portfolioSnapshots.recordedAt, today)
+      )
+    )
+    .limit(1);
+  if (!existingToday.length) {
+    await db.insert(portfolioSnapshots).values({
+      userId,
+      totalValueUsd: currentValue.toFixed(2),
+      totalCostUsd: totalCost.toFixed(2),
+      cardCount: totalCards,
+      pricedCards,
+    });
+  }
+  const history = await db
+    .select()
+    .from(portfolioSnapshots)
+    .where(
+      and(
+        eq(portfolioSnapshots.userId, userId),
+        gte(portfolioSnapshots.recordedAt, new Date(Date.now() - 365 * DAY_MS))
+      )
+    )
+    .orderBy(portfolioSnapshots.recordedAt);
+  const unrealizedGain = costedCurrentValue - comparableCost;
   return {
-    totalCards: collection.reduce((sum, row) => sum + row.quantity, 0),
+    totalCards,
     uniqueCards: collection.length,
     currentValue,
+    totalCost,
+    unrealizedGain,
+    gainPercent:
+      comparableCost > 0 ? (unrealizedGain / comparableCost) * 100 : null,
     pricedCards,
+    costedCards,
     change7d:
       previousValue > 0 ? changeBetween(comparableValue, previousValue) : null,
-    positions: positions.sort((a, b) => b.value - a.value).slice(0, 12),
+    positions: positions.sort((a, b) => b.value - a.value),
+    history: history.map(row => ({
+      value: money(row.totalValueUsd),
+      cost: money(row.totalCostUsd),
+      recordedAt: iso(row.recordedAt),
+    })),
   };
 }
