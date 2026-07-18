@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createCheckoutSession,
+  createConnectAccount,
   createRefund,
   expireCheckoutSession,
   getCheckoutSessionStatus,
@@ -62,6 +63,22 @@ describe("Stripe marketplace checkout", () => {
     expect(session.expiresAt.getTime()).toBeLessThanOrEqual(
       before + 31 * 60_000
     );
+  });
+
+  it("requests the paired Connect capabilities required for Brazilian sellers", async () => {
+    fetchMock.mockResolvedValueOnce(stripeResponse({ id: "acct_br_seller" }));
+
+    await expect(createConnectAccount("seller@example.com")).resolves.toBe(
+      "acct_br_seller"
+    );
+
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(request.body));
+    expect(url.endsWith("/accounts")).toBe(true);
+    expect(body.get("type")).toBe("express");
+    expect(body.get("email")).toBe("seller@example.com");
+    expect(body.get("capabilities[card_payments][requested]")).toBe("true");
+    expect(body.get("capabilities[transfers][requested]")).toBe("true");
   });
 
   it("refunds only the affected order amount", async () => {
