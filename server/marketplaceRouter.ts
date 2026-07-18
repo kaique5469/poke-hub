@@ -40,12 +40,19 @@ import {
 } from "./marketplaceDb";
 import {
   attachStripeSession,
+  cancelReservedOrders,
   getUnpayableCartSellers,
   getOrderById,
   releaseOrder,
   refundOrderMoney,
+  requireSellerReady,
 } from "./storeDb";
-import { createCheckoutSession, stripeEnabled } from "./lib/stripe";
+import { MARKETPLACE_TERMS_VERSION } from "@shared/marketplace";
+import {
+  createCheckoutSession,
+  expireCheckoutSession,
+  stripeEnabled,
+} from "./lib/stripe";
 import { ensureProductsSynced, getCatalogSyncStatus } from "./scrydexSync";
 import { getRetailerLinks } from "./lib/retailerLinks";
 
@@ -136,13 +143,14 @@ export const productsRouter = router({
       })
     )
     .mutation(({ input, ctx }) =>
-      rethrow(() =>
-        createProductListing({
+      rethrow(async () => {
+        await requireSellerReady(ctx.user.id);
+        return createProductListing({
           ...input,
           priceUsd: input.priceUsd.toFixed(2),
           sellerId: ctx.user.id,
-        })
-      )
+        });
+      })
     ),
 
   myListings: protectedProcedure.query(({ ctx }) =>
@@ -186,8 +194,11 @@ export const listingsRouter = router({
       })
     )
     .mutation(({ input, ctx }) =>
-      rethrow(() =>
-        updateListing(input.id, ctx.user.id, {
+      rethrow(async () => {
+        if (input.status !== "cancelled") {
+          await requireSellerReady(ctx.user.id);
+        }
+        return updateListing(input.id, ctx.user.id, {
           ...(input.priceUsd !== undefined
             ? { priceUsd: input.priceUsd.toFixed(2) }
             : {}),
@@ -195,8 +206,8 @@ export const listingsRouter = router({
           ...(input.condition ? { condition: input.condition } : {}),
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
           ...(input.status ? { status: input.status } : {}),
-        })
-      )
+        });
+      })
     ),
 });
 
@@ -251,7 +262,12 @@ export const cartRouter = router({
 
   /** Stripe checkout: creates the orders then redirects to Stripe-hosted payment. */
   stripeCheckout: protectedProcedure
-    .input(z.object({ notes: z.string().max(1000).optional() }).optional())
+    .input(
+      z.object({
+        notes: z.string().max(1000).optional(),
+        acceptMarketplaceTerms: z.literal(true),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       if (!stripeEnabled()) {
         throw new TRPCError({
@@ -263,39 +279,67 @@ export const cartRouter = router({
       if (notReady.length > 0) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: `Card payment unavailable: ${notReady.join(", ")} ${notReady.length > 1 ? "haven't" : "hasn't"} set up payouts yet. Use "Order & arrange payment with seller" instead.`,
+          message: `Checkout unavailable: ${notReady.join(", ")} ${notReady.length > 1 ? "haven't" : "hasn't"} completed payout setup. Remove those items and try again.`,
         });
       }
       const result = await rethrow(() =>
-        checkoutCart(ctx.user.id, input?.notes)
+        checkoutCart(ctx.user.id, input.notes, MARKETPLACE_TERMS_VERSION)
       );
       const proto =
         (ctx.req.headers["x-forwarded-proto"] as string | undefined)?.split(
           ","
         )[0] ?? ctx.req.protocol;
       const origin = `${proto}://${ctx.req.get("host")}`;
-      const session = await createCheckoutSession({
-        amountUsd: result.totalUsd,
-        description: `RarityGrid order (${result.orderIds.length} item${result.orderIds.length > 1 ? "s" : ""})`,
-        orderIds: result.orderIds,
-        buyerEmail: ctx.user.email,
-        origin,
-      });
-      await attachStripeSession(result.orderIds, session.id);
-      return {
-        checkoutUrl: session.url,
-        orderIds: result.orderIds,
-        skipped: result.skipped,
-      };
+      let session: Awaited<ReturnType<typeof createCheckoutSession>> | null = null;
+      try {
+        session = await createCheckoutSession({
+          amountUsd: result.totalUsd,
+          description: `RarityGrid order (${result.orderIds.length} item${result.orderIds.length > 1 ? "s" : ""})`,
+          orderIds: result.orderIds,
+          buyerEmail: ctx.user.email,
+          origin,
+        });
+        await attachStripeSession(
+          result.orderIds,
+          session.id,
+          session.expiresAt
+        );
+        await clearCart(ctx.user.id);
+        return {
+          checkoutUrl: session.url,
+          orderIds: result.orderIds,
+          skipped: result.skipped,
+        };
+      } catch (error) {
+        if (session) {
+          await expireCheckoutSession(session.id).catch(expireError =>
+            console.error("[stripe] failed to expire incomplete session", expireError)
+          );
+        }
+        await cancelReservedOrders(
+          result.orderIds,
+          "Secure checkout could not be created"
+        );
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Secure checkout could not be created",
+        });
+      }
     }),
 
   stripeAvailable: publicProcedure.query(() => stripeEnabled()),
 
   checkout: protectedProcedure
     .input(z.object({ notes: z.string().max(2000).optional() }).default({}))
-    .mutation(({ input, ctx }) =>
-      rethrow(() => checkoutCart(ctx.user.id, input.notes))
-    ),
+    .mutation(() => {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Off-platform checkout is disabled. Use secure card checkout.",
+      });
+    }),
 });
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -310,18 +354,27 @@ export const ordersRouter = router({
     .input(
       z.object({
         orderId: z.number().int().positive(),
-        status: z.enum([
-          "paid",
-          "shipped",
-          "delivered",
-          "cancelled",
-          "disputed",
-        ]),
+        status: z.enum(["shipped", "delivered", "cancelled", "disputed"]),
         trackingNumber: z.string().max(256).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const result = await rethrow(() =>
+      if (input.status === "cancelled") {
+        const order = await getOrderById(input.orderId);
+        if (!order || (order.buyerId !== ctx.user.id && order.sellerId !== ctx.user.id)) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+        }
+        if (order.status === "paid") {
+          if (order.sellerId !== ctx.user.id) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Buyers must open a dispute after payment",
+            });
+          }
+          await rethrow(() => refundOrderMoney(input.orderId));
+        }
+      }
+      return rethrow(() =>
         updateOrderStatus(
           input.orderId,
           ctx.user.id,
@@ -329,17 +382,6 @@ export const ordersRouter = router({
           input.trackingNumber
         )
       );
-      // ESCROW: a paid order that gets cancelled is refunded to the buyer.
-      // (Transition rules only allow cancelling before shipping.)
-      if (input.status === "cancelled") {
-        await refundOrderMoney(input.orderId).catch(e =>
-          console.error(
-            `[stripe] refund for cancelled order #${input.orderId} failed:`,
-            e
-          )
-        );
-      }
-      return result;
     }),
 
   /**

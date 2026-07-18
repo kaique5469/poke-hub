@@ -1,5 +1,5 @@
 /** DB helpers for seller stores + Stripe payment status. */
-import { and, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import {
   cartItems,
   listings,
@@ -18,9 +18,10 @@ import { getDb } from "./db";
 import {
   createRefund,
   createTransfer,
-  getSessionCharge,
+  getSessionPaymentDetails,
   stripeEnabled,
 } from "./lib/stripe";
+import { MARKETPLACE_TERMS_VERSION } from "@shared/marketplace";
 
 export function slugify(name: string): string {
   return name
@@ -45,6 +46,23 @@ export async function getStoreByUserId(
   return rows[0] ?? null;
 }
 
+/** Server-side gate used by every inventory mutation. */
+export async function requireSellerReady(userId: number): Promise<SellerStore> {
+  const store = await getStoreByUserId(userId);
+  if (!store) throw new Error("Open your store before publishing inventory");
+  if (store.status !== "active") throw new Error("Your store is paused");
+  if (
+    !store.sellerTermsAcceptedAt ||
+    store.sellerTermsVersion !== MARKETPLACE_TERMS_VERSION
+  ) {
+    throw new Error("Accept the current seller terms before publishing inventory");
+  }
+  if (!stripeEnabled() || !store.stripeAccountId || !store.stripePayoutsEnabled) {
+    throw new Error("Complete Stripe payout setup before publishing inventory");
+  }
+  return store;
+}
+
 export async function getStoreBySlug(slug: string) {
   const db = await getDb();
   if (!db) return null;
@@ -62,7 +80,16 @@ export async function getStoreBySlug(slug: string) {
     })
     .from(sellerStores)
     .leftJoin(users, eq(users.id, sellerStores.userId))
-    .where(eq(sellerStores.slug, slug))
+    .where(
+      and(
+        eq(sellerStores.slug, slug),
+        eq(sellerStores.status, "active"),
+        eq(sellerStores.stripePayoutsEnabled, true),
+        isNotNull(sellerStores.stripeAccountId),
+        isNotNull(sellerStores.sellerTermsAcceptedAt),
+        eq(sellerStores.sellerTermsVersion, MARKETPLACE_TERMS_VERSION)
+      )
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -75,6 +102,12 @@ export async function createStore(
   if (!db) throw new Error("DB unavailable");
   const existing = await getStoreByUserId(userId);
   if (existing) throw new Error("You already have a store");
+  if (
+    !data.sellerTermsAcceptedAt ||
+    data.sellerTermsVersion !== MARKETPLACE_TERMS_VERSION
+  ) {
+    throw new Error("Accept the current seller terms before opening a store");
+  }
 
   let slug = slugify(data.storeName);
   if (!slug) throw new Error("Invalid store name");
@@ -85,7 +118,11 @@ export async function createStore(
     .limit(1);
   if (clash[0]) slug = `${slug}-${userId}`;
 
-  await db.insert(sellerStores).values({ ...data, userId, slug });
+  await db.insert(sellerStores).values({
+    ...data,
+    userId,
+    slug,
+  });
   return getStoreByUserId(userId);
 }
 
@@ -139,14 +176,113 @@ export async function getStoreListings(sellerId: number) {
 /** Attach a Stripe session id to freshly created orders. */
 export async function attachStripeSession(
   orderIds: number[],
-  sessionId: string
+  sessionId: string,
+  expiresAt: Date
 ): Promise<void> {
   const db = await getDb();
   if (!db || orderIds.length === 0) return;
   await db
     .update(orders)
-    .set({ stripeSessionId: sessionId, paymentStatus: "processing" })
+    .set({
+      stripeSessionId: sessionId,
+      stripeSessionExpiresAt: expiresAt,
+      paymentStatus: "processing",
+    })
     .where(inArray(orders.id, orderIds));
+}
+
+async function cancelReservedRows(
+  orderIds: number[],
+  reason: string
+): Promise<number> {
+  const db = await getDb();
+  if (!db || orderIds.length === 0) return 0;
+  return db.transaction(async tx => {
+    const rows = await tx
+      .select()
+      .from(orders)
+      .where(inArray(orders.id, orderIds))
+      .for("update");
+    let cancelled = 0;
+    for (const order of rows) {
+      if (
+        order.status !== "pending" ||
+        !["unpaid", "processing"].includes(order.paymentStatus)
+      ) {
+        continue;
+      }
+      if (order.listingId) {
+        await tx
+          .update(listings)
+          .set({
+            quantity: sql`quantity + ${order.quantity}` as never,
+            status: "active",
+          })
+          .where(eq(listings.id, order.listingId));
+      } else if (order.productListingId) {
+        await tx
+          .update(productListings)
+          .set({
+            quantity: sql`quantity + ${order.quantity}` as never,
+            status: "active",
+          })
+          .where(eq(productListings.id, order.productListingId));
+      }
+      await tx
+        .update(orders)
+        .set({
+          status: "cancelled",
+          paymentStatus: "unpaid",
+          payoutStatus: "refunded",
+          cancellationReason: reason.slice(0, 255),
+        })
+        .where(eq(orders.id, order.id));
+      cancelled++;
+    }
+    return cancelled;
+  });
+}
+
+/** Restore inventory when Stripe session creation fails before redirect. */
+export function cancelReservedOrders(orderIds: number[], reason: string) {
+  return cancelReservedRows(orderIds, reason);
+}
+
+/** Restore inventory when Stripe reports that a Checkout Session expired. */
+export async function cancelCheckoutSessionOrders(
+  sessionId: string,
+  reason = "Stripe checkout expired"
+) {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(eq(orders.stripeSessionId, sessionId));
+  return cancelReservedRows(
+    rows.map(row => row.id),
+    reason
+  );
+}
+
+/** Safety net for a missed Stripe expiration webhook. */
+export async function cancelExpiredCheckoutReservations(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.status, "pending"),
+        eq(orders.paymentStatus, "processing"),
+        lte(orders.stripeSessionExpiresAt, new Date())
+      )
+    );
+  return cancelReservedRows(
+    rows.map(row => row.id),
+    "Secure checkout expired"
+  );
 }
 
 // ─── Webhook idempotency ─────────────────────────────────────────────────────
@@ -187,46 +323,63 @@ export async function markOrdersPaid(sessionId: string): Promise<number> {
   const rows = await db
     .select()
     .from(orders)
-    .where(eq(orders.stripeSessionId, sessionId));
+    .where(
+      and(
+        eq(orders.stripeSessionId, sessionId),
+        eq(orders.status, "pending"),
+        eq(orders.paymentStatus, "processing")
+      )
+    );
   if (rows.length === 0) return 0;
 
-  // Charge id is needed later for the delayed transfer (source_transaction)
-  const charge = await getSessionCharge(sessionId).catch(e => {
-    console.error("[stripe] failed to load charge for session", sessionId, e);
-    return null;
-  });
+  const payment = await getSessionPaymentDetails(sessionId);
+  if (!payment.chargeId) throw new Error("Stripe charge is missing");
+  if (!payment.shippingAddress || !payment.shippingName) {
+    throw new Error("Stripe shipping address is missing");
+  }
 
-  await db
+  const [updated] = await db
     .update(orders)
     .set({
       paymentStatus: "paid",
       status: "paid",
       payoutStatus: "held",
       buyerProtection: true,
-      ...(charge ? { stripeChargeId: charge } : {}),
+      stripeChargeId: payment.chargeId,
+      shippingName: payment.shippingName,
+      shippingPhone: payment.shippingPhone,
+      shippingAddress: payment.shippingAddress,
     })
-    .where(eq(orders.stripeSessionId, sessionId));
-
-  const notices = new Map<number, string>();
-  for (const o of rows) {
-    notices.set(
-      o.sellerId,
-      `Payment confirmed for order #${o.id}. Ship the item — your payout is released after delivery is confirmed.`
+    .where(
+      and(
+        eq(orders.stripeSessionId, sessionId),
+        eq(orders.status, "pending"),
+        eq(orders.paymentStatus, "processing")
+      )
     );
-    notices.set(
-      o.buyerId,
-      `Your payment for order #${o.id} was confirmed. Funds are held securely until you receive your order (buyer protection).`
-    );
+  if (Number((updated as { affectedRows?: number }).affectedRows ?? 0) === 0) {
+    return 0;
   }
-  for (const [userId, message] of Array.from(notices.entries())) {
-    await db.insert(notifications).values({
-      userId,
-      type: "order_update",
-      title: "Payment confirmed",
-      message,
-      entityType: "order",
-      entityId: String(rows[0].id),
-    });
+
+  for (const o of rows) {
+    await db.insert(notifications).values([
+      {
+        userId: o.sellerId,
+        type: "order_update",
+        title: "Paid order ready to ship",
+        message: `Payment confirmed for order #${o.id}. Ship it to the address shown in your sales dashboard.`,
+        entityType: "order",
+        entityId: String(o.id),
+      },
+      {
+        userId: o.buyerId,
+        type: "order_update",
+        title: "Payment confirmed",
+        message: `Your payment for order #${o.id} was confirmed. Funds are held until delivery is confirmed.`,
+        entityType: "order",
+        entityId: String(o.id),
+      },
+    ]);
   }
   return rows.length;
 }
@@ -271,7 +424,14 @@ export async function getUnpayableCartSellers(
   const bad: string[] = [];
   for (const id of ids) {
     const store = stores.find(st => st.userId === id);
-    if (!store || !store.stripeAccountId || !store.stripePayoutsEnabled) {
+    if (
+      !store ||
+      store.status !== "active" ||
+      !store.stripeAccountId ||
+      !store.stripePayoutsEnabled ||
+      !store.sellerTermsAcceptedAt ||
+      store.sellerTermsVersion !== MARKETPLACE_TERMS_VERSION
+    ) {
       const [u] = await db
         .select({ name: users.name, username: users.username })
         .from(users)
@@ -324,12 +484,7 @@ export async function releaseOrder(orderId: number): Promise<boolean> {
   if (existing[0] && existing[0].status !== "failed") return false;
 
   if (!stripeEnabled()) {
-    // No Stripe (e.g. PayPal order) — just mark released so the state machine completes.
-    await db
-      .update(orders)
-      .set({ payoutStatus: "released" })
-      .where(eq(orders.id, orderId));
-    return true;
+    throw new Error("Stripe is unavailable; payout remains safely held");
   }
 
   if (!order.stripeChargeId)
@@ -420,12 +575,18 @@ export async function refundOrderMoney(orderId: number): Promise<boolean> {
     .limit(1);
   if (!order || order.payoutStatus !== "held") return false;
 
-  if (
-    stripeEnabled() &&
-    order.stripeChargeId &&
-    order.paymentStatus === "paid"
-  ) {
-    await createRefund(order.stripeChargeId, `refund_order_${orderId}`);
+  if (order.paymentStatus === "paid") {
+    if (!stripeEnabled()) {
+      throw new Error("Stripe is unavailable; refund was not marked complete");
+    }
+    if (!order.stripeChargeId) {
+      throw new Error("Paid order has no Stripe charge; refund requires review");
+    }
+    await createRefund(
+      order.stripeChargeId,
+      Math.round(parseFloat(String(order.totalUsd)) * 100),
+      `refund_order_${orderId}`
+    );
   }
   await db
     .update(orders)

@@ -15,6 +15,7 @@ import {
 import { ConditionPill } from "@/components/ConditionPill";
 
 type OrderStatus = "pending" | "paid" | "shipped" | "delivered" | "cancelled" | "disputed";
+type OrderActionStatus = "shipped" | "delivered" | "cancelled" | "disputed";
 
 const STATUS_STYLE: Record<OrderStatus, { label: string; bg: string; fg: string }> = {
   pending: { label: "Pending", bg: "#FEF9C3", fg: "#854D0E" },
@@ -32,6 +33,12 @@ interface OrderRow {
     id: number; quantity: number; totalUsd: string; status: OrderStatus;
     payoutStatus?: PayoutStatus; autoReleaseAt?: string | Date | null;
     paymentStatus?: string;
+    stripeSessionExpiresAt?: string | Date | null;
+    shippingName?: string | null; shippingPhone?: string | null;
+    shippingAddress?: {
+      line1: string; line2?: string | null; city: string; state: string;
+      postalCode: string; country: string;
+    } | null;
     trackingNumber: string | null; notes: string | null; createdAt: string | Date;
   };
   cardListing: { cardName: string; imageUrl: string | null; condition: string; cardId: string } | null;
@@ -137,27 +144,34 @@ function OrderCard({
   const name = row.cardListing?.cardName ?? row.productName ?? "Item";
   const img = row.cardListing?.imageUrl ?? row.productImageUrl;
   const condition = row.cardListing?.condition ?? row.productListing?.condition;
-  const setStatus = (status: OrderStatus, trackingNumber?: string) =>
-    update.mutate({ orderId: o.id, status: status as Exclude<OrderStatus, "pending">, trackingNumber });
+  const setStatus = (status: OrderActionStatus, trackingNumber?: string) =>
+    update.mutate({ orderId: o.id, status, trackingNumber });
 
   const actions: React.ReactNode[] = [];
   if (role === "seller") {
-    if (o.status === "pending") {
-      actions.push(
-        <Button key="paid" size="sm" disabled={update.isPending} onClick={() => setStatus("paid")}>Mark paid</Button>,
-        <Button key="cancel" size="sm" variant="ghost" className="text-red-600" disabled={update.isPending} onClick={() => setStatus("cancelled")}>Cancel</Button>,
-      );
-    }
     if (o.status === "paid") {
       actions.push(
         <Button key="ship" size="sm" disabled={update.isPending} onClick={() => setShowShip(v => !v)} className="gap-1.5">
           <Truck className="w-4 h-4" />Mark shipped
         </Button>,
-        <Button key="cancel" size="sm" variant="ghost" className="text-red-600" disabled={update.isPending} onClick={() => setStatus("cancelled")}>Cancel</Button>,
+        <Button
+          key="cancel"
+          size="sm"
+          variant="ghost"
+          className="text-red-600"
+          disabled={update.isPending}
+          onClick={() => {
+            if (window.confirm("Cancel this paid order and refund the buyer? This cannot be undone.")) {
+              setStatus("cancelled");
+            }
+          }}
+        >
+          Cancel & refund
+        </Button>,
       );
     }
   } else {
-    if (o.status === "pending") {
+    if (o.status === "pending" && o.paymentStatus !== "processing") {
       actions.push(<Button key="cancel" size="sm" variant="ghost" className="text-red-600" disabled={update.isPending} onClick={() => setStatus("cancelled")}>Cancel order</Button>);
     }
     if (o.status === "shipped") {
@@ -209,6 +223,12 @@ function OrderCard({
             {o.trackingNumber && <span>· Tracking: <b>{o.trackingNumber}</b></span>}
           </div>
           {o.notes && <p className="text-xs mt-1 line-clamp-2" style={{ color: "oklch(0.52 0.015 240)" }}>“{o.notes}”</p>}
+          {o.status === "pending" && o.paymentStatus === "processing" && (
+            <p className="text-xs mt-1 font-semibold text-amber-700">
+              Secure payment in progress
+              {o.stripeSessionExpiresAt && ` · reservation expires ${new Date(o.stripeSessionExpiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}.
+            </p>
+          )}
           {o.payoutStatus === "held" && (o.status === "shipped" || o.status === "delivered") && (
             <p className="text-xs mt-1 flex items-center gap-1" style={{ color: "#6B21A8" }}>
               <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
@@ -231,14 +251,26 @@ function OrderCard({
         </div>
       </div>
 
+      {o.shippingAddress && o.status !== "pending" && (
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+          <p className="mb-1 font-black uppercase tracking-wide text-gray-500">
+            {role === "seller" ? "Ship to" : "Delivery address"}
+          </p>
+          <p className="font-bold">{o.shippingName}</p>
+          <p>{o.shippingAddress.line1}{o.shippingAddress.line2 ? `, ${o.shippingAddress.line2}` : ""}</p>
+          <p>{o.shippingAddress.city}, {o.shippingAddress.state} {o.shippingAddress.postalCode}</p>
+          {o.shippingPhone && <p className="mt-1">Phone: {o.shippingPhone}</p>}
+        </div>
+      )}
+
       {(actions.length > 0 || showShip) && (
         <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 flex-wrap">
           {showShip && (
             <div className="flex items-center gap-2 flex-1 min-w-[220px]">
               <Input value={tracking} onChange={e => setTracking(e.target.value)}
-                placeholder="Tracking number (optional)" className="h-8 text-sm" maxLength={256} />
-              <Button size="sm" disabled={update.isPending}
-                onClick={() => setStatus("shipped", tracking.trim() || undefined)}>Confirm</Button>
+                placeholder="Tracking number (required)" className="h-8 text-sm" maxLength={256} />
+              <Button size="sm" disabled={update.isPending || tracking.trim().length < 4}
+                onClick={() => setStatus("shipped", tracking.trim())}>Confirm</Button>
             </div>
           )}
           {!showShip && actions}

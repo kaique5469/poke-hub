@@ -3,12 +3,16 @@
  * Requires STRIPE_SECRET_KEY; webhook verification requires STRIPE_WEBHOOK_SECRET.
  */
 import crypto from "crypto";
+import {
+  CHECKOUT_RESERVATION_MINUTES,
+  type ShippingAddress,
+} from "@shared/marketplace";
 
 const API = "https://api.stripe.com/v1";
 const key = () => process.env.STRIPE_SECRET_KEY ?? "";
 
 export function stripeEnabled(): boolean {
-  return !!process.env.STRIPE_SECRET_KEY;
+  return !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_WEBHOOK_SECRET;
 }
 
 /** form-encode nested params the way Stripe expects (a[b][c]=v) */
@@ -21,6 +25,7 @@ function encode(params: Record<string, string | number>): string {
 export interface StripeSession {
   id: string;
   url: string;
+  expiresAt: Date;
 }
 
 export async function createCheckoutSession(opts: {
@@ -31,14 +36,27 @@ export async function createCheckoutSession(opts: {
   origin: string;
 }): Promise<StripeSession> {
   if (!stripeEnabled()) throw new Error("Stripe is not configured");
+  const expiresAt = new Date(
+    Date.now() + CHECKOUT_RESERVATION_MINUTES * 60_000
+  );
+  const checkoutReference = `rg_${opts.orderIds.join("_")}`;
   const params: Record<string, string | number> = {
     mode: "payment",
+    "payment_method_types[0]": "card",
     "line_items[0][quantity]": 1,
     "line_items[0][price_data][currency]": "usd",
     "line_items[0][price_data][unit_amount]": Math.round(opts.amountUsd * 100),
     "line_items[0][price_data][product_data][name]": opts.description,
-    success_url: `${opts.origin}/orders?payment=success`,
+    success_url: `${opts.origin}/orders?payment=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/cart?payment=cancelled`,
+    client_reference_id: checkoutReference,
+    expires_at: Math.ceil(expiresAt.getTime() / 1000),
+    "shipping_address_collection[allowed_countries][0]": "US",
+    "phone_number_collection[enabled]": "true",
+    billing_address_collection: "auto",
+    "payment_intent_data[transfer_group]": checkoutReference,
+    "custom_text[shipping_address][message]":
+      "Free tracked US shipping is included in marketplace listing prices.",
     "metadata[orderIds]": opts.orderIds.join(","),
   };
   if (opts.buyerEmail) params["customer_email"] = opts.buyerEmail;
@@ -48,6 +66,7 @@ export async function createCheckoutSession(opts: {
     headers: {
       Authorization: `Bearer ${key()}`,
       "Content-Type": "application/x-www-form-urlencoded",
+      "Idempotency-Key": `checkout_${opts.orderIds.join("_")}`,
     },
     body: encode(params),
   });
@@ -55,13 +74,25 @@ export async function createCheckoutSession(opts: {
   if (!res.ok || !data.id || !data.url) {
     throw new Error(data.error?.message ?? `Stripe error (${res.status})`);
   }
-  return { id: data.id, url: data.url };
+  return { id: data.id, url: data.url, expiresAt };
+}
+
+/** Prevent payment against an order whose local reservation could not persist. */
+export async function expireCheckoutSession(sessionId: string): Promise<void> {
+  await stripePost(`/checkout/sessions/${sessionId}/expire`, {});
 }
 
 export interface StripeEvent {
   id: string;
   type: string;
   data: { object: { id: string; metadata?: Record<string, string> } };
+}
+
+export interface StripePaymentDetails {
+  chargeId: string | null;
+  shippingName: string | null;
+  shippingPhone: string | null;
+  shippingAddress: ShippingAddress | null;
 }
 
 /**
@@ -164,11 +195,58 @@ export async function getAccountStatus(accountId: string): Promise<ConnectStatus
   };
 }
 
-/** Charge id behind a completed Checkout Session (needed for transfers). */
-export async function getSessionCharge(sessionId: string): Promise<string | null> {
+/** Charge + fulfillment details behind a completed Checkout Session. */
+export async function getSessionPaymentDetails(
+  sessionId: string
+): Promise<StripePaymentDetails> {
   const data = await stripeGet(`/checkout/sessions/${sessionId}?expand[]=payment_intent`);
   const pi = data.payment_intent as { latest_charge?: string } | null;
-  return pi?.latest_charge ?? null;
+  const collected = data.collected_information as
+    | { shipping_details?: StripeShippingDetails | null }
+    | null;
+  // `shipping_details` is retained as a compatibility fallback for older
+  // Stripe API versions while current versions use collected_information.
+  const shipping =
+    collected?.shipping_details ??
+    (data.shipping_details as StripeShippingDetails | null | undefined) ??
+    null;
+  const customer = data.customer_details as
+    | { phone?: string | null }
+    | null;
+  const address = shipping?.address;
+  return {
+    chargeId: pi?.latest_charge ?? null,
+    shippingName: shipping?.name ?? null,
+    shippingPhone: shipping?.phone ?? customer?.phone ?? null,
+    shippingAddress:
+      address?.line1 &&
+      address.city &&
+      address.state &&
+      address.postal_code &&
+      address.country
+        ? {
+            line1: address.line1,
+            line2: address.line2 ?? null,
+            city: address.city,
+            state: address.state,
+            postalCode: address.postal_code,
+            country: address.country,
+          }
+        : null,
+  };
+}
+
+interface StripeShippingDetails {
+  name?: string | null;
+  phone?: string | null;
+  address?: {
+    line1?: string | null;
+    line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postal_code?: string | null;
+    country?: string | null;
+  } | null;
 }
 
 /** Transfer funds from the platform balance to a connected account. */
@@ -189,8 +267,19 @@ export async function createTransfer(opts: {
   return data.id as string;
 }
 
-/** Refund a charge in full (cancellation/dispute before escrow release). */
-export async function createRefund(chargeId: string, idempotencyKey?: string): Promise<string> {
-  const data = await stripePost("/refunds", { charge: chargeId }, idempotencyKey);
+/** Refund one order's amount from a potentially multi-order cart charge. */
+export async function createRefund(
+  chargeId: string,
+  amountCents: number,
+  idempotencyKey?: string
+): Promise<string> {
+  if (!Number.isInteger(amountCents) || amountCents <= 0) {
+    throw new Error("Invalid refund amount");
+  }
+  const data = await stripePost(
+    "/refunds",
+    { charge: chargeId, amount: amountCents },
+    idempotencyKey
+  );
   return data.id as string;
 }

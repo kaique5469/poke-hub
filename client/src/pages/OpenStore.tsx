@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { toast } from "sonner";
+import { MARKETPLACE_TERMS_VERSION } from "@shared/marketplace";
 import {
   ArrowLeft,
   ArrowRight,
@@ -16,7 +17,6 @@ import {
   ShieldCheck,
   Store,
   Truck,
-  Wallet,
 } from "lucide-react";
 
 const VIOLET = "#7C3AED";
@@ -29,12 +29,6 @@ const PAYMENT_OPTIONS = [
     icon: <CreditCard size={18} />,
     desc: "Stripe secure checkout — funds are held in escrow and released to you when the buyer confirms delivery.",
     recommended: true,
-  },
-  {
-    value: "paypal",
-    label: "PayPal",
-    icon: <Wallet size={18} />,
-    desc: "Arranged directly with the buyer via order messages.",
   },
 ] as const;
 
@@ -123,12 +117,12 @@ export default function OpenStore() {
   const [location, setLocation] = useState("");
 
   // Step 2 — payments & shipping
-  const [payments, setPayments] = useState<PayMethod[]>(["card"]);
+  const payments: PayMethod[] = ["card"];
   const [shipCity, setShipCity] = useState("");
   const [shipState, setShipState] = useState("");
   const [handlingDays, setHandlingDays] = useState(2);
   const [shippingPolicy, setShippingPolicy] = useState(
-    "We ship anywhere in the United States (all 50 states). Orders ship within the handling time via USPS with tracking. Cards are sleeved, in toploaders and shipped in a bubble mailer."
+    "Free tracked shipping is included in every listing price. We ship anywhere in the United States within the stated handling time. Cards are sleeved, protected and packed securely."
   );
   const [returnPolicy, setReturnPolicy] = useState(
     "Returns accepted within 7 days if the item is not as described. Buyer pays return shipping unless the listing was inaccurate."
@@ -137,11 +131,21 @@ export default function OpenStore() {
   // Step 3 — terms
   const [agreed, setAgreed] = useState(false);
 
+  const connectOnboard = trpc.store.connectOnboard.useMutation({
+    onSuccess: result => {
+      window.location.href = result.url;
+    },
+    onError: e => {
+      toast.error(e.message);
+      navigate("/dashboard");
+    },
+  });
+
   const createStore = trpc.store.create.useMutation({
-    onSuccess: store => {
+    onSuccess: () => {
       utils.store.mine.invalidate();
-      toast.success("Your store is live!");
-      if (store) navigate(`/store/${store.slug}`);
+      toast.success("Store created. Complete payout verification to publish listings.");
+      connectOnboard.mutate();
     },
     onError: e => toast.error(e.message),
   });
@@ -168,6 +172,10 @@ export default function OpenStore() {
   }
 
   if (myStore.data) {
+    const ready =
+      myStore.data.stripePayoutsEnabled &&
+      !!myStore.data.sellerTermsAcceptedAt &&
+      myStore.data.sellerTermsVersion === MARKETPLACE_TERMS_VERSION;
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-4 text-center">
         <CheckCircle2 size={40} className="text-emerald-500" />
@@ -178,11 +186,13 @@ export default function OpenStore() {
           You already have a store
         </h1>
         <Link
-          href={`/store/${myStore.data.slug}`}
+          href={ready ? `/store/${myStore.data.slug}` : "/dashboard"}
           className="text-white font-black rounded-full px-8 py-3 text-sm uppercase"
           style={{ background: VIOLET }}
         >
-          Go to {myStore.data.storeName}
+          {ready
+            ? `Go to ${myStore.data.storeName}`
+            : "Complete payout setup"}
         </Link>
       </div>
     );
@@ -190,9 +200,6 @@ export default function OpenStore() {
 
   const canNext1 = storeName.trim().length >= 3;
   const canNext2 = payments.length > 0;
-
-  const togglePayment = (v: PayMethod) =>
-    setPayments(p => (p.includes(v) ? p.filter(x => x !== v) : [...p, v]));
 
   const shipsFrom = [shipCity.trim(), shipState].filter(Boolean).join(", ");
 
@@ -208,6 +215,7 @@ export default function OpenStore() {
       handlingDays,
       shippingPolicy: shippingPolicy.trim() || undefined,
       returnPolicy: returnPolicy.trim() || undefined,
+      acceptSellerTerms: true,
     });
   };
 
@@ -337,14 +345,14 @@ export default function OpenStore() {
               </div>
 
               <div>
-                <label className={labelCls}>Payment methods you accept *</label>
+                <label className={labelCls}>Secure payment method *</label>
                 <div className="grid sm:grid-cols-2 gap-3">
                   {PAYMENT_OPTIONS.map(opt => {
                     const active = payments.includes(opt.value);
                     return (
                       <button
                         key={opt.value}
-                        onClick={() => togglePayment(opt.value)}
+                        type="button"
                         className={`text-left border rounded-xl p-3.5 transition-all ${active ? "border-violet-500 bg-violet-50 ring-1 ring-violet-500" : "border-gray-200 hover:border-gray-300"}`}
                       >
                         <div
@@ -375,8 +383,7 @@ export default function OpenStore() {
                     Nationwide shipping — USA
                   </span>
                   <p className="mt-0.5">
-                    All RarityGrid stores ship anywhere in the United States,
-                    all 50 states. Buyers from any state can order from you.
+                    Every public listing includes tracked shipping in the item price and ships anywhere in the United States.
                   </p>
                 </div>
               </div>
@@ -502,7 +509,7 @@ export default function OpenStore() {
                 </div>
                 <div>
                   <span className="font-bold">Ships to:</span> United States —
-                  nationwide (all 50 states)
+                  nationwide with tracked shipping included
                 </div>
               </div>
 
@@ -513,8 +520,7 @@ export default function OpenStore() {
                 Opening a store is free. A 5% commission applies to completed
                 on-platform card payments. Payments are held in escrow and
                 released to you when the buyer confirms delivery (or
-                automatically 7 days after delivery). You commit to shipping
-                anywhere in the US within your handling time, describing card
+                automatically after the protection window). You commit to including tracked US shipping in every listing price, shipping within your handling time, describing card
                 conditions accurately and honoring your return policy. Repeated
                 disputes may pause your store.
               </div>
@@ -526,8 +532,9 @@ export default function OpenStore() {
                   onChange={e => setAgreed(e.target.checked)}
                   className="mt-0.5 accent-violet-600 w-4 h-4"
                 />
-                I agree to the seller terms and confirm my listings will be
-                accurate.
+                <span>
+                  I agree to the <Link href="/terms" className="font-bold text-violet-700 hover:underline">seller terms</Link> and confirm my listings will be accurate.
+                </span>
               </label>
 
               <div className="flex justify-between">
@@ -538,14 +545,16 @@ export default function OpenStore() {
                   <ArrowLeft size={15} /> Back
                 </button>
                 <button
-                  disabled={!agreed || createStore.isPending}
+                  disabled={!agreed || createStore.isPending || connectOnboard.isPending}
                   onClick={submit}
                   className="inline-flex items-center gap-2 text-white font-black rounded-full px-8 py-3 text-sm uppercase disabled:opacity-40 shadow-lg"
                   style={{
                     background: "linear-gradient(120deg, #7C3AED, #FF2E9A)",
                   }}
                 >
-                  {createStore.isPending ? "Creating..." : "Open my store"}{" "}
+                  {createStore.isPending || connectOnboard.isPending
+                    ? "Connecting Stripe..."
+                    : "Open store & connect payouts"}{" "}
                   <Store size={15} />
                 </button>
               </div>

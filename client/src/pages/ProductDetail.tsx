@@ -42,6 +42,9 @@ function SellDialog({
   const [condition, setCondition] = useState<(typeof CONDITIONS)[number]>("NM");
   const [notes, setNotes] = useState("");
   const utils = trpc.useUtils();
+  const sellerStatus = trpc.store.connectStatus.useQuery(undefined, {
+    enabled: open,
+  });
 
   const create = trpc.products.createListing.useMutation({
     onSuccess: () => {
@@ -67,6 +70,25 @@ function SellDialog({
         <DialogHeader>
           <DialogTitle>Sell: {productName}</DialogTitle>
         </DialogHeader>
+        {sellerStatus.data &&
+        (!sellerStatus.data.payoutsEnabled || !sellerStatus.data.termsAccepted) ? (
+          <div className="rounded-xl border border-violet-200 bg-violet-50 p-5 text-center">
+            <ShieldCheck className="mx-auto h-9 w-9 text-violet-600" />
+            <p className="mt-3 font-black text-gray-900">
+              {!sellerStatus.data.hasStore
+                ? "Open your seller store first"
+                : !sellerStatus.data.termsAccepted
+                  ? "Accept the current seller terms"
+                  : "Complete Stripe payout setup"}
+            </p>
+            <p className="mt-1 text-sm text-gray-600">
+              Only verified sellers can publish inventory.
+            </p>
+            <Link href={!sellerStatus.data.hasStore ? "/open-store" : "/dashboard"}>
+              <Button className="mt-4 w-full">Continue seller setup</Button>
+            </Link>
+          </div>
+        ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -79,6 +101,9 @@ function SellDialog({
                 onChange={e => setPrice(e.target.value)}
                 placeholder="0.00"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                Include tracked US shipping in the listing price.
+              </p>
             </div>
             <div>
               <label className="text-sm font-semibold">Quantity</label>
@@ -132,6 +157,7 @@ function SellDialog({
             {create.isPending ? "Publishing…" : "Publish listing"}
           </Button>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

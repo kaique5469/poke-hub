@@ -111,12 +111,12 @@ export default function Sell() {
   const ctaHref = !isAuthenticated
     ? getLoginUrl()
     : myStore.data
-      ? `/store/${myStore.data.slug}`
+      ? "/dashboard"
       : "/open-store";
   const ctaLabel = !isAuthenticated
     ? "Sign in to start selling"
     : myStore.data
-      ? "Go to your store"
+      ? "Manage your seller account"
       : "Open your store — it's free";
 
   return (
@@ -189,7 +189,7 @@ export default function Sell() {
               n: "1",
               icon: <Store size={20} />,
               title: "Open your store",
-              desc: "Pick a name, choose the payment methods you accept and set your shipping and return policies. Takes under 5 minutes.",
+              desc: "Pick a name, accept the seller terms, connect secure card payouts and set your shipping and return policies.",
             },
             {
               n: "2",
@@ -281,8 +281,8 @@ export default function Sell() {
       <section className="max-w-6xl mx-auto px-4 py-16">
         <SectionTitle
           kicker="Payments"
-          title="Get paid directly to your bank"
-          sub="Connect your Stripe account once — every card sale is paid out straight to you."
+          title="Protected payments, clear payouts"
+          sub="Stripe confirms every card payment; RarityGrid holds the seller share until fulfillment is complete."
         />
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <Feature
@@ -292,18 +292,18 @@ export default function Sell() {
           />
           <Feature
             icon={<Landmark size={20} />}
-            title="Direct payouts"
-            desc="Connect your own Stripe account and receive 95% of every card sale directly — no waiting on the platform."
+            title="Verified payouts"
+            desc="Connect and verify your Stripe account before inventory can go live. Your 95% seller share is released after fulfillment."
           />
           <Feature
             icon={<Wallet size={20} />}
-            title="PayPal"
-            desc="Arrange PayPal payments directly with the buyer through order messages."
+            title="Escrow protection"
+            desc="Funds remain held while you ship and are released after the buyer confirms receipt or the protection window ends."
           />
           <Feature
             icon={<Banknote size={20} />}
-            title="Fast settlement"
-            desc="Stripe deposits payouts to your bank on a rolling basis after the sale is confirmed."
+            title="Auditable settlement"
+            desc="Every payment, refund and seller transfer is tied to an order and protected against duplicate processing."
           />
         </div>
       </section>
@@ -346,15 +346,15 @@ export default function Sell() {
         <div className="space-y-3">
           <Faq
             q="How much does it cost to sell?"
-            a="Opening a store and listing items is free. A 5% commission applies only to completed on-platform card payments; it covers Stripe processing and buyer protection. Sales arranged via PayPal have no platform commission."
+            a="Opening a store and listing items is free. A 5% marketplace fee applies to completed card orders and supports checkout, escrow and buyer protection. Tracked US shipping must be included in each listing price."
           />
           <Faq
             q="When do I get paid?"
-            a="Connect your Stripe account from your dashboard (takes ~2 minutes). When a buyer pays by card, 95% of the sale is transferred automatically to your Stripe account and deposited to your bank — the 5% platform fee is already deducted."
+            a="Connect and verify Stripe from your dashboard. After a buyer pays, your 95% seller share is held during fulfillment and released when receipt is confirmed or the protection window ends. Stripe then sends it to your bank according to your payout schedule."
           />
           <Faq
             q="What do I need to open a store?"
-            a="A RarityGrid account, a store name and at least one accepted payment method. To receive card payments you also connect a free Stripe account for direct payouts. Shipping and return policies are strongly recommended."
+            a="A RarityGrid account, a store name, accepted seller terms and a verified Stripe payout account. Clear shipping and return policies are required for buyer trust."
           />
           <Faq
             q="How is the card condition handled?"

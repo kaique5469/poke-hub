@@ -94,6 +94,34 @@ describe("orders.confirmReceipt", () => {
   });
 });
 
+describe("marketplace payment guards", () => {
+  it("disables direct/off-platform checkout", async () => {
+    const caller = appRouter.createCaller(ctxFor(buyer));
+    await expect(caller.cart.checkout({})).rejects.toThrow(/off-platform/i);
+  });
+
+  it("does not let a seller mark an order paid manually", async () => {
+    const caller = appRouter.createCaller(ctxFor(buyer));
+    await expect(
+      caller.orders.updateStatus({
+        orderId: 1,
+        // @ts-expect-error — Stripe webhook is the only paid transition
+        status: "paid",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("requires explicit buyer acceptance at secure checkout", async () => {
+    const caller = appRouter.createCaller(ctxFor(buyer));
+    await expect(
+      caller.cart.stripeCheckout({
+        // @ts-expect-error — literal true is required
+        acceptMarketplaceTerms: false,
+      })
+    ).rejects.toThrow();
+  });
+});
+
 // ─── Admin escrow router guards ──────────────────────────────────────────────
 describe("escrow admin router", () => {
   it("blocks non-admin users from overview", async () => {

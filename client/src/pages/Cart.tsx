@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { toast } from "sonner";
 import { CreditCard, LockKeyhole, Minus, Package, Plus, ShieldCheck, ShoppingCart, Star, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { ConditionPill } from "@/components/ConditionPill";
 
@@ -34,8 +35,8 @@ function lineInfo(row: CartRow) {
 
 export default function Cart() {
   const { isAuthenticated, loading } = useAuth();
-  const [, navigate] = useLocation();
   const [notes, setNotes] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const utils = trpc.useUtils();
 
   const { data: rows, isLoading } = trpc.cart.get.useQuery(undefined, { enabled: isAuthenticated });
@@ -53,20 +54,6 @@ export default function Cart() {
     onSuccess: invalidate,
     onError: (e) => toast.error(e.message),
   });
-  const checkout = trpc.cart.checkout.useMutation({
-    onSuccess: (res) => {
-      invalidate();
-      utils.orders.myPurchases.invalidate();
-      if (res.skipped.length > 0) {
-        toast.warning(`${res.orderIds.length} order(s) created — ${res.skipped.length} item(s) skipped (out of stock).`);
-      } else {
-        toast.success(`${res.orderIds.length} order(s) created! Total $${res.totalUsd.toFixed(2)}`);
-      }
-      navigate("/orders");
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
   const stripeAvailable = trpc.cart.stripeAvailable.useQuery();
   const stripeCheckout = trpc.cart.stripeCheckout.useMutation({
     onSuccess: (res) => {
@@ -212,30 +199,48 @@ export default function Cart() {
                 <span style={{ color: "oklch(0.52 0.015 240)" }}>Sellers</span>
                 <span className="font-bold">{groups.length}</span>
               </div>
+              <div className="flex justify-between text-sm mb-1">
+                <span style={{ color: "oklch(0.52 0.015 240)" }}>Tracked US shipping</span>
+                <span className="font-bold text-emerald-600">Included</span>
+              </div>
               <div className="h-px my-3" style={{ background: "oklch(0.92 0.005 240)" }} />
               <div className="flex justify-between items-baseline mb-4">
                 <span className="font-bold">Total</span>
                 <span className="text-2xl font-black" style={{ color: "oklch(0.18 0.02 240)" }}>${total.toFixed(2)}</span>
               </div>
 
-              <Textarea value={notes} onChange={e => setNotes(e.target.value)} maxLength={2000}
-                placeholder="Note to sellers (optional) — shipping preferences, payment arrangement..."
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} maxLength={1000}
+                placeholder="Note to sellers (optional) — delivery or packing details..."
                 className="mb-3 text-sm" rows={3} />
+
+              <label className="mb-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-gray-200 p-3 text-xs text-gray-600">
+                <Checkbox
+                  checked={acceptedTerms}
+                  onCheckedChange={value => setAcceptedTerms(value === true)}
+                  className="mt-0.5"
+                />
+                <span>
+                  I agree to the RarityGrid <Link href="/terms" className="font-bold text-violet-600 hover:underline">Marketplace Terms</Link>, including the condition, shipping and buyer-protection rules.
+                </span>
+              </label>
 
               {stripeAvailable.data && (
                 <Button className="w-full gap-2 mb-2" size="lg"
                   style={{ background: "#635BFF" }}
-                  disabled={stripeCheckout.isPending || checkout.isPending}
-                  onClick={() => stripeCheckout.mutate({ notes: notes.trim() || undefined })}>
+                  disabled={stripeCheckout.isPending || !acceptedTerms}
+                  onClick={() => stripeCheckout.mutate({
+                    notes: notes.trim() || undefined,
+                    acceptMarketplaceTerms: true,
+                  })}>
                   <CreditCard size={16} />
-                  {stripeCheckout.isPending ? "Redirecting to secure checkout…" : "Pay with card"}
+                  {stripeCheckout.isPending ? "Reserving inventory…" : "Secure checkout"}
                 </Button>
               )}
-              <Button className="w-full" size="lg" variant={stripeAvailable.data ? "outline" : "default"}
-                disabled={checkout.isPending || stripeCheckout.isPending}
-                onClick={() => checkout.mutate({ notes: notes.trim() || undefined })}>
-                {checkout.isPending ? "Placing orders…" : "Order & arrange payment with seller"}
-              </Button>
+              {!stripeAvailable.isLoading && !stripeAvailable.data && (
+                <p className="rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                  Secure checkout is temporarily unavailable. Your cart has not been charged or reserved.
+                </p>
+              )}
 
               {/* Trust badges */}
               <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-gray-100 text-[10px] font-bold text-gray-400">
@@ -244,8 +249,7 @@ export default function Cart() {
                 <span className="inline-flex items-center gap-1"><ShieldCheck size={11} /> Buyer protection</span>
               </div>
               <p className="text-[11px] mt-3 leading-snug" style={{ color: "oklch(0.52 0.015 240)" }}>
-                Card payments are confirmed instantly and covered by buyer protection.
-                Choosing "arrange with seller" creates the orders and you settle payment directly with each seller.
+                Inventory is reserved for 30 minutes while you pay. Stripe securely collects your card and shipping address; RarityGrid never stores card numbers.
               </p>
             </div>
           </div>

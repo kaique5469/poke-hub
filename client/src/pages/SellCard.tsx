@@ -17,6 +17,7 @@ import {
   CheckCircle,
   ShoppingBag,
   Info,
+  ShieldCheck,
   Star,
   X,
 } from "lucide-react";
@@ -94,6 +95,9 @@ export default function SellCard() {
       { q: searchQuery, page: 1, pageSize: 12 },
       { enabled: searchQuery.length >= 2 }
     );
+  const sellerStatus = trpc.store.connectStatus.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
 
   const createListingMutation = trpc.listings.create.useMutation({
     onSuccess: () => {
@@ -174,6 +178,40 @@ export default function SellCard() {
               Sign In / Register
             </Button>
           </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    sellerStatus.data &&
+    (!sellerStatus.data.payoutsEnabled || !sellerStatus.data.termsAccepted)
+  ) {
+    const needsStore = !sellerStatus.data.hasStore;
+    const needsTerms = sellerStatus.data.hasStore && !sellerStatus.data.termsAccepted;
+    return (
+      <div className="min-h-[65vh] bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+          <ShieldCheck className="mx-auto h-12 w-12 text-violet-600" />
+          <h1 className="mt-4 text-2xl font-black text-gray-900">
+            {needsStore
+              ? "Open your seller store"
+              : needsTerms
+                ? "Accept the current seller terms"
+                : "Complete payout verification"}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-gray-500">
+            Sellers must accept the marketplace terms and verify Stripe payouts before inventory can appear to buyers.
+          </p>
+          <Link href={needsStore ? "/open-store" : "/dashboard"}>
+            <Button className="mt-6 w-full">
+              {needsStore
+                ? "Open store"
+                : needsTerms
+                  ? "Review seller terms"
+                  : "Complete Stripe setup"}
+            </Button>
+          </Link>
         </div>
       </div>
     );
@@ -434,6 +472,9 @@ export default function SellCard() {
                           : "✓ Fair market price"}
                     </p>
                   )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Include the cost of tracked US shipping in this price.
+                  </p>
                 </div>
 
                 {/* Quantity */}
@@ -533,6 +574,10 @@ export default function SellCard() {
                     <span className="text-gray-500">Language:</span>
                     <span className="font-medium text-gray-800">
                       {language}
+                    </span>
+                    <span className="text-gray-500">Estimated payout:</span>
+                    <span className="font-bold text-violet-700">
+                      ${(parseFloat(price) * quantity * 0.95).toFixed(2)}
                     </span>
                   </div>
                 </div>

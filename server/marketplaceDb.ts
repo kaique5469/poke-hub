@@ -11,6 +11,7 @@ import {
   eq,
   gte,
   inArray,
+  isNotNull,
   like,
   lte,
   notLike,
@@ -26,12 +27,14 @@ import {
   productListings,
   products,
   sellerReviews,
+  sellerStores,
   users,
   wantListItems,
   type InsertBazaarListing,
   type InsertProduct,
   type InsertWantListItem,
 } from "../drizzle/schema";
+import { MARKETPLACE_TERMS_VERSION } from "@shared/marketplace";
 import { getDb } from "./db";
 
 type Condition = "M" | "NM" | "SP" | "MP" | "HP" | "D";
@@ -47,6 +50,16 @@ const sellerCols = {
   sellerIsVerified: users.isVerifiedSeller,
   sellerHasPhysicalStore: users.hasPhysicalStore,
 } as const;
+
+function readyStoreWhere() {
+  return and(
+    eq(sellerStores.status, "active"),
+    eq(sellerStores.stripePayoutsEnabled, true),
+    isNotNull(sellerStores.stripeAccountId),
+    isNotNull(sellerStores.sellerTermsAcceptedAt),
+    eq(sellerStores.sellerTermsVersion, MARKETPLACE_TERMS_VERSION)
+  );
+}
 
 // ─── Card listings (singles) ──────────────────────────────────────────────────
 
@@ -102,14 +115,16 @@ export async function searchListings(input: SearchListingsInput) {
       .select({ listing: listings, ...sellerCols })
       .from(listings)
       .leftJoin(users, eq(listings.sellerId, users.id))
-      .where(where)
+      .innerJoin(sellerStores, eq(listings.sellerId, sellerStores.userId))
+      .where(and(where, readyStoreWhere()))
       .orderBy(orderBy)
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db
       .select({ count: sql<number>`count(*)` })
       .from(listings)
-      .where(where),
+      .innerJoin(sellerStores, eq(listings.sellerId, sellerStores.userId))
+      .where(and(where, readyStoreWhere())),
   ]);
 
   return { items, total: Number(totalRows[0]?.count ?? 0) };
@@ -123,7 +138,14 @@ export async function getListingsByCardWithSeller(cardId: string) {
     .select({ listing: listings, ...sellerCols })
     .from(listings)
     .leftJoin(users, eq(listings.sellerId, users.id))
-    .where(and(eq(listings.cardId, cardId), eq(listings.status, "active")))
+    .innerJoin(sellerStores, eq(listings.sellerId, sellerStores.userId))
+    .where(
+      and(
+        eq(listings.cardId, cardId),
+        eq(listings.status, "active"),
+        readyStoreWhere()
+      )
+    )
     .orderBy(asc(listings.priceUsd))
     .limit(100);
 }
@@ -163,8 +185,15 @@ function verifiedOrSellerListedProduct() {
     like(products.slug, "scrydex-%"),
     sql<boolean>`exists (
       select 1 from ${productListings}
+      inner join ${sellerStores}
+        on ${sellerStores.userId} = ${productListings.sellerId}
       where ${productListings.productId} = ${products.id}
         and ${productListings.status} = 'active'
+        and ${sellerStores.status} = 'active'
+        and ${sellerStores.stripePayoutsEnabled} = true
+        and ${sellerStores.stripeAccountId} is not null
+        and ${sellerStores.sellerTermsAcceptedAt} is not null
+        and ${sellerStores.sellerTermsVersion} = ${MARKETPLACE_TERMS_VERSION}
     )`
   );
 }
@@ -319,10 +348,15 @@ export async function getProductListings(productId: number) {
     .select({ listing: productListings, ...sellerCols })
     .from(productListings)
     .leftJoin(users, eq(productListings.sellerId, users.id))
+    .innerJoin(
+      sellerStores,
+      eq(productListings.sellerId, sellerStores.userId)
+    )
     .where(
       and(
         eq(productListings.productId, productId),
-        eq(productListings.status, "active")
+        eq(productListings.status, "active"),
+        readyStoreWhere()
       )
     )
     .orderBy(asc(productListings.priceUsd))
@@ -488,12 +522,14 @@ export interface CheckoutResult {
 
 /**
  * Creates one order per cart line (grouped visually by seller on the client),
- * decrements stock, marks sold-out listings, clears the cart and notifies
- * each seller — all inside a single transaction.
+ * decrements stock and marks sold-out listings in one transaction. Cart
+ * clearing and seller notifications happen only after secure checkout is
+ * attached and payment is confirmed, respectively.
  */
 export async function checkoutCart(
   buyerId: number,
-  notes?: string
+  notes: string | undefined,
+  buyerTermsVersion: string
 ): Promise<CheckoutResult> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -508,8 +544,6 @@ export async function checkoutCart(
     const orderIds: number[] = [];
     const skipped: CheckoutResult["skipped"] = [];
     let totalUsd = 0;
-    const sellerTotals = new Map<number, number>();
-
     for (const item of items) {
       if (item.listingId) {
         const [l] = await tx
@@ -531,6 +565,23 @@ export async function checkoutCart(
           });
           continue;
         }
+        const [readyStore] = await tx
+          .select({ userId: sellerStores.userId })
+          .from(sellerStores)
+          .where(
+            and(
+              eq(sellerStores.userId, l.sellerId),
+              readyStoreWhere()
+            )
+          )
+          .limit(1);
+        if (!readyStore) {
+          skipped.push({
+            cartItemId: item.id,
+            reason: "Seller checkout is temporarily unavailable",
+          });
+          continue;
+        }
         const lineTotal = parseFloat(String(l.priceUsd)) * item.quantity;
         const [res] = await tx.insert(orders).values({
           buyerId,
@@ -540,13 +591,11 @@ export async function checkoutCart(
           totalUsd: lineTotal.toFixed(2),
           status: "pending",
           notes: notes ?? null,
+          buyerTermsVersion,
+          buyerTermsAcceptedAt: new Date(),
         });
         orderIds.push(res.insertId);
         totalUsd += lineTotal;
-        sellerTotals.set(
-          l.sellerId,
-          (sellerTotals.get(l.sellerId) ?? 0) + lineTotal
-        );
 
         const remaining = l.quantity - item.quantity;
         await tx
@@ -576,6 +625,23 @@ export async function checkoutCart(
           });
           continue;
         }
+        const [readyStore] = await tx
+          .select({ userId: sellerStores.userId })
+          .from(sellerStores)
+          .where(
+            and(
+              eq(sellerStores.userId, pl.sellerId),
+              readyStoreWhere()
+            )
+          )
+          .limit(1);
+        if (!readyStore) {
+          skipped.push({
+            cartItemId: item.id,
+            reason: "Seller checkout is temporarily unavailable",
+          });
+          continue;
+        }
         const lineTotal = parseFloat(String(pl.priceUsd)) * item.quantity;
         const [res] = await tx.insert(orders).values({
           buyerId,
@@ -585,13 +651,11 @@ export async function checkoutCart(
           totalUsd: lineTotal.toFixed(2),
           status: "pending",
           notes: notes ?? null,
+          buyerTermsVersion,
+          buyerTermsAcceptedAt: new Date(),
         });
         orderIds.push(res.insertId);
         totalUsd += lineTotal;
-        sellerTotals.set(
-          pl.sellerId,
-          (sellerTotals.get(pl.sellerId) ?? 0) + lineTotal
-        );
 
         const remaining = pl.quantity - item.quantity;
         await tx
@@ -606,20 +670,6 @@ export async function checkoutCart(
 
     if (orderIds.length === 0) {
       throw new Error(skipped[0]?.reason ?? "No purchasable items in cart");
-    }
-
-    await tx.delete(cartItems).where(eq(cartItems.userId, buyerId));
-
-    // Notify each seller inside the same transaction
-    for (const [sellerId, amount] of Array.from(sellerTotals.entries())) {
-      await tx.insert(notifications).values({
-        userId: sellerId,
-        type: "order_update",
-        title: "New order received",
-        message: `You received a new order totaling $${amount.toFixed(2)}. Contact the buyer to arrange payment and shipping.`,
-        entityType: "order",
-        entityId: String(orderIds[0]),
-      });
     }
 
     return { orderIds, totalUsd, skipped };
@@ -673,7 +723,7 @@ export async function getSellerOrders(sellerId: number) {
 }
 
 const SELLER_TRANSITIONS: Record<string, string[]> = {
-  pending: ["paid", "cancelled"],
+  pending: ["cancelled"],
   paid: ["shipped", "cancelled"],
   shipped: [],
   delivered: [],
@@ -692,7 +742,7 @@ const BUYER_TRANSITIONS: Record<string, string[]> = {
 export async function updateOrderStatus(
   orderId: number,
   userId: number,
-  newStatus: "paid" | "shipped" | "delivered" | "cancelled" | "disputed",
+  newStatus: "shipped" | "delivered" | "cancelled" | "disputed",
   trackingNumber?: string
 ) {
   const db = await getDb();
@@ -719,6 +769,18 @@ export async function updateOrderStatus(
       );
     }
 
+    if (
+      newStatus === "cancelled" &&
+      order.paymentStatus === "processing"
+    ) {
+      throw new Error(
+        "Secure checkout is still in progress. The reservation will cancel automatically if payment expires."
+      );
+    }
+    if (newStatus === "shipped" && !trackingNumber?.trim()) {
+      throw new Error("A tracking number is required before marking an order shipped");
+    }
+
     // ESCROW: once the payout was released to the seller, disputes go through
     // support — the money is no longer held by the platform.
     if (newStatus === "disputed" && order.payoutStatus === "released") {
@@ -731,7 +793,8 @@ export async function updateOrderStatus(
       .update(orders)
       .set({
         status: newStatus,
-        trackingNumber: trackingNumber ?? order.trackingNumber,
+        trackingNumber: trackingNumber?.trim() || order.trackingNumber,
+        ...(newStatus === "cancelled" ? { payoutStatus: "refunded" as const } : {}),
       })
       .where(eq(orders.id, orderId));
 
