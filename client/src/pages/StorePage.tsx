@@ -7,10 +7,8 @@ import { trpc } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BadgeCheck,
-  Banknote,
   Clock,
   CreditCard,
-  Landmark,
   LockKeyhole,
   MapPin,
   Package,
@@ -19,7 +17,6 @@ import {
   Star,
   Store,
   Truck,
-  Wallet,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -29,9 +26,6 @@ const INK = "#0B1220";
 
 const PAYMENT_LABELS: Record<string, { label: string; icon: ReactNode }> = {
   card: { label: "Card (secure checkout)", icon: <CreditCard size={13} /> },
-  paypal: { label: "PayPal", icon: <Wallet size={13} /> },
-  pix: { label: "Pix", icon: <Banknote size={13} /> },
-  bank_transfer: { label: "Bank transfer", icon: <Landmark size={13} /> },
 };
 
 const CONDITION_LABELS: Record<string, string> = {

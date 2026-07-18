@@ -3,7 +3,7 @@ import { Mail, ShieldCheck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
-const updated = "July 16, 2026";
+const updated = "July 18, 2026";
 
 const privacySections = [
   [
@@ -39,7 +39,15 @@ const termsSections = [
   ],
   [
     "Orders and disputes",
-    "Payments may be held while an order is fulfilled. Buyers and sellers must provide truthful information during a cancellation, delivery claim or dispute.",
+    "Card payments are processed by Stripe and the seller share is held while an order is fulfilled. Buyers and sellers must provide truthful information and supporting evidence during a cancellation, delivery claim or dispute.",
+  ],
+  [
+    "Inventory reservations and shipping",
+    "Checkout reserves inventory for 30 minutes. If payment is not completed, the reservation expires and inventory returns to sale. Marketplace listing prices include tracked shipping within the United States; sellers must ship to the address collected at secure checkout.",
+  ],
+  [
+    "Fees, refunds and payouts",
+    "RarityGrid deducts a 5% marketplace fee from completed orders. Eligible refunds return the affected order amount to the original payment method. Seller payouts are released after confirmed fulfillment or the applicable protection window.",
   ],
   [
     "Prohibited activity",
@@ -89,7 +97,7 @@ export default function Legal() {
             </h2>
             {info.data?.contactEmail ? (
               <a
-                href={`mailto:${info.data.contactEmail}?subject=TCG%20Arena%20Support`}
+                href={`mailto:${info.data.contactEmail}?subject=RarityGrid%20Support`}
                 className="mt-3 inline-flex rounded-full bg-violet-600 px-5 py-3 text-sm font-black text-white"
               >
                 {info.data.contactEmail}

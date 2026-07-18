@@ -57,6 +57,14 @@ function PayoutsCard() {
     },
     onError: error => toast.error(error.message),
   });
+  const acceptTerms = trpc.store.acceptTerms.useMutation({
+    onSuccess: () => {
+      toast.success("Seller terms accepted. Your store can publish after payout verification.");
+      void utils.store.connectStatus.invalidate();
+      void utils.store.mine.invalidate();
+    },
+    onError: error => toast.error(error.message),
+  });
   if (status.isLoading) return <Skeleton className="h-32 rounded-2xl" />;
   const current = status.data;
   if (!current?.hasStore)
@@ -77,6 +85,29 @@ function PayoutsCard() {
         </div>
       </Panel>
     );
+  if (!current.termsAccepted) {
+    return (
+      <Panel>
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h3 className="font-black text-gray-950">Updated seller terms</h3>
+            <p className="mt-1 max-w-xl text-sm text-gray-500">
+              Review the current marketplace, tracked-shipping, escrow and buyer-protection rules before publishing inventory.
+            </p>
+            <Link href="/terms" className="mt-2 inline-block text-sm font-bold text-violet-700 hover:underline">
+              Read Marketplace Terms
+            </Link>
+          </div>
+          <Button
+            disabled={acceptTerms.isPending}
+            onClick={() => acceptTerms.mutate({ acceptSellerTerms: true })}
+          >
+            {acceptTerms.isPending ? "Saving…" : "Accept seller terms"}
+          </Button>
+        </div>
+      </Panel>
+    );
+  }
   return (
     <Panel>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">

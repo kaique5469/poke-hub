@@ -366,6 +366,13 @@ export const orders = mysqlTable("orders", {
   paymentStatus: mysqlEnum("paymentStatus", ["unpaid", "processing", "paid", "refunded"]).default("unpaid").notNull(),
   stripeSessionId: varchar("stripeSessionId", { length: 255 }),
   stripeChargeId: varchar("stripeChargeId", { length: 255 }),
+  stripeSessionExpiresAt: timestamp("stripeSessionExpiresAt"),
+  shippingName: varchar("shippingName", { length: 160 }),
+  shippingPhone: varchar("shippingPhone", { length: 40 }),
+  shippingAddress: json("shippingAddress"),
+  buyerTermsVersion: varchar("buyerTermsVersion", { length: 32 }),
+  buyerTermsAcceptedAt: timestamp("buyerTermsAcceptedAt"),
+  cancellationReason: varchar("cancellationReason", { length: 255 }),
   /** Escrow: money held on platform until delivery is confirmed. */
   payoutStatus: mysqlEnum("payoutStatus", ["held", "released", "refunded"]).default("held").notNull(),
   deliveredAt: timestamp("deliveredAt"),
@@ -375,7 +382,14 @@ export const orders = mysqlTable("orders", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [
+  index("orders_stripe_session_idx").on(table.stripeSessionId),
+  index("orders_reservation_expiry_idx").on(
+    table.status,
+    table.paymentStatus,
+    table.stripeSessionExpiresAt
+  ),
+]);
 
 export type Order = typeof orders.$inferSelect;
 
@@ -643,15 +657,17 @@ export const sellerStores = mysqlTable("seller_stores", {
   logoUrl: text("logoUrl"),
   bannerUrl: text("bannerUrl"),
   location: varchar("location", { length: 128 }),
-  /** e.g. ["card", "paypal"] — card == Stripe checkout on-platform */
+  /** Current marketplace checkout method: ["card"]. */
   paymentMethods: json("paymentMethods"),
-  /** Stripe Connect (Express) account id — payouts go directly to the seller */
+  /** Stripe Connect account used after escrow release. */
   stripeAccountId: varchar("stripeAccountId", { length: 255 }),
   stripePayoutsEnabled: boolean("stripePayoutsEnabled").default(false).notNull(),
   shipsFrom: varchar("shipsFrom", { length: 128 }),
   handlingDays: int("handlingDays").default(2).notNull(),
   shippingPolicy: text("shippingPolicy"),
   returnPolicy: text("returnPolicy"),
+  sellerTermsVersion: varchar("sellerTermsVersion", { length: 32 }),
+  sellerTermsAcceptedAt: timestamp("sellerTermsAcceptedAt"),
   status: mysqlEnum("status", ["active", "paused"]).default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

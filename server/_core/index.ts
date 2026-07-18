@@ -14,8 +14,14 @@ import { autoReleaseHandler } from "../scheduledRelease";
 import { scrydexSyncHandler } from "../scheduledScrydex";
 import { marketSnapshotHandler } from "../scheduledMarket";
 import { ensureMarketPulseSchema } from "../marketSchema";
+import { ensureMarketplaceSchema } from "../marketplaceSchema";
 import { verifyWebhook } from "../lib/stripe";
-import { markOrdersPaid, wasEventProcessed, recordEvent } from "../storeDb";
+import {
+  cancelCheckoutSessionOrders,
+  markOrdersPaid,
+  wasEventProcessed,
+  recordEvent,
+} from "../storeDb";
 import { registerSeoRoutes } from "../seo";
 
 const apiBuckets = new Map<
@@ -72,6 +78,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  await ensureMarketplaceSchema();
   await ensureMarketPulseSchema();
   const app = express();
   const server = createServer(app);
@@ -131,6 +138,12 @@ async function startServer() {
           const n = await markOrdersPaid(event.data.object.id);
           console.log(
             `[stripe] session ${event.data.object.id} completed — ${n} order(s) marked paid (funds held)`
+          );
+        }
+        if (event.type === "checkout.session.expired") {
+          const n = await cancelCheckoutSessionOrders(event.data.object.id);
+          console.log(
+            `[stripe] session ${event.data.object.id} expired — ${n} reservation(s) restored`
           );
         }
         await recordEvent(event.id, event.type);

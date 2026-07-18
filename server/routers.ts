@@ -31,7 +31,6 @@ import {
   addComment,
   getDeckById,
   getDeckCards,
-  getListingsByCard,
   getPublicDecks,
   getPublishedArticles,
   getArticleBySlug,
@@ -104,8 +103,10 @@ import {
   getStoreByUserId,
   getStoreListings,
   releaseOrder,
+  requireSellerReady,
   updateStore,
 } from "./storeDb";
+import { MARKETPLACE_TERMS_VERSION } from "@shared/marketplace";
 import {
   createAccountLink,
   createConnectAccount,
@@ -970,8 +971,8 @@ export const appRouter = router({
     getByCard: publicProcedure
       .input(z.object({ cardId: z.string() }))
       .query(async ({ input }) => {
-        const rows = await getListingsByCard(input.cardId);
-        return rows.map(l => ({
+        const rows = await getListingsByCardWithSeller(input.cardId);
+        return rows.map(({ listing: l }) => ({
           ...l,
           priceUsd: l.priceUsd ? parseFloat(String(l.priceUsd)) : null,
           createdAt: l.createdAt.toISOString(),
@@ -1030,6 +1031,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        await requireSellerReady(ctx.user.id);
         await createListing({
           sellerId: ctx.user.id,
           cardId: input.cardId,
@@ -1060,16 +1062,22 @@ export const appRouter = router({
           tagline: z.string().max(256).optional(),
           description: z.string().max(4000).optional(),
           location: z.string().max(128).optional(),
-          paymentMethods: z.array(z.enum(["card", "paypal"])).min(1),
+          paymentMethods: z.array(z.literal("card")).length(1),
           shipsFrom: z.string().max(128).optional(),
           handlingDays: z.number().int().min(1).max(10).default(2),
           shippingPolicy: z.string().max(4000).optional(),
           returnPolicy: z.string().max(4000).optional(),
+          acceptSellerTerms: z.literal(true),
         })
       )
       .mutation(async ({ input, ctx }) => {
         try {
-          return await createStore(ctx.user.id, input);
+          const { acceptSellerTerms: _accepted, ...store } = input;
+          return await createStore(ctx.user.id, {
+            ...store,
+            sellerTermsVersion: MARKETPLACE_TERMS_VERSION,
+            sellerTermsAcceptedAt: new Date(),
+          });
         } catch (e) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -1086,8 +1094,8 @@ export const appRouter = router({
           description: z.string().max(4000).optional(),
           location: z.string().max(128).optional(),
           paymentMethods: z
-            .array(z.enum(["card", "paypal"]))
-            .min(1)
+            .array(z.literal("card"))
+            .length(1)
             .optional(),
           shipsFrom: z.string().max(128).optional(),
           handlingDays: z.number().int().min(1).max(10).optional(),
@@ -1097,6 +1105,23 @@ export const appRouter = router({
         })
       )
       .mutation(({ input, ctx }) => updateStore(ctx.user.id, input)),
+
+    acceptTerms: protectedProcedure
+      .input(z.object({ acceptSellerTerms: z.literal(true) }))
+      .mutation(async ({ ctx }) => {
+        const store = await getStoreByUserId(ctx.user.id);
+        if (!store) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Open your store first",
+          });
+        }
+        return updateStore(ctx.user.id, {
+          paymentMethods: ["card"],
+          sellerTermsVersion: MARKETPLACE_TERMS_VERSION,
+          sellerTermsAcceptedAt: new Date(),
+        });
+      }),
 
     bySlug: publicProcedure
       .input(z.object({ slug: z.string().min(1).max(140) }))
@@ -1150,9 +1175,22 @@ export const appRouter = router({
     connectStatus: protectedProcedure.query(async ({ ctx }) => {
       const store = await getStoreByUserId(ctx.user.id);
       if (!store)
-        return { hasStore: false, connected: false, payoutsEnabled: false };
+        return {
+          hasStore: false,
+          connected: false,
+          payoutsEnabled: false,
+          termsAccepted: false,
+        };
+      const termsAccepted =
+        !!store.sellerTermsAcceptedAt &&
+        store.sellerTermsVersion === MARKETPLACE_TERMS_VERSION;
       if (!store.stripeAccountId || !stripeEnabled()) {
-        return { hasStore: true, connected: false, payoutsEnabled: false };
+        return {
+          hasStore: true,
+          connected: false,
+          payoutsEnabled: false,
+          termsAccepted,
+        };
       }
       try {
         const status = await getAccountStatus(store.stripeAccountId);
@@ -1166,12 +1204,14 @@ export const appRouter = router({
           connected: true,
           payoutsEnabled: status.payoutsEnabled,
           detailsSubmitted: status.detailsSubmitted,
+          termsAccepted,
         };
       } catch {
         return {
           hasStore: true,
           connected: true,
           payoutsEnabled: store.stripePayoutsEnabled,
+          termsAccepted,
         };
       }
     }),
