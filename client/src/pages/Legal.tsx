@@ -20,7 +20,15 @@ const privacySections = [
   ],
   [
     "Third-party services",
-    "Card and market data may come from Scrydex, Pokémon TCG API and linked retailers. Their own privacy terms apply when you leave RarityGrid.",
+    "Card and market data may come from Scrydex, Pokémon TCG API and linked retailers. Advertising may be provided by Google AdSense. These providers process information under their own privacy terms.",
+  ],
+  [
+    "Advertising, cookies and device data",
+    "RarityGrid uses Google AdSense to fund public content. Google and its advertising partners may use cookies, local storage, device identifiers, IP address, page activity and ad interactions to select, deliver, measure and protect advertising.",
+  ],
+  [
+    "Consent and privacy controls",
+    "Where required, visitors receive consent or opt-out controls before personalized advertising is used. Choices can be revisited through the privacy message, and Google advertising preferences can be managed through Google My Ad Center.",
   ],
   [
     "Your choices",
