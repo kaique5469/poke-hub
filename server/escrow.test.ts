@@ -8,6 +8,7 @@ import {
   wasEventProcessed,
   recordEvent,
   getOrdersDueForRelease,
+  reconcileExpiredCheckoutReservations,
 } from "./storeDb";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -16,7 +17,10 @@ function ctxFor(user: AuthenticatedUser | null): TrpcContext {
   return {
     user,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
-    res: { clearCookie: () => {}, cookie: () => {} } as unknown as TrpcContext["res"],
+    res: {
+      clearCookie: () => {},
+      cookie: () => {},
+    } as unknown as TrpcContext["res"],
   };
 }
 
@@ -32,7 +36,12 @@ const buyer: AuthenticatedUser = {
   lastSignedIn: new Date(),
 };
 
-const admin: AuthenticatedUser = { ...buyer, id: 1, openId: "admin", role: "admin" };
+const admin: AuthenticatedUser = {
+  ...buyer,
+  id: 1,
+  openId: "admin",
+  role: "admin",
+};
 
 // ─── Fee math: always integer cents ──────────────────────────────────────────
 describe("sellerShareCents", () => {
@@ -70,9 +79,21 @@ describe("escrow safety without DB", () => {
     await expect(getOrdersDueForRelease()).resolves.toEqual([]);
   });
 
+  it("fails closed when reservation reconciliation has no database", async () => {
+    await expect(reconcileExpiredCheckoutReservations()).resolves.toEqual({
+      checked: 0,
+      paid: 0,
+      cancelled: 0,
+      pending: 0,
+      failedSessionIds: [],
+    });
+  });
+
   it("webhook idempotency helpers never throw", async () => {
     await expect(wasEventProcessed("evt_test_1")).resolves.toBe(false);
-    await expect(recordEvent("evt_test_1", "checkout.session.completed")).resolves.toBeUndefined();
+    await expect(
+      recordEvent("evt_test_1", "checkout.session.completed")
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -80,17 +101,23 @@ describe("escrow safety without DB", () => {
 describe("orders.confirmReceipt", () => {
   it("rejects unauthenticated callers", async () => {
     const caller = appRouter.createCaller(ctxFor(null));
-    await expect(caller.orders.confirmReceipt({ orderId: 1 })).rejects.toThrow();
+    await expect(
+      caller.orders.confirmReceipt({ orderId: 1 })
+    ).rejects.toThrow();
   });
 
   it("rejects when the order does not belong to the caller / does not exist", async () => {
     const caller = appRouter.createCaller(ctxFor(buyer));
-    await expect(caller.orders.confirmReceipt({ orderId: 999999 })).rejects.toThrow(/not found/i);
+    await expect(
+      caller.orders.confirmReceipt({ orderId: 999999 })
+    ).rejects.toThrow(/not found/i);
   });
 
   it("rejects invalid orderId input", async () => {
     const caller = appRouter.createCaller(ctxFor(buyer));
-    await expect(caller.orders.confirmReceipt({ orderId: -1 })).rejects.toThrow();
+    await expect(
+      caller.orders.confirmReceipt({ orderId: -1 })
+    ).rejects.toThrow();
   });
 });
 
@@ -109,6 +136,27 @@ describe("marketplace payment guards", () => {
         status: "paid",
       })
     ).rejects.toThrow();
+  });
+
+  it("requires structured evidence before opening a dispute", async () => {
+    const caller = appRouter.createCaller(ctxFor(buyer));
+    await expect(
+      caller.orders.updateStatus({
+        orderId: 1,
+        status: "disputed",
+      })
+    ).rejects.toThrow(/reason|details/i);
+  });
+
+  it("requires a carrier and tracking number before shipping", async () => {
+    const caller = appRouter.createCaller(ctxFor(buyer));
+    await expect(
+      caller.orders.updateStatus({
+        orderId: 1,
+        status: "shipped",
+        trackingNumber: "9400111899223856928499",
+      })
+    ).rejects.toThrow(/carrier/i);
   });
 
   it("requires explicit buyer acceptance at secure checkout", async () => {
@@ -132,7 +180,7 @@ describe("escrow admin router", () => {
   it("blocks non-admin users from resolveDispute", async () => {
     const caller = appRouter.createCaller(ctxFor(buyer));
     await expect(
-      caller.escrow.resolveDispute({ orderId: 1, resolution: "refund_buyer" }),
+      caller.escrow.resolveDispute({ orderId: 1, resolution: "refund_buyer" })
     ).rejects.toThrow();
   });
 
@@ -141,7 +189,12 @@ describe("escrow admin router", () => {
     await expect(caller.escrow.overview()).resolves.toEqual({
       held: [],
       disputed: [],
+      needsShipment: [],
+      reports: [],
+      connectNeedsAction: [],
       ledger: [],
+      failedPayouts: [],
+      events: [],
       totals: { heldCents: 0, releasedCents: 0 },
     });
   });
@@ -150,7 +203,14 @@ describe("escrow admin router", () => {
     const caller = appRouter.createCaller(ctxFor(admin));
     await expect(
       // @ts-expect-error — invalid enum on purpose
-      caller.escrow.resolveDispute({ orderId: 1, resolution: "keep_money" }),
+      caller.escrow.resolveDispute({ orderId: 1, resolution: "keep_money" })
+    ).rejects.toThrow();
+  });
+
+  it("blocks non-admin users from moderating marketplace reports", async () => {
+    const caller = appRouter.createCaller(ctxFor(buyer));
+    await expect(
+      caller.escrow.updateReport({ reportId: 1, status: "resolved" })
     ).rejects.toThrow();
   });
 });

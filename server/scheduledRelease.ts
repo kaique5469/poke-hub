@@ -10,17 +10,19 @@
 import type { Request, Response } from "express";
 import { ENV } from "./_core/env";
 import {
-  cancelExpiredCheckoutReservations,
   getOrdersDueForRelease,
+  reconcileExpiredCheckoutReservations,
   releaseOrder,
 } from "./storeDb";
 
 export async function autoReleaseHandler(req: Request, res: Response) {
   if (!ENV.cronSecret || req.headers["x-cron-secret"] !== ENV.cronSecret) {
-    return res.status(403).json({ error: "cron-only endpoint (x-cron-secret inválido)" });
+    return res
+      .status(403)
+      .json({ error: "cron-only endpoint (x-cron-secret inválido)" });
   }
 
-  const expiredReservations = await cancelExpiredCheckoutReservations();
+  const reservations = await reconcileExpiredCheckoutReservations();
   const due = await getOrdersDueForRelease();
   let released = 0;
   const failures: number[] = [];
@@ -32,9 +34,11 @@ export async function autoReleaseHandler(req: Request, res: Response) {
       console.error(`[auto-release] order #${o.id} failed:`, e);
     }
   }
-  console.log(`[auto-release] due=${due.length} released=${released} failed=${failures.length}`);
+  console.log(
+    `[auto-release] due=${due.length} released=${released} failed=${failures.length}`
+  );
   return res.json({
-    expiredReservations,
+    reservations,
     due: due.length,
     released,
     failures,

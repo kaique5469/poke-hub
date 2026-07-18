@@ -18,7 +18,9 @@ export function stripeEnabled(): boolean {
 /** form-encode nested params the way Stripe expects (a[b][c]=v) */
 function encode(params: Record<string, string | number>): string {
   return Object.entries(params)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .map(
+      ([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`
+    )
     .join("&");
 }
 
@@ -70,7 +72,11 @@ export async function createCheckoutSession(opts: {
     },
     body: encode(params),
   });
-  const data = (await res.json()) as { id?: string; url?: string; error?: { message?: string } };
+  const data = (await res.json()) as {
+    id?: string;
+    url?: string;
+    error?: { message?: string };
+  };
   if (!res.ok || !data.id || !data.url) {
     throw new Error(data.error?.message ?? `Stripe error (${res.status})`);
   }
@@ -99,12 +105,15 @@ export interface StripePaymentDetails {
  * Verify a Stripe webhook signature (v1 scheme) and return the parsed event.
  * Returns null when the signature is invalid or the timestamp is too old.
  */
-export function verifyWebhook(payload: Buffer, sigHeader: string | undefined): StripeEvent | null {
+export function verifyWebhook(
+  payload: Buffer,
+  sigHeader: string | undefined
+): StripeEvent | null {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret || !sigHeader) return null;
 
   const parts = Object.fromEntries(
-    sigHeader.split(",").map((p) => p.split("=") as [string, string]),
+    sigHeader.split(",").map(p => p.split("=") as [string, string])
   );
   const t = parts["t"];
   const v1 = parts["v1"];
@@ -135,15 +144,18 @@ async function stripeGet(path: string): Promise<Record<string, unknown>> {
   const res = await fetch(`${API}${path}`, {
     headers: { Authorization: `Bearer ${key()}` },
   });
-  const data = (await res.json()) as Record<string, unknown> & { error?: { message?: string } };
-  if (!res.ok) throw new Error(data.error?.message ?? `Stripe error (${res.status})`);
+  const data = (await res.json()) as Record<string, unknown> & {
+    error?: { message?: string };
+  };
+  if (!res.ok)
+    throw new Error(data.error?.message ?? `Stripe error (${res.status})`);
   return data;
 }
 
 async function stripePost(
   path: string,
   params: Record<string, string | number>,
-  idempotencyKey?: string,
+  idempotencyKey?: string
 ): Promise<Record<string, unknown>> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${key()}`,
@@ -155,13 +167,47 @@ async function stripePost(
     headers,
     body: encode(params),
   });
-  const data = (await res.json()) as Record<string, unknown> & { error?: { message?: string } };
-  if (!res.ok) throw new Error(data.error?.message ?? `Stripe error (${res.status})`);
+  const data = (await res.json()) as Record<string, unknown> & {
+    error?: { message?: string };
+  };
+  if (!res.ok)
+    throw new Error(data.error?.message ?? `Stripe error (${res.status})`);
   return data;
 }
 
+export interface CheckoutSessionStatus {
+  status: "open" | "complete" | "expired";
+  paymentStatus: "paid" | "unpaid" | "no_payment_required";
+}
+
+/**
+ * Used by the reservation safety job before restoring inventory. A local
+ * timeout alone is not proof that Stripe did not receive the payment.
+ */
+export async function getCheckoutSessionStatus(
+  sessionId: string
+): Promise<CheckoutSessionStatus> {
+  const data = await stripeGet(`/checkout/sessions/${sessionId}`);
+  const status = data.status;
+  const paymentStatus = data.payment_status;
+  if (!["open", "complete", "expired"].includes(String(status))) {
+    throw new Error("Stripe returned an unknown Checkout Session status");
+  }
+  if (
+    !["paid", "unpaid", "no_payment_required"].includes(String(paymentStatus))
+  ) {
+    throw new Error("Stripe returned an unknown payment status");
+  }
+  return {
+    status: status as CheckoutSessionStatus["status"],
+    paymentStatus: paymentStatus as CheckoutSessionStatus["paymentStatus"],
+  };
+}
+
 /** Create an Express connected account for a seller. Returns the account id. */
-export async function createConnectAccount(email?: string | null): Promise<string> {
+export async function createConnectAccount(
+  email?: string | null
+): Promise<string> {
   const params: Record<string, string | number> = {
     type: "express",
     "capabilities[transfers][requested]": "true",
@@ -172,7 +218,10 @@ export async function createConnectAccount(email?: string | null): Promise<strin
 }
 
 /** One-time onboarding link for an Express account. */
-export async function createAccountLink(accountId: string, origin: string): Promise<string> {
+export async function createAccountLink(
+  accountId: string,
+  origin: string
+): Promise<string> {
   const data = await stripePost("/account_links", {
     account: accountId,
     refresh_url: `${origin}/dashboard?connect=refresh`,
@@ -187,7 +236,9 @@ export interface ConnectStatus {
   detailsSubmitted: boolean;
 }
 
-export async function getAccountStatus(accountId: string): Promise<ConnectStatus> {
+export async function getAccountStatus(
+  accountId: string
+): Promise<ConnectStatus> {
   const data = await stripeGet(`/accounts/${accountId}`);
   return {
     payoutsEnabled: !!data.payouts_enabled,
@@ -199,20 +250,20 @@ export async function getAccountStatus(accountId: string): Promise<ConnectStatus
 export async function getSessionPaymentDetails(
   sessionId: string
 ): Promise<StripePaymentDetails> {
-  const data = await stripeGet(`/checkout/sessions/${sessionId}?expand[]=payment_intent`);
+  const data = await stripeGet(
+    `/checkout/sessions/${sessionId}?expand[]=payment_intent`
+  );
   const pi = data.payment_intent as { latest_charge?: string } | null;
-  const collected = data.collected_information as
-    | { shipping_details?: StripeShippingDetails | null }
-    | null;
+  const collected = data.collected_information as {
+    shipping_details?: StripeShippingDetails | null;
+  } | null;
   // `shipping_details` is retained as a compatibility fallback for older
   // Stripe API versions while current versions use collected_information.
   const shipping =
     collected?.shipping_details ??
     (data.shipping_details as StripeShippingDetails | null | undefined) ??
     null;
-  const customer = data.customer_details as
-    | { phone?: string | null }
-    | null;
+  const customer = data.customer_details as { phone?: string | null } | null;
   const address = shipping?.address;
   return {
     chargeId: pi?.latest_charge ?? null,
@@ -257,13 +308,17 @@ export async function createTransfer(opts: {
   description: string;
   idempotencyKey?: string;
 }): Promise<string> {
-  const data = await stripePost("/transfers", {
-    amount: opts.amountCents,
-    currency: "usd",
-    destination: opts.destination,
-    source_transaction: opts.sourceCharge,
-    description: opts.description,
-  }, opts.idempotencyKey);
+  const data = await stripePost(
+    "/transfers",
+    {
+      amount: opts.amountCents,
+      currency: "usd",
+      destination: opts.destination,
+      source_transaction: opts.sourceCharge,
+      description: opts.description,
+    },
+    opts.idempotencyKey
+  );
   return data.id as string;
 }
 

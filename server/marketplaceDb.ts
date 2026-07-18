@@ -23,6 +23,7 @@ import {
   cartItems,
   listings,
   notifications,
+  orderEvents,
   orders,
   productListings,
   products,
@@ -34,7 +35,11 @@ import {
   type InsertProduct,
   type InsertWantListItem,
 } from "../drizzle/schema";
-import { MARKETPLACE_TERMS_VERSION } from "@shared/marketplace";
+import {
+  MARKETPLACE_TERMS_VERSION,
+  type OrderDisputeReason,
+} from "@shared/marketplace";
+import type { TrackingCarrier } from "@shared/tracking";
 import { getDb } from "./db";
 
 type Condition = "M" | "NM" | "SP" | "MP" | "HP" | "D";
@@ -348,10 +353,7 @@ export async function getProductListings(productId: number) {
     .select({ listing: productListings, ...sellerCols })
     .from(productListings)
     .leftJoin(users, eq(productListings.sellerId, users.id))
-    .innerJoin(
-      sellerStores,
-      eq(productListings.sellerId, sellerStores.userId)
-    )
+    .innerJoin(sellerStores, eq(productListings.sellerId, sellerStores.userId))
     .where(
       and(
         eq(productListings.productId, productId),
@@ -568,12 +570,7 @@ export async function checkoutCart(
         const [readyStore] = await tx
           .select({ userId: sellerStores.userId })
           .from(sellerStores)
-          .where(
-            and(
-              eq(sellerStores.userId, l.sellerId),
-              readyStoreWhere()
-            )
-          )
+          .where(and(eq(sellerStores.userId, l.sellerId), readyStoreWhere()))
           .limit(1);
         if (!readyStore) {
           skipped.push({
@@ -628,12 +625,7 @@ export async function checkoutCart(
         const [readyStore] = await tx
           .select({ userId: sellerStores.userId })
           .from(sellerStores)
-          .where(
-            and(
-              eq(sellerStores.userId, pl.sellerId),
-              readyStoreWhere()
-            )
-          )
+          .where(and(eq(sellerStores.userId, pl.sellerId), readyStoreWhere()))
           .limit(1);
         if (!readyStore) {
           skipped.push({
@@ -682,6 +674,10 @@ const orderJoinCols = {
   productListing: productListings,
   productName: products.name,
   productImageUrl: products.imageUrl,
+  hasReview: sql<boolean>`exists (
+    select 1 from ${sellerReviews}
+    where ${sellerReviews.orderId} = ${orders.id}
+  )`,
 } as const;
 
 export async function getBuyerOrders(buyerId: number) {
@@ -743,7 +739,12 @@ export async function updateOrderStatus(
   orderId: number,
   userId: number,
   newStatus: "shipped" | "delivered" | "cancelled" | "disputed",
-  trackingNumber?: string
+  options?: {
+    trackingNumber?: string;
+    trackingCarrier?: TrackingCarrier;
+    disputeReason?: OrderDisputeReason;
+    disputeDetails?: string;
+  }
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -769,16 +770,23 @@ export async function updateOrderStatus(
       );
     }
 
-    if (
-      newStatus === "cancelled" &&
-      order.paymentStatus === "processing"
-    ) {
+    if (newStatus === "cancelled" && order.paymentStatus === "processing") {
       throw new Error(
         "Secure checkout is still in progress. The reservation will cancel automatically if payment expires."
       );
     }
-    if (newStatus === "shipped" && !trackingNumber?.trim()) {
-      throw new Error("A tracking number is required before marking an order shipped");
+    if (newStatus === "shipped" && !options?.trackingNumber?.trim()) {
+      throw new Error(
+        "A tracking number is required before marking an order shipped"
+      );
+    }
+    if (newStatus === "shipped" && !options?.trackingCarrier) {
+      throw new Error(
+        "Select the shipping carrier before marking an order shipped"
+      );
+    }
+    if (newStatus === "disputed" && !options?.disputeReason) {
+      throw new Error("Select a reason for the dispute");
     }
 
     // ESCROW: once the payout was released to the seller, disputes go through
@@ -793,10 +801,48 @@ export async function updateOrderStatus(
       .update(orders)
       .set({
         status: newStatus,
-        trackingNumber: trackingNumber?.trim() || order.trackingNumber,
-        ...(newStatus === "cancelled" ? { payoutStatus: "refunded" as const } : {}),
+        trackingNumber: options?.trackingNumber?.trim() || order.trackingNumber,
+        trackingCarrier: options?.trackingCarrier || order.trackingCarrier,
+        ...(newStatus === "shipped" ? { shippedAt: new Date() } : {}),
+        ...(newStatus === "disputed"
+          ? {
+              disputeReason: options?.disputeReason,
+              disputeDetails: options?.disputeDetails?.trim() || null,
+              disputeOpenedAt: new Date(),
+            }
+          : {}),
+        ...(newStatus === "cancelled"
+          ? { payoutStatus: "refunded" as const }
+          : {}),
       })
       .where(eq(orders.id, orderId));
+
+    await tx.insert(orderEvents).values({
+      orderId,
+      actorUserId: userId,
+      actorType: isSeller ? "seller" : "buyer",
+      eventType:
+        newStatus === "shipped"
+          ? "shipment_created"
+          : newStatus === "disputed"
+            ? "dispute_opened"
+            : "status_changed",
+      fromStatus: order.status,
+      toStatus: newStatus,
+      note:
+        newStatus === "disputed"
+          ? options?.disputeDetails?.trim() || options?.disputeReason
+          : undefined,
+      metadata:
+        newStatus === "shipped"
+          ? {
+              carrier: options?.trackingCarrier,
+              trackingNumber: options?.trackingNumber?.trim(),
+            }
+          : newStatus === "disputed"
+            ? { reason: options?.disputeReason }
+            : undefined,
+    });
 
     // ESCROW schedule:
     //  - shipped   → fallback auto-release in 21 days (protects seller if buyer never confirms)
@@ -880,7 +926,8 @@ export async function addSellerReview(
       .select()
       .from(orders)
       .where(eq(orders.id, orderId))
-      .limit(1);
+      .limit(1)
+      .for("update");
     if (!order) throw new Error("Order not found");
     if (order.buyerId !== reviewerId)
       throw new Error("Only the buyer can review this order");
