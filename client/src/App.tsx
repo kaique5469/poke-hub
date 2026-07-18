@@ -110,8 +110,9 @@ function Router() {
           <Route path="/sell-card" component={SellCard} />
           <Route path="/open-store" component={OpenStore} />
           <Route path="/store/:slug" component={StorePage} />
-          <Route path="/profile/:username" component={PlayerProfile} />
           <Route path="/profile/edit" component={ProfileEdit} />
+          <Route path="/profile" component={ProfileEdit} />
+          <Route path="/profile/:username" component={PlayerProfile} />
           <Route path="/dashboard" component={UserDashboard} />
           <Route path="/admin/escrow" component={AdminEscrow} />
           <Route path="/account" component={UserDashboard} />

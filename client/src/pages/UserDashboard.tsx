@@ -249,6 +249,9 @@ export default function UserDashboard() {
     user?.username ??
     user?.name?.toLowerCase().replace(/[^a-z0-9]+/g, "-") ??
     "trainer";
+  const publicProfileHref = user?.username
+    ? `/profile/${encodeURIComponent(user.username)}`
+    : "/profile/edit";
 
   return (
     <main className="min-h-screen bg-[#f6f7fb]">
@@ -286,7 +289,7 @@ export default function UserDashboard() {
                 Edit profile
               </Button>
             </Link>
-            <Link href={`/profile/${username}`}>
+            <Link href={publicProfileHref}>
               <Button className="gap-2">
                 <Eye className="h-4 w-4" />
                 Public profile

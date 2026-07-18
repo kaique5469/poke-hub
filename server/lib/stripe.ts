@@ -210,6 +210,7 @@ export async function createConnectAccount(
 ): Promise<string> {
   const params: Record<string, string | number> = {
     type: "express",
+    "capabilities[card_payments][requested]": "true",
     "capabilities[transfers][requested]": "true",
   };
   if (email) params["email"] = email;

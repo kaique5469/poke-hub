@@ -1,7 +1,16 @@
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { BookOpen, Check, Copy, Database, Globe, Lock, Trophy, User } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  Copy,
+  Database,
+  Globe,
+  Lock,
+  Trophy,
+  User,
+} from "lucide-react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +27,9 @@ export default function PlayerProfile() {
     { enabled: !!username }
   );
 
-  const isOwner = false; // openId not exposed in public profile
+  const isOwner = Boolean(
+    currentUser?.username && currentUser.username === profile?.username
+  );
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -41,7 +52,10 @@ export default function PlayerProfile() {
           </div>
           <div className="grid grid-cols-3 gap-4 mb-8">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-card border border-border rounded-xl p-5 animate-pulse">
+              <div
+                key={i}
+                className="bg-card border border-border rounded-xl p-5 animate-pulse"
+              >
                 <div className="h-6 bg-muted rounded w-1/2 mb-1" />
                 <div className="h-3.5 bg-muted rounded w-2/3" />
               </div>
@@ -56,9 +70,15 @@ export default function PlayerProfile() {
     return (
       <div className="container py-20 text-center">
         <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-foreground mb-2">Player Not Found</h2>
-        <p className="text-muted-foreground mb-6">This player profile doesn't exist or hasn't been set up yet.</p>
-        <Button asChild variant="outline"><Link href="/">Go Home</Link></Button>
+        <h2 className="text-xl font-bold text-foreground mb-2">
+          Player Not Found
+        </h2>
+        <p className="text-muted-foreground mb-6">
+          This player profile doesn't exist or hasn't been set up yet.
+        </p>
+        <Button asChild variant="outline">
+          <Link href="/">Go Home</Link>
+        </Button>
       </div>
     );
   }
@@ -83,14 +103,18 @@ export default function PlayerProfile() {
                   {profile.name ?? profile.username}
                 </h1>
                 <Badge variant="secondary" className="text-[10px] gap-1">
-                    <Globe className="w-2.5 h-2.5" /> Public
-                  </Badge>
+                  <Globe className="w-2.5 h-2.5" /> Public
+                </Badge>
               </div>
               {profile.username && (
-                <p className="text-sm text-muted-foreground">@{profile.username}</p>
+                <p className="text-sm text-muted-foreground">
+                  @{profile.username}
+                </p>
               )}
               {profile.bio && (
-                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{profile.bio}</p>
+                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                  {profile.bio}
+                </p>
               )}
             </div>
 
@@ -102,11 +126,19 @@ export default function PlayerProfile() {
                 onClick={handleCopyLink}
                 className="gap-1.5"
               >
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? (
+                  <Check className="w-3.5 h-3.5" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
                 {copied ? "Copied!" : "Share"}
               </Button>
               {isOwner && (
-                <Button size="sm" asChild className="bg-primary text-primary-foreground gap-1.5">
+                <Button
+                  size="sm"
+                  asChild
+                  className="bg-primary text-primary-foreground gap-1.5"
+                >
                   <Link href="/profile/edit">Edit Profile</Link>
                 </Button>
               )}
@@ -117,7 +149,9 @@ export default function PlayerProfile() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-card border border-border rounded-xl p-5">
-            <p className="text-2xl font-bold text-foreground font-display">{profile.publicDecks?.length ?? 0}</p>
+            <p className="text-2xl font-bold text-foreground font-display">
+              {profile.publicDecks?.length ?? 0}
+            </p>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
               <BookOpen className="w-3.5 h-3.5" /> Decks Built
             </p>
@@ -145,27 +179,43 @@ export default function PlayerProfile() {
               </h3>
             </div>
             <div className="divide-y divide-border">
-              {profile.publicDecks.map((deck: { id: number; name: string; format: string; cardCount: number; estimatedCostUsd?: string | number | null }) => (
-                <Link key={deck.id} href={`/decks/${deck.id}`}>
-                  <div className="px-5 py-4 flex items-center gap-4 hover:bg-accent/20 transition-colors cursor-pointer">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground text-sm truncate">{deck.name}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{deck.format} · {deck.cardCount} cards</p>
+              {profile.publicDecks.map(
+                (deck: {
+                  id: number;
+                  name: string;
+                  format: string;
+                  cardCount: number;
+                  estimatedCostUsd?: string | number | null;
+                }) => (
+                  <Link key={deck.id} href={`/decks/${deck.id}`}>
+                    <div className="px-5 py-4 flex items-center gap-4 hover:bg-accent/20 transition-colors cursor-pointer">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground text-sm truncate">
+                          {deck.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {deck.format} · {deck.cardCount} cards
+                        </p>
+                      </div>
+                      {deck.estimatedCostUsd && (
+                        <p className="text-sm font-bold text-primary shrink-0">
+                          $
+                          {parseFloat(String(deck.estimatedCostUsd)).toFixed(2)}
+                        </p>
+                      )}
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] shrink-0"
+                      >
+                        View
+                      </Badge>
                     </div>
-                    {deck.estimatedCostUsd && (
-                      <p className="text-sm font-bold text-primary shrink-0">
-                        ${parseFloat(String(deck.estimatedCostUsd)).toFixed(2)}
-                      </p>
-                    )}
-                    <Badge variant="secondary" className="text-[10px] shrink-0">View</Badge>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                )
+              )}
             </div>
           </div>
         )}
-
-
       </div>
     </div>
   );

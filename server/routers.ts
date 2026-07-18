@@ -748,7 +748,10 @@ export const appRouter = router({
           }
         }
         await updateUserProfile(user.id, input);
-        return { success: true };
+        return {
+          success: true,
+          username: input.username ?? user.username,
+        };
       }),
   }),
 
