@@ -26,6 +26,7 @@ import {
   Settings,
   BarChart2,
   Gamepad2,
+  Camera,
 } from "lucide-react";
 import ArenaLogo from "@/components/ArenaLogo";
 import GlobalSearch from "@/components/GlobalSearch";
@@ -138,6 +139,12 @@ const navSections = [
         href: "/cards",
         icon: <Search size={16} />,
         desc: "Search all 15,000+ cards",
+      },
+      {
+        label: "Card Scanner",
+        href: "/scanner",
+        icon: <Camera size={16} />,
+        desc: "Identify a card from a photo",
       },
       {
         label: "Editions / Sets",
@@ -415,6 +422,15 @@ export default function Navbar() {
               </span>
             </Link>
             <Link
+              href="/scanner"
+              className="hover:opacity-100 transition-opacity flex items-center gap-1"
+            >
+              Card Scanner
+              <span className="text-[9px] font-black bg-cyan-300 text-cyan-950 rounded-full px-1.5 py-px leading-tight">
+                NEW
+              </span>
+            </Link>
+            <Link
               href="/articles"
               className="hover:opacity-100 transition-opacity"
             >
@@ -623,6 +639,11 @@ export default function Navbar() {
                             href: "/profile",
                             icon: <User size={15} />,
                             label: "My Profile",
+                          },
+                          {
+                            href: "/scanner",
+                            icon: <Camera size={15} />,
+                            label: "Card Scanner",
                           },
                           {
                             href: "/binder",

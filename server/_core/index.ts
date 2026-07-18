@@ -25,6 +25,7 @@ import {
 } from "../storeDb";
 import { registerSeoRoutes } from "../seo";
 import { CONTENT_SECURITY_POLICY } from "../securityHeaders";
+import { registerScannerRoutes } from "../scannerRoutes";
 
 const apiBuckets = new Map<
   string,
@@ -94,7 +95,7 @@ async function startServer() {
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader(
       "Permissions-Policy",
-      "camera=(), microphone=(), geolocation=(), payment=(self)"
+      "camera=(self), microphone=(), geolocation=(), payment=(self)"
     );
     res.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
     if (ENV.isProduction) {
@@ -143,6 +144,10 @@ async function startServer() {
       }
     }
   );
+
+  // Scanner images use a small dedicated binary endpoint. It is registered
+  // before the global JSON parser so photos never become oversized JSON.
+  registerScannerRoutes(app);
 
   // API payloads are textual. Large binary uploads must use a dedicated route
   // instead of making every endpoint accept an excessive request body.
