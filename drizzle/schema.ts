@@ -77,6 +77,11 @@ export const binderCards = mysqlTable("binder_cards", {
     .notNull(),
   language: varchar("language", { length: 32 }).default("English"),
   priceUsd: decimal("priceUsd", { precision: 10, scale: 2 }),
+  purchasePriceUsd: decimal("purchasePriceUsd", { precision: 10, scale: 2 }),
+  acquiredAt: timestamp("acquiredAt"),
+  acquisitionSource: varchar("acquisitionSource", { length: 32 }),
+  gradingCompany: varchar("gradingCompany", { length: 16 }),
+  grade: decimal("grade", { precision: 3, scale: 1 }),
   notes: text("notes"),
   addedAt: timestamp("addedAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -84,6 +89,19 @@ export const binderCards = mysqlTable("binder_cards", {
 
 export type BinderCard = typeof binderCards.$inferSelect;
 export type InsertBinderCard = typeof binderCards.$inferInsert;
+
+export const portfolioSnapshots = mysqlTable("portfolio_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  totalValueUsd: decimal("totalValueUsd", {
+    precision: 14,
+    scale: 2,
+  }).notNull(),
+  totalCostUsd: decimal("totalCostUsd", { precision: 14, scale: 2 }).notNull(),
+  cardCount: int("cardCount").notNull(),
+  pricedCards: int("pricedCards").notNull(),
+  recordedAt: timestamp("recordedAt").defaultNow().notNull(),
+});
 
 // ─── Decks ────────────────────────────────────────────────────────────────────
 

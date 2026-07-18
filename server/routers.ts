@@ -420,13 +420,30 @@ export const appRouter = router({
           rarity: z.string().optional(),
           quantity: z.number().int().min(1).max(99).default(1),
           condition: z.enum(["M", "NM", "SP", "MP", "HP", "D"]).default("NM"),
+          purchasePriceUsd: z.number().min(0).max(1_000_000).optional(),
+          acquiredAt: z.coerce.date().optional(),
+          acquisitionSource: z
+            .enum(["purchase", "trade", "gift", "pull", "other"])
+            .optional(),
+          gradingCompany: z
+            .enum(["PSA", "BGS", "CGC", "SGC", "Other"])
+            .optional(),
+          grade: z.number().min(1).max(10).multipleOf(0.5).optional(),
           notes: z.string().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
-        await addBinderCard({ ...input, userId: user.id });
+        await addBinderCard({
+          ...input,
+          purchasePriceUsd:
+            input.purchasePriceUsd == null
+              ? null
+              : input.purchasePriceUsd.toFixed(2),
+          grade: input.grade == null ? null : input.grade.toFixed(1),
+          userId: user.id,
+        });
         return { success: true };
       }),
 
@@ -436,6 +453,28 @@ export const appRouter = router({
           id: z.number().int(),
           quantity: z.number().int().min(1).max(99).optional(),
           condition: z.enum(["M", "NM", "SP", "MP", "HP", "D"]).optional(),
+          purchasePriceUsd: z
+            .number()
+            .min(0)
+            .max(1_000_000)
+            .nullable()
+            .optional(),
+          acquiredAt: z.coerce.date().nullable().optional(),
+          acquisitionSource: z
+            .enum(["purchase", "trade", "gift", "pull", "other"])
+            .nullable()
+            .optional(),
+          gradingCompany: z
+            .enum(["PSA", "BGS", "CGC", "SGC", "Other"])
+            .nullable()
+            .optional(),
+          grade: z
+            .number()
+            .min(1)
+            .max(10)
+            .multipleOf(0.5)
+            .nullable()
+            .optional(),
           notes: z.string().optional(),
         })
       )
@@ -443,7 +482,14 @@ export const appRouter = router({
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
         const { id, ...data } = input;
-        await updateBinderCard(id, user.id, data);
+        await updateBinderCard(id, user.id, {
+          ...data,
+          purchasePriceUsd:
+            data.purchasePriceUsd == null
+              ? data.purchasePriceUsd
+              : data.purchasePriceUsd.toFixed(2),
+          grade: data.grade == null ? data.grade : data.grade.toFixed(1),
+        });
         return { success: true };
       }),
 
@@ -454,6 +500,72 @@ export const appRouter = router({
         if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
         await removeBinderCard(input.id, user.id);
         return { success: true };
+      }),
+
+    importCsv: protectedProcedure
+      .input(
+        z.object({
+          rows: z
+            .array(
+              z.object({
+                cardId: z.string().trim().min(1).max(64),
+                quantity: z.number().int().min(1).max(99).default(1),
+                condition: z
+                  .enum(["M", "NM", "SP", "MP", "HP", "D"])
+                  .default("NM"),
+                purchasePriceUsd: z.number().min(0).max(1_000_000).optional(),
+                acquiredAt: z.coerce.date().optional(),
+                acquisitionSource: z
+                  .enum(["purchase", "trade", "gift", "pull", "other"])
+                  .optional(),
+                gradingCompany: z
+                  .enum(["PSA", "BGS", "CGC", "SGC", "Other"])
+                  .optional(),
+                grade: z.number().min(1).max(10).multipleOf(0.5).optional(),
+                notes: z.string().trim().max(500).optional(),
+              })
+            )
+            .min(1)
+            .max(100),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const canonical = await getCardsByIds(
+          Array.from(new Set(input.rows.map(row => row.cardId)))
+        );
+        const cards = new Map(canonical.map(card => [card.id, card]));
+        let imported = 0;
+        const rejected: Array<{ cardId: string; reason: string }> = [];
+        for (const row of input.rows) {
+          const card = cards.get(row.cardId);
+          if (!card) {
+            rejected.push({
+              cardId: row.cardId,
+              reason: "Card ID was not found in the canonical catalog",
+            });
+            continue;
+          }
+          const market = getPriceFromCard(card);
+          await addBinderCard({
+            ...row,
+            userId: user.id,
+            cardName: card.name,
+            setId: card.set.id,
+            setName: card.set.name,
+            imageUrl: card.images?.large ?? card.images?.small,
+            rarity: card.rarity,
+            priceUsd: market?.market == null ? null : market.market.toFixed(2),
+            purchasePriceUsd:
+              row.purchasePriceUsd == null
+                ? null
+                : row.purchasePriceUsd.toFixed(2),
+            grade: row.grade == null ? null : row.grade.toFixed(1),
+          });
+          imported += 1;
+        }
+        return { imported, rejected };
       }),
   }),
 

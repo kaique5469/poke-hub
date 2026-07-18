@@ -3,7 +3,7 @@ import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
 // ─── Mock DB helpers ──────────────────────────────────────────────────────────
-vi.mock("./db", async (importOriginal) => {
+vi.mock("./db", async importOriginal => {
   const actual = await importOriginal<typeof import("./db")>();
   return {
     ...actual,
@@ -102,6 +102,18 @@ describe("binder procedures", () => {
     expect(result.success).toBe(true);
   });
 
+  it("stores collector cost basis fields", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.binder.update({
+      id: 1,
+      purchasePriceUsd: 12.5,
+      acquisitionSource: "purchase",
+      gradingCompany: "PSA",
+      grade: 9.5,
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("removes a card from the binder", async () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.binder.remove({ id: 1 });
@@ -118,7 +130,24 @@ describe("binder procedures", () => {
   it("rejects add with quantity over 99", async () => {
     const caller = appRouter.createCaller(makeCtx());
     await expect(
-      caller.binder.add({ cardId: "sv1-1", cardName: "Bulbasaur", quantity: 100 })
+      caller.binder.add({
+        cardId: "sv1-1",
+        cardName: "Bulbasaur",
+        quantity: 100,
+      })
+    ).rejects.toThrow();
+  });
+
+  it("caps CSV imports at 100 rows", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(
+      caller.binder.importCsv({
+        rows: Array.from({ length: 101 }, (_, index) => ({
+          cardId: `sv1-${index + 1}`,
+          quantity: 1,
+          condition: "NM" as const,
+        })),
+      })
     ).rejects.toThrow();
   });
 });
@@ -145,7 +174,11 @@ describe("deck procedures", () => {
   it("rejects an invalid format", async () => {
     const caller = appRouter.createCaller(makeCtx());
     await expect(
-      caller.decks.create({ name: "My Deck", format: "invalid-format" as "standard", isPublic: false })
+      caller.decks.create({
+        name: "My Deck",
+        format: "invalid-format" as "standard",
+        isPublic: false,
+      })
     ).rejects.toThrow();
   });
 
