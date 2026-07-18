@@ -23,6 +23,7 @@ import {
   recordEvent,
 } from "../storeDb";
 import { registerSeoRoutes } from "../seo";
+import { CONTENT_SECURITY_POLICY } from "../securityHeaders";
 
 const apiBuckets = new Map<
   string,
@@ -95,18 +96,7 @@ async function startServer() {
     );
     res.setHeader(
       "Content-Security-Policy",
-      [
-        "default-src 'self'",
-        "script-src 'self'",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' data: https://fonts.gstatic.com",
-        "img-src 'self' data: blob: https:",
-        "connect-src 'self'",
-        "frame-src https://js.stripe.com https://hooks.stripe.com",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "frame-ancestors 'none'",
-      ].join("; ")
+      CONTENT_SECURITY_POLICY
     );
     if (ENV.isProduction) {
       res.setHeader(
