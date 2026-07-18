@@ -100,10 +100,14 @@ import {
   createStore,
   getEscrowOverview,
   getStoreBySlug,
+  getStoreTrustMetrics,
   getStoreByUserId,
   getStoreListings,
+  pauseSellerForSafety,
   releaseOrder,
   requireSellerReady,
+  submitMarketplaceReport,
+  updateMarketplaceReport,
   updateStore,
 } from "./storeDb";
 import { MARKETPLACE_TERMS_VERSION } from "@shared/marketplace";
@@ -1093,10 +1097,7 @@ export const appRouter = router({
           tagline: z.string().max(256).optional(),
           description: z.string().max(4000).optional(),
           location: z.string().max(128).optional(),
-          paymentMethods: z
-            .array(z.literal("card"))
-            .length(1)
-            .optional(),
+          paymentMethods: z.array(z.literal("card")).length(1).optional(),
           shipsFrom: z.string().max(128).optional(),
           handlingDays: z.number().int().min(1).max(10).optional(),
           shippingPolicy: z.string().max(4000).optional(),
@@ -1132,8 +1133,41 @@ export const appRouter = router({
             code: "NOT_FOUND",
             message: "Store not found",
           });
-        const listings = await getStoreListings(row.store.userId);
-        return { ...row, listings };
+        const [listings, trustMetrics] = await Promise.all([
+          getStoreListings(row.store.userId),
+          getStoreTrustMetrics(row.store.userId),
+        ]);
+        return { ...row, listings, trustMetrics };
+      }),
+
+    report: protectedProcedure
+      .input(
+        z.object({
+          storeId: z.number().int().positive(),
+          reason: z.enum([
+            "suspected_counterfeit",
+            "misleading_listing",
+            "prohibited_item",
+            "harassment",
+            "other",
+          ]),
+          details: z.string().trim().min(20).max(2000),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        try {
+          return await submitMarketplaceReport(ctx.user.id, {
+            targetType: "store",
+            targetId: input.storeId,
+            reason: input.reason,
+            details: input.details,
+          });
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error instanceof Error ? error.message : "Report failed",
+          });
+        }
       }),
 
     /** Start (or resume) Stripe Connect onboarding — returns the hosted URL. */
@@ -1254,6 +1288,29 @@ export const appRouter = router({
           });
         }
       }),
+
+    updateReport: adminProcedure
+      .input(
+        z.object({
+          reportId: z.number().int().positive(),
+          status: z.enum(["reviewing", "resolved", "dismissed"]),
+          adminNote: z.string().trim().max(2000).optional(),
+        })
+      )
+      .mutation(({ input }) =>
+        updateMarketplaceReport(input.reportId, input.status, input.adminNote)
+      ),
+
+    pauseSeller: adminProcedure
+      .input(
+        z.object({
+          sellerId: z.number().int().positive(),
+          reason: z.string().trim().min(10).max(1000),
+        })
+      )
+      .mutation(({ input }) =>
+        pauseSellerForSafety(input.sellerId, input.reason)
+      ),
   }),
 
   game: router({

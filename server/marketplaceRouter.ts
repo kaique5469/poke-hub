@@ -47,7 +47,11 @@ import {
   refundOrderMoney,
   requireSellerReady,
 } from "./storeDb";
-import { MARKETPLACE_TERMS_VERSION } from "@shared/marketplace";
+import {
+  MARKETPLACE_TERMS_VERSION,
+  ORDER_DISPUTE_REASONS,
+} from "@shared/marketplace";
+import { TRACKING_CARRIERS } from "@shared/tracking";
 import {
   createCheckoutSession,
   expireCheckoutSession,
@@ -290,7 +294,8 @@ export const cartRouter = router({
           ","
         )[0] ?? ctx.req.protocol;
       const origin = `${proto}://${ctx.req.get("host")}`;
-      let session: Awaited<ReturnType<typeof createCheckoutSession>> | null = null;
+      let session: Awaited<ReturnType<typeof createCheckoutSession>> | null =
+        null;
       try {
         session = await createCheckoutSession({
           amountUsd: result.totalUsd,
@@ -313,7 +318,10 @@ export const cartRouter = router({
       } catch (error) {
         if (session) {
           await expireCheckoutSession(session.id).catch(expireError =>
-            console.error("[stripe] failed to expire incomplete session", expireError)
+            console.error(
+              "[stripe] failed to expire incomplete session",
+              expireError
+            )
           );
         }
         await cancelReservedOrders(
@@ -352,17 +360,47 @@ export const ordersRouter = router({
 
   updateStatus: protectedProcedure
     .input(
-      z.object({
-        orderId: z.number().int().positive(),
-        status: z.enum(["shipped", "delivered", "cancelled", "disputed"]),
-        trackingNumber: z.string().max(256).optional(),
-      })
+      z
+        .object({
+          orderId: z.number().int().positive(),
+          status: z.enum(["shipped", "delivered", "cancelled", "disputed"]),
+          trackingNumber: z.string().trim().min(4).max(256).optional(),
+          trackingCarrier: z.enum(TRACKING_CARRIERS).optional(),
+          disputeReason: z.enum(ORDER_DISPUTE_REASONS).optional(),
+          disputeDetails: z.string().trim().min(10).max(2000).optional(),
+        })
+        .superRefine((value, ctx) => {
+          if (
+            value.status === "shipped" &&
+            (!value.trackingNumber || !value.trackingCarrier)
+          ) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Carrier and tracking number are required",
+            });
+          }
+          if (
+            value.status === "disputed" &&
+            (!value.disputeReason || !value.disputeDetails)
+          ) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Dispute reason and details are required",
+            });
+          }
+        })
     )
     .mutation(async ({ input, ctx }) => {
       if (input.status === "cancelled") {
         const order = await getOrderById(input.orderId);
-        if (!order || (order.buyerId !== ctx.user.id && order.sellerId !== ctx.user.id)) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+        if (
+          !order ||
+          (order.buyerId !== ctx.user.id && order.sellerId !== ctx.user.id)
+        ) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Order not found",
+          });
         }
         if (order.status === "paid") {
           if (order.sellerId !== ctx.user.id) {
@@ -375,12 +413,12 @@ export const ordersRouter = router({
         }
       }
       return rethrow(() =>
-        updateOrderStatus(
-          input.orderId,
-          ctx.user.id,
-          input.status,
-          input.trackingNumber
-        )
+        updateOrderStatus(input.orderId, ctx.user.id, input.status, {
+          trackingNumber: input.trackingNumber,
+          trackingCarrier: input.trackingCarrier,
+          disputeReason: input.disputeReason,
+          disputeDetails: input.disputeDetails,
+        })
       );
     }),
 

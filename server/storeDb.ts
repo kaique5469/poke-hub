@@ -3,11 +3,14 @@ import { and, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import {
   cartItems,
   listings,
+  marketplaceReports,
   notifications,
+  orderEvents,
   orders,
   payouts,
   productListings,
   products,
+  sellerReviews,
   sellerStores,
   users,
   webhookEvents,
@@ -18,6 +21,7 @@ import { getDb } from "./db";
 import {
   createRefund,
   createTransfer,
+  getCheckoutSessionStatus,
   getSessionPaymentDetails,
   stripeEnabled,
 } from "./lib/stripe";
@@ -55,9 +59,15 @@ export async function requireSellerReady(userId: number): Promise<SellerStore> {
     !store.sellerTermsAcceptedAt ||
     store.sellerTermsVersion !== MARKETPLACE_TERMS_VERSION
   ) {
-    throw new Error("Accept the current seller terms before publishing inventory");
+    throw new Error(
+      "Accept the current seller terms before publishing inventory"
+    );
   }
-  if (!stripeEnabled() || !store.stripeAccountId || !store.stripePayoutsEnabled) {
+  if (
+    !stripeEnabled() ||
+    !store.stripeAccountId ||
+    !store.stripePayoutsEnabled
+  ) {
     throw new Error("Complete Stripe payout setup before publishing inventory");
   }
   return store;
@@ -173,6 +183,174 @@ export async function getStoreListings(sellerId: number) {
   return { cards, products: prods };
 }
 
+/** Public performance summary built only from completed marketplace records. */
+export async function getStoreTrustMetrics(sellerId: number) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      successfulOrders: 0,
+      cancelledOrders: 0,
+      openDisputes: 0,
+      verifiedReviews: 0,
+    };
+  }
+  const [orderAgg, reviewAgg] = await Promise.all([
+    db
+      .select({
+        successfulOrders: sql<number>`sum(case when ${orders.status} = 'delivered' then 1 else 0 end)`,
+        cancelledOrders: sql<number>`sum(case when ${orders.status} = 'cancelled' then 1 else 0 end)`,
+        openDisputes: sql<number>`sum(case when ${orders.status} = 'disputed' then 1 else 0 end)`,
+      })
+      .from(orders)
+      .where(eq(orders.sellerId, sellerId)),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(sellerReviews)
+      .where(eq(sellerReviews.sellerId, sellerId)),
+  ]);
+  return {
+    successfulOrders: Number(orderAgg[0]?.successfulOrders ?? 0),
+    cancelledOrders: Number(orderAgg[0]?.cancelledOrders ?? 0),
+    openDisputes: Number(orderAgg[0]?.openDisputes ?? 0),
+    verifiedReviews: Number(reviewAgg[0]?.count ?? 0),
+  };
+}
+
+export type MarketplaceReportReason =
+  | "suspected_counterfeit"
+  | "misleading_listing"
+  | "prohibited_item"
+  | "harassment"
+  | "other";
+
+export type MarketplaceReportTarget =
+  "store" | "card_listing" | "product_listing" | "order";
+
+export async function submitMarketplaceReport(
+  reporterId: number,
+  input: {
+    targetType: MarketplaceReportTarget;
+    targetId: number;
+    reason: MarketplaceReportReason;
+    details: string;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  let sellerId: number | null = null;
+  if (input.targetType === "store") {
+    const [store] = await db
+      .select({ userId: sellerStores.userId })
+      .from(sellerStores)
+      .where(eq(sellerStores.id, input.targetId))
+      .limit(1);
+    if (!store) throw new Error("Store not found");
+    sellerId = store.userId;
+  } else if (input.targetType === "card_listing") {
+    const [listing] = await db
+      .select({ sellerId: listings.sellerId })
+      .from(listings)
+      .where(eq(listings.id, input.targetId))
+      .limit(1);
+    if (!listing) throw new Error("Listing not found");
+    sellerId = listing.sellerId;
+  } else if (input.targetType === "product_listing") {
+    const [listing] = await db
+      .select({ sellerId: productListings.sellerId })
+      .from(productListings)
+      .where(eq(productListings.id, input.targetId))
+      .limit(1);
+    if (!listing) throw new Error("Listing not found");
+    sellerId = listing.sellerId;
+  } else {
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, input.targetId))
+      .limit(1);
+    if (!order || ![order.buyerId, order.sellerId].includes(reporterId)) {
+      throw new Error("Order not found");
+    }
+    sellerId = order.sellerId;
+  }
+  if (sellerId === reporterId) {
+    throw new Error("You cannot report your own store");
+  }
+
+  const [existing] = await db
+    .select({ id: marketplaceReports.id })
+    .from(marketplaceReports)
+    .where(
+      and(
+        eq(marketplaceReports.reporterId, reporterId),
+        eq(marketplaceReports.targetType, input.targetType),
+        eq(marketplaceReports.targetId, input.targetId),
+        inArray(marketplaceReports.status, ["open", "reviewing"])
+      )
+    )
+    .limit(1);
+  if (existing) return { id: existing.id, duplicate: true };
+
+  const [result] = await db.insert(marketplaceReports).values({
+    reporterId,
+    sellerId,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    reason: input.reason,
+    details: input.details.trim(),
+  });
+  return { id: result.insertId, duplicate: false };
+}
+
+export async function updateMarketplaceReport(
+  reportId: number,
+  status: "reviewing" | "resolved" | "dismissed",
+  adminNote?: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [report] = await db
+    .select()
+    .from(marketplaceReports)
+    .where(eq(marketplaceReports.id, reportId))
+    .limit(1);
+  if (!report) throw new Error("Report not found");
+  await db
+    .update(marketplaceReports)
+    .set({
+      status,
+      adminNote: adminNote?.trim() || report.adminNote,
+      resolvedAt: status === "reviewing" ? null : new Date(),
+    })
+    .where(eq(marketplaceReports.id, reportId));
+  return { success: true };
+}
+
+export async function pauseSellerForSafety(sellerId: number, reason: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [store] = await db
+    .select()
+    .from(sellerStores)
+    .where(eq(sellerStores.userId, sellerId))
+    .limit(1);
+  if (!store) throw new Error("Seller store not found");
+  await db
+    .update(sellerStores)
+    .set({ status: "paused" })
+    .where(eq(sellerStores.userId, sellerId));
+  await db.insert(notifications).values({
+    userId: sellerId,
+    type: "order_update",
+    title: "Store paused for safety review",
+    message: reason.trim().slice(0, 1000),
+    entityType: "store",
+    entityId: String(store.id),
+  });
+  return { success: true };
+}
+
 /** Attach a Stripe session id to freshly created orders. */
 export async function attachStripeSession(
   orderIds: number[],
@@ -237,6 +415,14 @@ async function cancelReservedRows(
           cancellationReason: reason.slice(0, 255),
         })
         .where(eq(orders.id, order.id));
+      await tx.insert(orderEvents).values({
+        orderId: order.id,
+        actorType: "system",
+        eventType: "reservation_cancelled",
+        fromStatus: order.status,
+        toStatus: "cancelled",
+        note: reason.slice(0, 1000),
+      });
       cancelled++;
     }
     return cancelled;
@@ -265,12 +451,32 @@ export async function cancelCheckoutSessionOrders(
   );
 }
 
-/** Safety net for a missed Stripe expiration webhook. */
-export async function cancelExpiredCheckoutReservations(): Promise<number> {
+export interface ReservationReconciliation {
+  checked: number;
+  paid: number;
+  cancelled: number;
+  pending: number;
+  failedSessionIds: string[];
+}
+
+/**
+ * Safety net for a missed Stripe webhook. Never restore inventory from the
+ * local clock alone: first ask Stripe whether the session was paid, expired,
+ * or is still open. This prevents a delayed webhook from turning a successful
+ * payment into an oversold, cancelled order.
+ */
+export async function reconcileExpiredCheckoutReservations(): Promise<ReservationReconciliation> {
   const db = await getDb();
-  if (!db) return 0;
+  const empty = {
+    checked: 0,
+    paid: 0,
+    cancelled: 0,
+    pending: 0,
+    failedSessionIds: [] as string[],
+  };
+  if (!db) return empty;
   const rows = await db
-    .select({ id: orders.id })
+    .select({ sessionId: orders.stripeSessionId })
     .from(orders)
     .where(
       and(
@@ -279,10 +485,37 @@ export async function cancelExpiredCheckoutReservations(): Promise<number> {
         lte(orders.stripeSessionExpiresAt, new Date())
       )
     );
-  return cancelReservedRows(
-    rows.map(row => row.id),
-    "Secure checkout expired"
+  const sessions = Array.from(
+    new Set(rows.map(row => row.sessionId).filter((id): id is string => !!id))
   );
+  const result: ReservationReconciliation = {
+    ...empty,
+    checked: sessions.length,
+  };
+  for (const sessionId of sessions) {
+    try {
+      const session = await getCheckoutSessionStatus(sessionId);
+      if (session.paymentStatus === "paid") {
+        result.paid += await markOrdersPaid(sessionId);
+        continue;
+      }
+      if (session.status === "expired") {
+        result.cancelled += await cancelCheckoutSessionOrders(
+          sessionId,
+          "Secure checkout expired"
+        );
+        continue;
+      }
+      result.pending++;
+    } catch (error) {
+      result.failedSessionIds.push(sessionId);
+      console.error(
+        `[stripe] reservation reconciliation failed for ${sessionId}:`,
+        error
+      );
+    }
+  }
+  return result;
 }
 
 // ─── Webhook idempotency ─────────────────────────────────────────────────────
@@ -362,6 +595,14 @@ export async function markOrdersPaid(sessionId: string): Promise<number> {
   }
 
   for (const o of rows) {
+    await db.insert(orderEvents).values({
+      orderId: o.id,
+      actorType: "stripe",
+      eventType: "payment_confirmed",
+      fromStatus: o.status,
+      toStatus: "paid",
+      metadata: { sessionId, chargeId: payment.chargeId },
+    });
     await db.insert(notifications).values([
       {
         userId: o.sellerId,
@@ -461,104 +702,115 @@ export async function releaseOrder(orderId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
 
-  const [order] = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.id, orderId))
-    .limit(1);
-  if (!order) throw new Error("Order not found");
-  if (order.payoutStatus !== "held") return false; // already released/refunded → no-op
-  const pastWindow =
-    order.autoReleaseAt !== null && order.autoReleaseAt <= new Date();
-  const releasable =
-    ["delivered", "completed"].includes(order.status) ||
-    (order.status === "shipped" && pastWindow); // buyer never confirmed → 21-day fallback
-  if (!releasable) throw new Error("Order is not delivered yet");
+  // The row lock serializes buyer disputes, admin refunds and scheduled
+  // releases. Holding it across the idempotent Stripe transfer is deliberate:
+  // money must never leave while a dispute transition wins the race.
+  let transferError: unknown;
+  const released = await db.transaction(async tx => {
+    const [order] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .limit(1)
+      .for("update");
+    if (!order) throw new Error("Order not found");
+    if (order.payoutStatus !== "held") return false;
+    const pastWindow =
+      order.autoReleaseAt !== null && order.autoReleaseAt <= new Date();
+    const releasable =
+      ["delivered", "completed"].includes(order.status) ||
+      (order.status === "shipped" && pastWindow);
+    if (!releasable) throw new Error("Order is not delivered yet");
 
-  // Ledger guard: if a payout row already exists for this order, never send again.
-  const existing = await db
-    .select()
-    .from(payouts)
-    .where(eq(payouts.orderId, orderId))
-    .limit(1);
-  if (existing[0] && existing[0].status !== "failed") return false;
+    const [existing] = await tx
+      .select()
+      .from(payouts)
+      .where(eq(payouts.orderId, orderId))
+      .limit(1);
+    if (existing && existing.status !== "failed") return false;
+    if (!stripeEnabled()) {
+      throw new Error("Stripe is unavailable; payout remains safely held");
+    }
+    if (!order.stripeChargeId) {
+      throw new Error("Order has no Stripe charge attached");
+    }
 
-  if (!stripeEnabled()) {
-    throw new Error("Stripe is unavailable; payout remains safely held");
-  }
+    const [store] = await tx
+      .select()
+      .from(sellerStores)
+      .where(eq(sellerStores.userId, order.sellerId))
+      .limit(1);
+    if (!store?.stripeAccountId || !store.stripePayoutsEnabled) {
+      throw new Error(
+        `Seller ${order.sellerId} has no payout account — funds stay on platform`
+      );
+    }
 
-  if (!order.stripeChargeId)
-    throw new Error("Order has no Stripe charge attached");
-
-  const [store] = await db
-    .select()
-    .from(sellerStores)
-    .where(eq(sellerStores.userId, order.sellerId))
-    .limit(1);
-  if (!store?.stripeAccountId || !store.stripePayoutsEnabled) {
-    throw new Error(
-      `Seller ${order.sellerId} has no payout account — funds stay on platform`
-    );
-  }
-
-  const amountCents = sellerShareCents(order.totalUsd);
-  if (amountCents <= 0) return false;
-
-  // Ledger first (pending), then transfer, then mark sent + released.
-  if (existing[0]) {
-    await db
-      .update(payouts)
-      .set({ status: "pending" })
-      .where(eq(payouts.orderId, orderId));
-  } else {
-    await db
-      .insert(payouts)
-      .values({
+    const amountCents = sellerShareCents(order.totalUsd);
+    if (amountCents <= 0) return false;
+    if (existing) {
+      await tx
+        .update(payouts)
+        .set({ status: "pending" })
+        .where(eq(payouts.orderId, orderId));
+    } else {
+      await tx.insert(payouts).values({
         orderId,
         sellerId: order.sellerId,
         amountCents,
         status: "pending",
       });
-  }
+    }
 
-  let transferId: string;
-  try {
-    transferId = await createTransfer({
-      amountCents,
-      destination: store.stripeAccountId,
-      sourceCharge: order.stripeChargeId,
-      description: `RarityGrid payout — order #${orderId}`,
-      idempotencyKey: `payout_order_${orderId}`, // Stripe-side duplicate protection
-    });
-  } catch (e) {
-    await db
+    let transferId: string;
+    try {
+      transferId = await createTransfer({
+        amountCents,
+        destination: store.stripeAccountId,
+        sourceCharge: order.stripeChargeId,
+        description: `RarityGrid payout — order #${orderId}`,
+        idempotencyKey: `payout_order_${orderId}`,
+      });
+    } catch (error) {
+      await tx
+        .update(payouts)
+        .set({ status: "failed" })
+        .where(eq(payouts.orderId, orderId));
+      transferError = error;
+      return false;
+    }
+
+    await tx
       .update(payouts)
-      .set({ status: "failed" })
+      .set({ stripeTransferId: transferId, status: "sent" })
       .where(eq(payouts.orderId, orderId));
-    throw e;
-  }
-
-  await db
-    .update(payouts)
-    .set({ stripeTransferId: transferId, status: "sent" })
-    .where(eq(payouts.orderId, orderId));
-  await db
-    .update(orders)
-    .set({ payoutStatus: "released" })
-    .where(eq(orders.id, orderId));
-
-  await db.insert(notifications).values({
-    userId: order.sellerId,
-    type: "order_update",
-    title: "Payout sent",
-    message: `$${(amountCents / 100).toFixed(2)} for order #${orderId} was sent to your Stripe account (95% of the sale — 5% platform fee).`,
-    entityType: "order",
-    entityId: String(orderId),
+    await tx
+      .update(orders)
+      .set({ payoutStatus: "released" })
+      .where(eq(orders.id, orderId));
+    await tx.insert(orderEvents).values({
+      orderId,
+      actorType: "system",
+      eventType: "payout_released",
+      fromStatus: order.status,
+      toStatus: order.status,
+      metadata: { transferId, amountCents },
+    });
+    await tx.insert(notifications).values({
+      userId: order.sellerId,
+      type: "order_update",
+      title: "Payout sent",
+      message: `$${(amountCents / 100).toFixed(2)} for order #${orderId} was sent to your Stripe account (95% of the sale — 5% platform fee).`,
+      entityType: "order",
+      entityId: String(orderId),
+    });
+    console.log(
+      `[stripe] released ${amountCents}c to seller ${order.sellerId} for order #${orderId} (${transferId})`
+    );
+    return true;
   });
-  console.log(
-    `[stripe] released ${amountCents}c to seller ${order.sellerId} for order #${orderId} (${transferId})`
-  );
-  return true;
+  if (transferError) throw transferError;
+  return released;
 }
 
 /**
@@ -580,7 +832,9 @@ export async function refundOrderMoney(orderId: number): Promise<boolean> {
       throw new Error("Stripe is unavailable; refund was not marked complete");
     }
     if (!order.stripeChargeId) {
-      throw new Error("Paid order has no Stripe charge; refund requires review");
+      throw new Error(
+        "Paid order has no Stripe charge; refund requires review"
+      );
     }
     await createRefund(
       order.stripeChargeId,
@@ -592,6 +846,16 @@ export async function refundOrderMoney(orderId: number): Promise<boolean> {
     .update(orders)
     .set({ payoutStatus: "refunded", paymentStatus: "refunded" })
     .where(eq(orders.id, orderId));
+  await db.insert(orderEvents).values({
+    orderId,
+    actorType: "system",
+    eventType: "refund_issued",
+    fromStatus: order.status,
+    toStatus: order.status,
+    metadata: {
+      amountCents: Math.round(parseFloat(String(order.totalUsd)) * 100),
+    },
+  });
 
   await db.insert(notifications).values({
     userId: order.buyerId,
@@ -644,7 +908,12 @@ export async function getEscrowOverview() {
     return {
       held: [],
       disputed: [],
+      needsShipment: [],
+      reports: [],
+      connectNeedsAction: [],
       ledger: [],
+      failedPayouts: [],
+      events: [],
       totals: { heldCents: 0, releasedCents: 0 },
     };
 
@@ -666,13 +935,84 @@ export async function getEscrowOverview() {
     .from(payouts)
     .orderBy(desc(payouts.createdAt))
     .limit(100);
+  const [shipmentRows, reports, connectNeedsAction, events] = await Promise.all(
+    [
+      db
+        .select({
+          order: orders,
+          storeName: sellerStores.storeName,
+          handlingDays: sellerStores.handlingDays,
+        })
+        .from(orders)
+        .leftJoin(sellerStores, eq(sellerStores.userId, orders.sellerId))
+        .where(and(eq(orders.status, "paid"), eq(orders.paymentStatus, "paid")))
+        .orderBy(orders.createdAt)
+        .limit(200),
+      db
+        .select({
+          report: marketplaceReports,
+          storeName: sellerStores.storeName,
+        })
+        .from(marketplaceReports)
+        .leftJoin(
+          sellerStores,
+          eq(sellerStores.userId, marketplaceReports.sellerId)
+        )
+        .where(inArray(marketplaceReports.status, ["open", "reviewing"]))
+        .orderBy(desc(marketplaceReports.createdAt))
+        .limit(100),
+      db
+        .select({
+          sellerId: sellerStores.userId,
+          storeName: sellerStores.storeName,
+          stripeAccountId: sellerStores.stripeAccountId,
+          updatedAt: sellerStores.updatedAt,
+        })
+        .from(sellerStores)
+        .where(
+          and(
+            eq(sellerStores.status, "active"),
+            isNotNull(sellerStores.stripeAccountId),
+            eq(sellerStores.stripePayoutsEnabled, false)
+          )
+        )
+        .orderBy(desc(sellerStores.updatedAt))
+        .limit(100),
+      db
+        .select()
+        .from(orderEvents)
+        .orderBy(desc(orderEvents.createdAt))
+        .limit(100),
+    ]
+  );
+
+  const now = Date.now();
+  const needsShipment = shipmentRows.filter(row => {
+    const handlingDays = Math.max(1, row.handlingDays ?? 2);
+    return (
+      new Date(row.order.createdAt).getTime() +
+        handlingDays * 24 * 60 * 60 * 1000 <=
+      now
+    );
+  });
+  const failedPayouts = ledger.filter(p => p.status === "failed");
 
   const heldCents = held.reduce((s, o) => s + sellerShareCents(o.totalUsd), 0);
   const releasedCents = ledger
     .filter(p => p.status === "sent")
     .reduce((s, p) => s + p.amountCents, 0);
 
-  return { held, disputed, ledger, totals: { heldCents, releasedCents } };
+  return {
+    held,
+    disputed,
+    needsShipment,
+    reports,
+    connectNeedsAction,
+    ledger,
+    failedPayouts,
+    events,
+    totals: { heldCents, releasedCents },
+  };
 }
 
 /**
@@ -700,8 +1040,20 @@ export async function adminResolveDispute(
     await refundOrderMoney(orderId);
     await db
       .update(orders)
-      .set({ status: "cancelled" })
+      .set({
+        status: "cancelled",
+        disputeResolution: resolution,
+        disputeResolvedAt: new Date(),
+      })
       .where(eq(orders.id, orderId));
+    await db.insert(orderEvents).values({
+      orderId,
+      actorType: "admin",
+      eventType: "dispute_resolved",
+      fromStatus: "disputed",
+      toStatus: "cancelled",
+      note: resolution,
+    });
     await db.insert(notifications).values({
       userId: order.sellerId,
       type: "order_update",
@@ -714,9 +1066,21 @@ export async function adminResolveDispute(
     // Reinstate delivered so releaseOrder's state check passes, then release.
     await db
       .update(orders)
-      .set({ status: "delivered" })
+      .set({
+        status: "delivered",
+        disputeResolution: resolution,
+        disputeResolvedAt: new Date(),
+      })
       .where(eq(orders.id, orderId));
     await releaseOrder(orderId);
+    await db.insert(orderEvents).values({
+      orderId,
+      actorType: "admin",
+      eventType: "dispute_resolved",
+      fromStatus: "disputed",
+      toStatus: "delivered",
+      note: resolution,
+    });
     await db.insert(notifications).values({
       userId: order.buyerId,
       type: "order_update",

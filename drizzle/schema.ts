@@ -25,7 +25,9 @@ export const users = mysqlTable("users", {
   avatarUrl: text("avatarUrl"),
   bio: text("bio"),
   location: varchar("location", { length: 128 }),
-  sellerRating: decimal("sellerRating", { precision: 3, scale: 2 }).default("0.00"),
+  sellerRating: decimal("sellerRating", { precision: 3, scale: 2 }).default(
+    "0.00"
+  ),
   totalSales: int("totalSales").default(0).notNull(),
   isVerifiedSeller: boolean("isVerifiedSeller").default(false).notNull(),
   hasPhysicalStore: boolean("hasPhysicalStore").default(false).notNull(),
@@ -48,7 +50,9 @@ export const binders = mysqlTable("binders", {
   description: text("description"),
   coverImageUrl: text("coverImageUrl"),
   isPublic: boolean("isPublic").default(false).notNull(),
-  totalValueUsd: decimal("totalValueUsd", { precision: 10, scale: 2 }).default("0.00"),
+  totalValueUsd: decimal("totalValueUsd", { precision: 10, scale: 2 }).default(
+    "0.00"
+  ),
   cardCount: int("cardCount").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -68,7 +72,9 @@ export const binderCards = mysqlTable("binder_cards", {
   imageUrl: text("imageUrl"),
   rarity: varchar("rarity", { length: 128 }),
   quantity: int("quantity").default(1).notNull(),
-  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"]).default("NM").notNull(),
+  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"])
+    .default("NM")
+    .notNull(),
   language: varchar("language", { length: 32 }).default("English"),
   priceUsd: decimal("priceUsd", { precision: 10, scale: 2 }),
   notes: text("notes"),
@@ -86,7 +92,9 @@ export const decks = mysqlTable("decks", {
   userId: int("userId").notNull(),
   name: varchar("name", { length: 256 }).notNull(),
   description: text("description"),
-  format: mysqlEnum("format", ["standard", "expanded", "unlimited", "glc"]).default("standard").notNull(),
+  format: mysqlEnum("format", ["standard", "expanded", "unlimited", "glc"])
+    .default("standard")
+    .notNull(),
   isPublic: boolean("isPublic").default(false).notNull(),
   estimatedCostUsd: decimal("estimatedCostUsd", { precision: 10, scale: 2 }),
   minCostUsd: decimal("minCostUsd", { precision: 10, scale: 2 }),
@@ -128,7 +136,14 @@ export const listings = mysqlTable("listings", {
   setId: varchar("setId", { length: 64 }),
   setName: varchar("setName", { length: 256 }),
   imageUrl: text("imageUrl"),
-  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"]).notNull(),
+  condition: mysqlEnum("condition", [
+    "M",
+    "NM",
+    "SP",
+    "MP",
+    "HP",
+    "D",
+  ]).notNull(),
   language: varchar("language", { length: 32 }).default("English").notNull(),
   priceUsd: decimal("priceUsd", { precision: 10, scale: 2 }).notNull(),
   quantity: int("quantity").default(1).notNull(),
@@ -136,7 +151,9 @@ export const listings = mysqlTable("listings", {
   isAltered: boolean("isAltered").default(false).notNull(),
   isFirstEdition: boolean("isFirstEdition").default(false).notNull(),
   notes: text("notes"),
-  status: mysqlEnum("status", ["active", "sold", "cancelled"]).default("active").notNull(),
+  status: mysqlEnum("status", ["active", "sold", "cancelled"])
+    .default("active")
+    .notNull(),
   viewCount: int("viewCount").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -156,7 +173,9 @@ export const buyListItems = mysqlTable("buy_list_items", {
   setName: varchar("setName", { length: 256 }),
   imageUrl: text("imageUrl"),
   quantity: int("quantity").default(1).notNull(),
-  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"]).default("NM").notNull(),
+  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"])
+    .default("NM")
+    .notNull(),
   language: varchar("language", { length: 32 }).default("English"),
   maxPriceUsd: decimal("maxPriceUsd", { precision: 10, scale: 2 }),
   addedAt: timestamp("addedAt").defaultNow().notNull(),
@@ -175,7 +194,9 @@ export const wantListItems = mysqlTable("want_list_items", {
   setId: varchar("setId", { length: 64 }),
   imageUrl: text("imageUrl"),
   quantity: int("quantity").default(1).notNull(),
-  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"]).default("NM"),
+  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"]).default(
+    "NM"
+  ),
   maxPriceUsd: decimal("maxPriceUsd", { precision: 10, scale: 2 }),
   addedAt: timestamp("addedAt").defaultNow().notNull(),
 });
@@ -194,19 +215,26 @@ export const auctions = mysqlTable("auctions", {
   setId: varchar("setId", { length: 64 }),
   setName: varchar("setName", { length: 256 }),
   imageUrl: text("imageUrl"),
-  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"]).default("NM").notNull(),
+  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"])
+    .default("NM")
+    .notNull(),
   language: varchar("language", { length: 32 }).default("English").notNull(),
   isFoil: boolean("isFoil").default(false).notNull(),
   isPromo: boolean("isPromo").default(false).notNull(),
   isFirstEdition: boolean("isFirstEdition").default(false).notNull(),
-  startingBidUsd: decimal("startingBidUsd", { precision: 10, scale: 2 }).notNull(),
+  startingBidUsd: decimal("startingBidUsd", {
+    precision: 10,
+    scale: 2,
+  }).notNull(),
   currentBidUsd: decimal("currentBidUsd", { precision: 10, scale: 2 }),
   fixedPriceUsd: decimal("fixedPriceUsd", { precision: 10, scale: 2 }),
   buyerProtection: boolean("buyerProtection").default(false).notNull(),
   bidCount: int("bidCount").default(0).notNull(),
   watchCount: int("watchCount").default(0).notNull(),
   endsAt: timestamp("endsAt").notNull(),
-  status: mysqlEnum("status", ["active", "ended", "cancelled"]).default("active").notNull(),
+  status: mysqlEnum("status", ["active", "ended", "cancelled"])
+    .default("active")
+    .notNull(),
   winnerId: int("winnerId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -243,7 +271,9 @@ export const bazaarListings = mysqlTable("bazaar_listings", {
   setName: varchar("setName", { length: 256 }),
   imageUrl: text("imageUrl"),
   quantity: int("quantity").default(1).notNull(),
-  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"]).default("NM").notNull(),
+  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"])
+    .default("NM")
+    .notNull(),
   language: varchar("language", { length: 32 }).default("English"),
   priceUsd: decimal("priceUsd", { precision: 10, scale: 2 }),
   isForTrade: boolean("isForTrade").default(true).notNull(),
@@ -266,7 +296,16 @@ export const articles = mysqlTable("articles", {
   slug: varchar("slug", { length: 512 }).notNull().unique(),
   coverImageUrl: text("coverImageUrl"),
   content: text("content").notNull(),
-  category: mysqlEnum("category", ["strategy", "deck_guide", "set_review", "tournament", "collector", "news"]).default("news").notNull(),
+  category: mysqlEnum("category", [
+    "strategy",
+    "deck_guide",
+    "set_review",
+    "tournament",
+    "collector",
+    "news",
+  ])
+    .default("news")
+    .notNull(),
   tags: json("tags"),
   viewCount: int("viewCount").default(0).notNull(),
   isPublished: boolean("isPublished").default(false).notNull(),
@@ -283,7 +322,13 @@ export type InsertArticle = typeof articles.$inferInsert;
 export const comments = mysqlTable("comments", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
-  entityType: mysqlEnum("entityType", ["card", "product", "article", "deck", "auction"]).notNull(),
+  entityType: mysqlEnum("entityType", [
+    "card",
+    "product",
+    "article",
+    "deck",
+    "auction",
+  ]).notNull(),
   entityId: varchar("entityId", { length: 128 }).notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -302,10 +347,28 @@ export const products = mysqlTable("products", {
   description: text("description"),
   imageUrl: text("imageUrl"),
   category: mysqlEnum("category", [
-    "booster_pack", "booster_box", "etb", "tin", "blister", "theme_deck",
-    "pre_release", "collector_box", "battle_deck", "world_championship",
-    "plush", "miniature", "apparel", "trainer_kit", "empty_box",
-    "playmat", "damage_counter", "sleeves", "deck_box", "pin", "coin", "binder_portfolio"
+    "booster_pack",
+    "booster_box",
+    "etb",
+    "tin",
+    "blister",
+    "theme_deck",
+    "pre_release",
+    "collector_box",
+    "battle_deck",
+    "world_championship",
+    "plush",
+    "miniature",
+    "apparel",
+    "trainer_kit",
+    "empty_box",
+    "playmat",
+    "damage_counter",
+    "sleeves",
+    "deck_box",
+    "pin",
+    "coin",
+    "binder_portfolio",
   ]).notNull(),
   language: varchar("language", { length: 32 }).default("English"),
   setId: varchar("setId", { length: 64 }),
@@ -328,10 +391,14 @@ export const productListings = mysqlTable("product_listings", {
   sellerId: int("sellerId").notNull(),
   priceUsd: decimal("priceUsd", { precision: 10, scale: 2 }).notNull(),
   quantity: int("quantity").default(1).notNull(),
-  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"]).default("NM").notNull(),
+  condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"])
+    .default("NM")
+    .notNull(),
   language: varchar("language", { length: 32 }).default("English"),
   notes: text("notes"),
-  status: mysqlEnum("status", ["active", "sold", "cancelled"]).default("active").notNull(),
+  status: mysqlEnum("status", ["active", "sold", "cancelled"])
+    .default("active")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -354,44 +421,147 @@ export type SellerReview = typeof sellerReviews.$inferSelect;
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
-export const orders = mysqlTable("orders", {
-  id: int("id").autoincrement().primaryKey(),
-  buyerId: int("buyerId").notNull(),
-  sellerId: int("sellerId").notNull(),
-  listingId: int("listingId"),
-  productListingId: int("productListingId"),
-  quantity: int("quantity").default(1).notNull(),
-  totalUsd: decimal("totalUsd", { precision: 10, scale: 2 }).notNull(),
-  status: mysqlEnum("status", ["pending", "paid", "shipped", "delivered", "cancelled", "disputed"]).default("pending").notNull(),
-  paymentStatus: mysqlEnum("paymentStatus", ["unpaid", "processing", "paid", "refunded"]).default("unpaid").notNull(),
-  stripeSessionId: varchar("stripeSessionId", { length: 255 }),
-  stripeChargeId: varchar("stripeChargeId", { length: 255 }),
-  stripeSessionExpiresAt: timestamp("stripeSessionExpiresAt"),
-  shippingName: varchar("shippingName", { length: 160 }),
-  shippingPhone: varchar("shippingPhone", { length: 40 }),
-  shippingAddress: json("shippingAddress"),
-  buyerTermsVersion: varchar("buyerTermsVersion", { length: 32 }),
-  buyerTermsAcceptedAt: timestamp("buyerTermsAcceptedAt"),
-  cancellationReason: varchar("cancellationReason", { length: 255 }),
-  /** Escrow: money held on platform until delivery is confirmed. */
-  payoutStatus: mysqlEnum("payoutStatus", ["held", "released", "refunded"]).default("held").notNull(),
-  deliveredAt: timestamp("deliveredAt"),
-  autoReleaseAt: timestamp("autoReleaseAt"),
-  buyerProtection: boolean("buyerProtection").default(false).notNull(),
-  trackingNumber: varchar("trackingNumber", { length: 256 }),
-  notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, table => [
-  index("orders_stripe_session_idx").on(table.stripeSessionId),
-  index("orders_reservation_expiry_idx").on(
-    table.status,
-    table.paymentStatus,
-    table.stripeSessionExpiresAt
-  ),
-]);
+export const orders = mysqlTable(
+  "orders",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    buyerId: int("buyerId").notNull(),
+    sellerId: int("sellerId").notNull(),
+    listingId: int("listingId"),
+    productListingId: int("productListingId"),
+    quantity: int("quantity").default(1).notNull(),
+    totalUsd: decimal("totalUsd", { precision: 10, scale: 2 }).notNull(),
+    status: mysqlEnum("status", [
+      "pending",
+      "paid",
+      "shipped",
+      "delivered",
+      "cancelled",
+      "disputed",
+    ])
+      .default("pending")
+      .notNull(),
+    paymentStatus: mysqlEnum("paymentStatus", [
+      "unpaid",
+      "processing",
+      "paid",
+      "refunded",
+    ])
+      .default("unpaid")
+      .notNull(),
+    stripeSessionId: varchar("stripeSessionId", { length: 255 }),
+    stripeChargeId: varchar("stripeChargeId", { length: 255 }),
+    stripeSessionExpiresAt: timestamp("stripeSessionExpiresAt"),
+    shippingName: varchar("shippingName", { length: 160 }),
+    shippingPhone: varchar("shippingPhone", { length: 40 }),
+    shippingAddress: json("shippingAddress"),
+    buyerTermsVersion: varchar("buyerTermsVersion", { length: 32 }),
+    buyerTermsAcceptedAt: timestamp("buyerTermsAcceptedAt"),
+    cancellationReason: varchar("cancellationReason", { length: 255 }),
+    /** Escrow: money held on platform until delivery is confirmed. */
+    payoutStatus: mysqlEnum("payoutStatus", ["held", "released", "refunded"])
+      .default("held")
+      .notNull(),
+    deliveredAt: timestamp("deliveredAt"),
+    autoReleaseAt: timestamp("autoReleaseAt"),
+    buyerProtection: boolean("buyerProtection").default(false).notNull(),
+    trackingCarrier: varchar("trackingCarrier", { length: 32 }),
+    trackingNumber: varchar("trackingNumber", { length: 256 }),
+    shippedAt: timestamp("shippedAt"),
+    disputeReason: varchar("disputeReason", { length: 64 }),
+    disputeDetails: text("disputeDetails"),
+    disputeOpenedAt: timestamp("disputeOpenedAt"),
+    disputeResolution: varchar("disputeResolution", { length: 32 }),
+    disputeResolvedAt: timestamp("disputeResolvedAt"),
+    notes: text("notes"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("orders_stripe_session_idx").on(table.stripeSessionId),
+    index("orders_reservation_expiry_idx").on(
+      table.status,
+      table.paymentStatus,
+      table.stripeSessionExpiresAt
+    ),
+    index("orders_fulfillment_queue_idx").on(
+      table.status,
+      table.paymentStatus,
+      table.createdAt
+    ),
+  ]
+);
 
 export type Order = typeof orders.$inferSelect;
+
+// ─── Marketplace audit trail ────────────────────────────────────────────────
+
+export const orderEvents = mysqlTable(
+  "order_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    orderId: int("orderId").notNull(),
+    actorUserId: int("actorUserId"),
+    actorType: varchar("actorType", { length: 32 }).default("system").notNull(),
+    eventType: varchar("eventType", { length: 64 }).notNull(),
+    fromStatus: varchar("fromStatus", { length: 32 }),
+    toStatus: varchar("toStatus", { length: 32 }),
+    note: text("note"),
+    metadata: json("metadata"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("order_events_order_created_idx").on(table.orderId, table.createdAt),
+    index("order_events_type_created_idx").on(table.eventType, table.createdAt),
+  ]
+);
+
+export type OrderEvent = typeof orderEvents.$inferSelect;
+
+// ─── Trust & safety reports ─────────────────────────────────────────────────
+
+export const marketplaceReports = mysqlTable(
+  "marketplace_reports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    reporterId: int("reporterId").notNull(),
+    sellerId: int("sellerId"),
+    targetType: mysqlEnum("targetType", [
+      "store",
+      "card_listing",
+      "product_listing",
+      "order",
+    ]).notNull(),
+    targetId: int("targetId").notNull(),
+    reason: mysqlEnum("reason", [
+      "suspected_counterfeit",
+      "misleading_listing",
+      "prohibited_item",
+      "harassment",
+      "other",
+    ]).notNull(),
+    details: text("details").notNull(),
+    status: mysqlEnum("status", ["open", "reviewing", "resolved", "dismissed"])
+      .default("open")
+      .notNull(),
+    adminNote: text("adminNote"),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("marketplace_reports_status_created_idx").on(
+      table.status,
+      table.createdAt
+    ),
+    index("marketplace_reports_seller_created_idx").on(
+      table.sellerId,
+      table.createdAt
+    ),
+  ]
+);
+
+export type MarketplaceReport = typeof marketplaceReports.$inferSelect;
 
 // ─── Stripe webhook idempotency ──────────────────────────────────────────────
 
@@ -411,7 +581,9 @@ export const payouts = mysqlTable("payouts", {
   sellerId: int("sellerId").notNull(),
   amountCents: int("amountCents").notNull(),
   stripeTransferId: varchar("stripeTransferId", { length: 255 }),
-  status: mysqlEnum("status", ["pending", "sent", "failed", "reversed"]).default("pending").notNull(),
+  status: mysqlEnum("status", ["pending", "sent", "failed", "reversed"])
+    .default("pending")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -435,7 +607,14 @@ export type CartItem = typeof cartItems.$inferSelect;
 export const notifications = mysqlTable("notifications", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
-  type: mysqlEnum("type", ["auction_bid", "auction_won", "order_update", "price_alert", "drop_alert", "bazaar_match"]).notNull(),
+  type: mysqlEnum("type", [
+    "auction_bid",
+    "auction_won",
+    "order_update",
+    "price_alert",
+    "drop_alert",
+    "bazaar_match",
+  ]).notNull(),
   title: varchar("title", { length: 256 }).notNull(),
   message: text("message").notNull(),
   entityType: varchar("entityType", { length: 64 }),
@@ -452,7 +631,11 @@ export const dropAlerts = mysqlTable("drop_alerts", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   productName: varchar("productName", { length: 512 }).notNull(),
-  retailer: mysqlEnum("retailer", ["pokemon_center", "amazon", "target"]).notNull(),
+  retailer: mysqlEnum("retailer", [
+    "pokemon_center",
+    "amazon",
+    "target",
+  ]).notNull(),
   productUrl: text("productUrl"),
   isActive: boolean("isActive").default(true).notNull(),
   pushSubscription: json("pushSubscription"),
@@ -622,7 +805,9 @@ export const gameRounds = mysqlTable("game_rounds", {
   userId: int("userId").notNull(),
   targetId: int("targetId").notNull(),
   attemptsUsed: int("attemptsUsed").default(0).notNull(),
-  status: mysqlEnum("status", ["active", "won", "lost"]).default("active").notNull(),
+  status: mysqlEnum("status", ["active", "won", "lost"])
+    .default("active")
+    .notNull(),
   roundScore: int("roundScore").default(0).notNull(),
   guesses: json("guesses"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -661,7 +846,9 @@ export const sellerStores = mysqlTable("seller_stores", {
   paymentMethods: json("paymentMethods"),
   /** Stripe Connect account used after escrow release. */
   stripeAccountId: varchar("stripeAccountId", { length: 255 }),
-  stripePayoutsEnabled: boolean("stripePayoutsEnabled").default(false).notNull(),
+  stripePayoutsEnabled: boolean("stripePayoutsEnabled")
+    .default(false)
+    .notNull(),
   shipsFrom: varchar("shipsFrom", { length: 128 }),
   handlingDays: int("handlingDays").default(2).notNull(),
   shippingPolicy: text("shippingPolicy"),
