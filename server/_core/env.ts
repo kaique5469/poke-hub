@@ -18,6 +18,10 @@ export const ENV = {
   ownerEmail: process.env.OWNER_EMAIL ?? "",
   /** Public support address. Falls back to the owner while the brand inbox is set up. */
   supportEmail: process.env.SUPPORT_EMAIL ?? process.env.OWNER_EMAIL ?? "",
+  /** Optional Resend delivery. Without it, messages are safely logged. */
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  emailFrom:
+    process.env.EMAIL_FROM ?? "RarityGrid <notifications@raritygrid.com>",
   /** Directory for uploaded/generated files (mount a Railway volume here). */
   dataDir: process.env.DATA_DIR ?? "./data",
   /** Optional key for CardMarket price API via RapidAPI. */

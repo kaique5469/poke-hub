@@ -5,11 +5,15 @@ import {
   BarChart3,
   BookOpen,
   CalendarDays,
+  Clock3,
+  Gamepad2,
+  Gift,
   Package,
   Search,
   ShieldCheck,
   Sparkles,
   TrendingUp,
+  Trophy,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -67,42 +71,53 @@ export default function Home() {
     { limit: 7 },
     { staleTime: 300_000, retry: false }
   );
-  const newestSet: any = sets.data?.[0];
+  const weekly = trpc.game.weeklyLeaderboard.useQuery(
+    { limit: 3 },
+    { staleTime: 60_000, retry: false }
+  );
   const highCards: any[] = (cards.data as any)?.data?.slice(0, 8) ?? [];
   const productRows: any[] = products.data?.items ?? [];
   const articleRows: any[] = articles.data ?? [];
 
   return (
     <main className="min-h-screen bg-[#f6f7fb]">
-      <section className="relative overflow-hidden bg-[#0b1020] text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_20%,rgba(124,58,237,.32),transparent_34%),radial-gradient(circle_at_15%_90%,rgba(14,165,233,.18),transparent_30%)]" />
-        <div className="container relative grid min-h-[560px] gap-10 py-14 lg:grid-cols-[1.05fr_.95fr] lg:items-center">
+      <section className="relative isolate overflow-hidden bg-[#090d1c] text-white">
+        <div
+          className="absolute inset-0 -z-20 bg-cover bg-center"
+          style={{ backgroundImage: "url('/images/raritygrid-hero-v2.webp')" }}
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#070b18] via-[#080d1ce8] to-[#0a0d1a70]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_60%_75%,rgba(124,58,237,.2),transparent_32%),linear-gradient(to_top,rgba(3,7,18,.58),transparent_45%)]" />
+        <div className="container relative grid min-h-[600px] gap-10 py-16 lg:grid-cols-[1.02fr_.98fr] lg:items-center">
           <div className="relative z-10">
             <p className="inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-400/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-200">
-              <Sparkles className="h-3.5 w-3.5" /> The US Pokémon TCG market,
-              organized
+              <Sparkles className="h-3.5 w-3.5" /> Built for collectors, not
+              clutter
             </p>
             <h1 className="mt-6 max-w-3xl text-5xl font-black leading-[.98] tracking-tight text-white md:text-7xl">
-              Know the card.
+              Collect smarter.
               <br />
-              <span className="text-violet-300">Know the market.</span>
+              <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-amber-200 bg-clip-text text-transparent">
+                Play for the top.
+              </span>
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 md:text-lg">
-              Search English cards, compare market references and discover
-              source-verified sealed products connected to each set.
+              Explore real cards and sealed products, follow the market and
+              climb a new skill-based leaderboard every week.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/cards"
-                className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-900/30 transition hover:bg-violet-500"
+                href="/game"
+                className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-900/30 transition hover:-translate-y-0.5 hover:bg-violet-500"
               >
-                Search cards <Search className="h-4 w-4" />
+                Play Weekly Arena <Gamepad2 className="h-4 w-4" />
               </Link>
               <Link
-                href="/shop"
+                href="/cards"
                 className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15"
               >
-                Explore sealed products <ArrowRight className="h-4 w-4" />
+                Search cards <Search className="h-4 w-4" />
               </Link>
               <Link
                 href="/market"
@@ -111,53 +126,119 @@ export default function Home() {
                 Open Market Pulse <BarChart3 className="h-4 w-4" />
               </Link>
             </div>
+            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-xs font-bold text-slate-400">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                Server-verified scoring
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock3 className="h-4 w-4 text-violet-300" />
+                Fresh ranking every Monday
+              </span>
+            </div>
           </div>
-          <div className="relative mx-auto min-h-[380px] w-full max-w-xl">
-            <div className="absolute inset-x-10 bottom-0 top-12 rotate-2 rounded-[36px] border border-white/10 bg-white/5 backdrop-blur" />
-            {newestSet?.images?.logo ? (
-              <Link
-                href={`/sets/${newestSet.id}`}
-                className="absolute inset-x-16 top-16 bottom-24 flex items-center justify-center rounded-[30px] border border-white/10 bg-gradient-to-br from-white/10 to-violet-500/10 p-10 shadow-2xl transition hover:border-violet-300/40"
-              >
-                <img
-                  src={newestSet.images.logo}
-                  alt={`${newestSet.name} logo`}
-                  fetchPriority="high"
-                  className="max-h-44 w-full object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.45)]"
-                />
-              </Link>
-            ) : (
-              <Skeleton className="absolute inset-x-16 top-16 bottom-24 rounded-[30px] bg-white/10" />
-            )}
-            {newestSet && (
-              <Link
-                href={`/sets/${newestSet.id}`}
-                className="absolute bottom-2 left-1/2 z-10 w-[86%] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#12182a]/95 p-4 shadow-2xl backdrop-blur"
-              >
-                <div className="flex items-center gap-4">
-                  {newestSet.images?.logo && (
+          <div className="relative mx-auto w-full max-w-xl lg:pl-8">
+            <div className="absolute -inset-5 rotate-2 rounded-[34px] border border-violet-300/10 bg-violet-400/5 blur-[1px]" />
+            <div className="relative overflow-hidden rounded-[30px] border border-white/15 bg-[#0b1020d9] p-5 shadow-[0_35px_90px_rgba(0,0,0,.48)] backdrop-blur-xl sm:p-7">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-orange-500 text-gray-950 shadow-lg shadow-amber-950/20">
+                    <Trophy className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[.2em] text-violet-300">
+                      RarityGrid Weekly Arena
+                    </p>
+                    <h2 className="mt-0.5 text-xl font-black text-white">
+                      Guess. Score. Take #1.
+                    </h2>
+                  </div>
+                </div>
+                <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-300">
+                  Live
+                </span>
+              </div>
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/[.055] p-4">
+                <div className="flex items-start gap-3">
+                  {weekly.data?.competition?.prizeImageUrl ? (
                     <img
-                      src={newestSet.images.logo}
-                      alt={newestSet.name}
-                      className="h-12 w-24 object-contain"
+                      src={weekly.data.competition.prizeImageUrl}
+                      alt={weekly.data.competition.prizeTitle}
+                      loading="lazy"
+                      className="h-14 w-14 shrink-0 rounded-xl border border-white/10 bg-white object-contain p-1"
                     />
+                  ) : (
+                    <Gift className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
                   )}
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[.18em] text-violet-300">
-                      Newest set
+                  <div>
+                    <p className="text-sm font-black text-white">
+                      {weekly.data?.competition?.prizeTitle ??
+                        "Weekly challenge leaderboard"}
                     </p>
-                    <p className="truncate text-base font-black text-white">
-                      {newestSet.name}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {newestSet.total} cards ·{" "}
-                      {shortDate(newestSet.releaseDate)}
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      {weekly.data?.competition
+                        ? "Brazil-only prize. No purchase necessary. Official rules apply."
+                        : "Prize rounds appear only after official rules and authorization are active."}
                     </p>
                   </div>
-                  <ArrowRight className="ml-auto h-5 w-5 text-violet-300" />
                 </div>
+              </div>
+              <div className="mt-5">
+                <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[.18em] text-slate-500">
+                  <span>Top this week</span>
+                  <span>{weekly.data?.weekKey ?? "Weekly reset"}</span>
+                </div>
+                <div className="space-y-2">
+                  {weekly.isLoading
+                    ? [1, 2, 3].map(rank => (
+                        <div
+                          key={rank}
+                          className="h-11 animate-pulse rounded-xl bg-white/[.06]"
+                        />
+                      ))
+                    : (weekly.data?.rows ?? []).length
+                      ? weekly.data!.rows.map((row: any, index: number) => (
+                          <div
+                            key={row.userId}
+                            className="flex items-center gap-3 rounded-xl border border-white/[.06] bg-white/[.045] px-3 py-2.5"
+                          >
+                            <span className="w-5 text-center text-sm font-black text-amber-300">
+                              {index + 1}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-200">
+                              {row.name ?? row.username ?? "Trainer"}
+                            </span>
+                            <span className="text-sm font-black text-violet-300">
+                              {row.points} pts
+                            </span>
+                          </div>
+                        ))
+                      : [
+                          "Your name could be here",
+                          "New week, clean slate",
+                          "Play smart, not endlessly",
+                        ].map((label, index) => (
+                          <div
+                            key={label}
+                            className="flex items-center gap-3 rounded-xl border border-white/[.06] bg-white/[.035] px-3 py-2.5"
+                          >
+                            <span className="w-5 text-center text-sm font-black text-slate-600">
+                              {index + 1}
+                            </span>
+                            <span className="text-sm font-bold text-slate-500">
+                              {label}
+                            </span>
+                          </div>
+                        ))}
+                </div>
+              </div>
+              <Link
+                href="/game"
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-black text-gray-950 transition hover:bg-violet-100"
+              >
+                Enter the arena <ArrowRight className="h-4 w-4" />
               </Link>
-            )}
+            </div>
           </div>
         </div>
       </section>

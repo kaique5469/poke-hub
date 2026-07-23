@@ -34,6 +34,10 @@ const privacySections = [
     "Your choices",
     "You may request correction or deletion of your account information by contacting support.",
   ],
+  [
+    "Weekly prize fulfillment",
+    "Shipping details are requested only from a confirmed weekly winner, restricted to authorized fulfillment administrators, and used to deliver the prize. They are not displayed on rankings or public profiles.",
+  ],
 ];
 
 const termsSections = [
@@ -60,6 +64,10 @@ const termsSections = [
   [
     "Prohibited activity",
     "Counterfeit goods, manipulated demand, fraudulent payments, harassment, automated abuse and misleading listings are prohibited.",
+  ],
+  [
+    "Weekly Arena",
+    "The skill leaderboard resets weekly. Only a limited number of daily wins score to reduce automated abuse. A physical prize exists only when an authorized competition, public official rules, eligibility and authorization reference are displayed on the game page. No purchase is necessary.",
   ],
   [
     "Third-party purchases",

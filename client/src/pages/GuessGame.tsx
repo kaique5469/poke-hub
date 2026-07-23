@@ -3,11 +3,16 @@ import { Link } from "wouter";
 import {
   Brain,
   Crown,
+  Clock3,
   Dices,
   Flame,
+  Gift,
   HelpCircle,
   Loader2,
+  LockKeyhole,
+  MapPin,
   Medal,
+  PackageCheck,
   RotateCcw,
   Search,
   Sparkles,
@@ -133,6 +138,210 @@ function HintChip({ ok, label }: { ok: boolean; label: string }) {
   );
 }
 
+function WeeklyArenaBanner({ data }: { data: any }) {
+  const competition = data?.competition;
+  const endsAt = data?.endsAt ? new Date(data.endsAt) : null;
+  return (
+    <section className="relative mb-6 overflow-hidden rounded-3xl border border-violet-200 bg-[#0b1020] p-5 text-white shadow-xl sm:p-7">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(124,58,237,.45),transparent_35%),radial-gradient(circle_at_10%_100%,rgba(14,165,233,.22),transparent_36%)]" />
+      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-orange-500 text-gray-950">
+            <Trophy size={24} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[.2em] text-violet-300">
+              Weekly Arena · Brazil
+            </p>
+            <h2 className="mt-1 text-xl font-black sm:text-2xl">
+              {competition?.prizeTitle ?? "Climb this week's leaderboard"}
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              {competition
+                ? competition.prizeDescription ||
+                  "Finish first when the weekly ranking closes to become the eligible winner."
+                : "The ranking is live in practice mode. A physical prize is shown only when official rules and authorization are active."}
+            </p>
+            {competition && (
+              <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-bold text-slate-400">
+                <a
+                  href={competition.rulesUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-violet-300 underline underline-offset-2"
+                >
+                  Official rules
+                </a>
+                <span>Authorization: {competition.authorizationReference}</span>
+                <span>No purchase necessary</span>
+              </div>
+            )}
+          </div>
+          {competition?.prizeImageUrl && (
+            <img
+              src={competition.prizeImageUrl}
+              alt={competition.prizeTitle}
+              loading="lazy"
+              className="hidden h-24 w-24 shrink-0 rounded-2xl border border-white/10 bg-white object-contain p-2 shadow-lg sm:block"
+            />
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.06] px-4 py-3 backdrop-blur">
+          <Clock3 size={20} className="text-violet-300" />
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+              Ranking closes
+            </p>
+            <p className="text-sm font-black">
+              {endsAt
+                ? endsAt.toLocaleString("pt-BR", {
+                    weekday: "short",
+                    day: "2-digit",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZone: "America/Sao_Paulo",
+                  })
+                : "Every Monday"}
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const EMPTY_CLAIM = {
+  fullName: "",
+  email: "",
+  phone: "",
+  postalCode: "",
+  addressLine1: "",
+  addressNumber: "",
+  addressLine2: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+};
+
+function PrizeClaimCard({ prize }: { prize: any }) {
+  const utils = trpc.useUtils();
+  const [form, setForm] = useState(EMPTY_CLAIM);
+  const claim = trpc.game.claimPrize.useMutation({
+    onSuccess: () => utils.game.myPrizeClaim.invalidate(),
+  });
+  if (prize.claim) {
+    return (
+      <section
+        id="claim-prize"
+        className="mb-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-6"
+      >
+        <div className="flex items-start gap-3">
+          <PackageCheck className="mt-0.5 h-6 w-6 text-emerald-600" />
+          <div>
+            <h2 className="text-lg font-black text-emerald-950">
+              Prize claim received
+            </h2>
+            <p className="mt-1 text-sm text-emerald-800">
+              Status: <strong>{prize.claim.status}</strong>
+              {prize.claim.trackingCode && (
+                <> · Tracking: {prize.claim.trackingCode}</>
+              )}
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+  if (!prize.canClaim) return null;
+  const fields: Array<[keyof typeof EMPTY_CLAIM, string, string]> = [
+    ["fullName", "Full legal name", "text"],
+    ["email", "Email", "email"],
+    ["phone", "Phone (optional)", "tel"],
+    ["postalCode", "CEP", "text"],
+    ["addressLine1", "Street / avenue", "text"],
+    ["addressNumber", "Number", "text"],
+    ["addressLine2", "Complement (optional)", "text"],
+    ["neighborhood", "Neighborhood", "text"],
+    ["city", "City", "text"],
+    ["state", "State (UF)", "text"],
+  ];
+  return (
+    <section
+      id="claim-prize"
+      className="mb-6 rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 shadow-lg sm:p-7"
+    >
+      <div className="flex items-start gap-3">
+        <Gift className="mt-0.5 h-7 w-7 text-amber-600" />
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[.2em] text-amber-700">
+            You finished #1
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-gray-950">
+            Claim {prize.competition.prizeTitle}
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Shipping data is private, visible only to the fulfillment admin and
+            never shown on the leaderboard.
+          </p>
+        </div>
+      </div>
+      <form
+        className="mt-6 grid gap-3 sm:grid-cols-2"
+        onSubmit={event => {
+          event.preventDefault();
+          claim.mutate({
+            ...form,
+            phone: form.phone || undefined,
+            addressLine2: form.addressLine2 || undefined,
+            state: form.state.toUpperCase(),
+          });
+        }}
+      >
+        {fields.map(([key, label, type]) => (
+          <label key={key} className="text-xs font-bold text-gray-700">
+            {label}
+            <input
+              type={type}
+              required={!label.includes("optional")}
+              maxLength={key === "state" ? 2 : undefined}
+              value={form[key]}
+              onChange={event =>
+                setForm(value => ({ ...value, [key]: event.target.value }))
+              }
+              className="mt-1.5 w-full rounded-xl border border-amber-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500"
+            />
+          </label>
+        ))}
+        <div className="sm:col-span-2 mt-2 flex flex-col gap-3 border-t border-amber-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex max-w-xl items-start gap-2 text-[11px] leading-5 text-gray-600">
+            <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
+            Used only to deliver this prize. Confirm the address before sending;
+            resubmission is blocked for safety.
+          </p>
+          <Button
+            type="submit"
+            disabled={claim.isPending}
+            className="shrink-0 rounded-full bg-violet-600 px-6 font-black text-white"
+          >
+            {claim.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <MapPin className="mr-2 h-4 w-4" />
+            )}
+            Send shipping details
+          </Button>
+        </div>
+        {claim.error && (
+          <p className="sm:col-span-2 text-sm font-bold text-red-600">
+            {claim.error.message}
+          </p>
+        )}
+      </form>
+    </section>
+  );
+}
+
 export default function GuessGame() {
   usePageMeta(
     "Guess the Pokémon",
@@ -155,6 +364,10 @@ export default function GuessGame() {
     enabled: isAuthenticated,
   });
   const boardQ = trpc.game.leaderboard.useQuery({ limit: 10 });
+  const weeklyQ = trpc.game.weeklyLeaderboard.useQuery({ limit: 10 });
+  const claimQ = trpc.game.myPrizeClaim.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
 
   const startM = trpc.game.start.useMutation({
     onSuccess: res => {
@@ -172,6 +385,8 @@ export default function GuessGame() {
         setShowModal(true);
         utils.game.myStats.invalidate();
         utils.game.leaderboard.invalidate();
+        utils.game.weeklyLeaderboard.invalidate();
+        utils.game.myPrizeClaim.invalidate();
       }
     },
   });
@@ -257,6 +472,9 @@ export default function GuessGame() {
           </div>
         )}
       </div>
+
+      <WeeklyArenaBanner data={weeklyQ.data} />
+      {claimQ.data && <PrizeClaimCard prize={claimQ.data} />}
 
       {!isAuthenticated ? (
         <div className="rounded-2xl border bg-white p-10 text-center max-w-lg mx-auto">
@@ -615,15 +833,15 @@ export default function GuessGame() {
 
             <div className="rounded-2xl border bg-white p-5">
               <h3 className="font-bold text-sm uppercase text-gray-500 mb-3 flex items-center gap-2">
-                <Trophy size={16} className="text-amber-500" /> Leaderboard
+                <Trophy size={16} className="text-amber-500" /> This Week
               </h3>
-              {(boardQ.data ?? []).length === 0 && (
+              {(weeklyQ.data?.rows ?? []).length === 0 && (
                 <p className="text-sm text-gray-400">
                   No players yet — be the first!
                 </p>
               )}
               <div className="space-y-1.5">
-                {(boardQ.data ?? []).map((row: any, i: number) => (
+                {(weeklyQ.data?.rows ?? []).map((row: any, i: number) => (
                   <div
                     key={row.userId}
                     className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 ${row.name === user?.name ? "bg-violet-50" : ""}`}
@@ -648,6 +866,34 @@ export default function GuessGame() {
                       {row.name ?? row.username ?? "Trainer"}
                     </span>
                     <span className="text-sm font-black text-violet-600">
+                      {row.points}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 border-t pt-3 text-[11px] leading-5 text-gray-500">
+                Only the first {weeklyQ.data?.dailyLimit ?? 10} wins each day
+                score. Ties favor more Hard wins, then the earliest final score.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-5">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase text-gray-500">
+                <Medal size={16} className="text-violet-500" /> Career leaders
+              </h3>
+              <div className="space-y-1.5">
+                {(boardQ.data ?? []).slice(0, 5).map((row: any, i: number) => (
+                  <div
+                    key={row.userId}
+                    className="flex items-center gap-2 text-xs"
+                  >
+                    <span className="w-5 font-black text-gray-300">
+                      {i + 1}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-semibold">
+                      {row.name ?? row.username ?? "Trainer"}
+                    </span>
+                    <span className="font-black text-violet-600">
                       {row.totalPoints}
                     </span>
                   </div>
@@ -769,6 +1015,19 @@ export default function GuessGame() {
                 </div>
               </div>
             </div>
+            {lastResult.status === "won" && lastResult.weeklyResult && (
+              <div
+                className={`mb-5 rounded-xl border px-3 py-2 text-xs font-bold ${
+                  lastResult.weeklyResult.awarded
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-amber-200 bg-amber-50 text-amber-800"
+                }`}
+              >
+                {lastResult.weeklyResult.awarded
+                  ? `+${"points" in lastResult.weeklyResult ? lastResult.weeklyResult.points : 0} points added to this week's ranking.`
+                  : `Daily ranking limit reached. Your career stats still count.`}
+              </div>
+            )}
             <p
               className="text-[11px] font-black uppercase tracking-wider mb-5"
               style={{ color: MODES[lastResult.difficulty].accent }}

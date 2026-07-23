@@ -13,6 +13,7 @@ import {
   type GameDifficulty,
   type GuessFeedback,
 } from "./lib/guessGame";
+import { awardWeeklyPoints } from "./gameCompetitionDb";
 
 export interface StoredRoundState {
   version: 2;
@@ -116,10 +117,11 @@ export async function recordResult(
   userId: number,
   won: boolean,
   roundScore: number,
-  attemptsUsed: number
-): Promise<void> {
+  attemptsUsed: number,
+  difficulty: GameDifficulty
+) {
   const db = await getDb();
-  if (!db) return;
+  if (!db) return null;
   await db
     .insert(gameStats)
     .values({
@@ -143,6 +145,7 @@ export async function recordResult(
           : {}),
       },
     });
+  return won ? awardWeeklyPoints(userId, difficulty, roundScore) : null;
 }
 
 export async function getStats(userId: number) {

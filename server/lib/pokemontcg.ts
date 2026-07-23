@@ -1,7 +1,13 @@
 /**
  * Pokémon TCG API client (pokemontcg.io)
- * Handles card and set data with in-memory caching to reduce API calls.
+ * Handles card and set data with memory + persistent last-known-good caching.
  */
+
+import {
+  readExternalApiCache,
+  writeExternalApiCache,
+} from "../externalApiCacheDb";
+import { notifyOwner } from "../_core/notification";
 
 const BASE_URL = "https://api.pokemontcg.io/v2";
 const API_KEY = process.env.POKEMONTCG_API_KEY || "";
@@ -11,18 +17,27 @@ const headers: Record<string, string> = {
 };
 if (API_KEY) headers["X-Api-Key"] = API_KEY;
 
-// Simple in-memory cache
-const cache = new Map<string, { data: unknown; expires: number }>();
+// Fast process-local cache. The stale limit prevents an old response from
+// living forever in a long-running instance.
+const cache = new Map<
+  string,
+  { data: unknown; expires: number; staleExpires: number }
+>();
 
 const inflight = new Map<string, Promise<unknown>>();
 
 function cached<T>(
   key: string,
   ttlMs: number,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  staleTtlMs = 14 * 24 * 60 * 60 * 1000
 ): Promise<T> {
-  const hit = cache.get(key);
   const now = Date.now();
+  let hit = cache.get(key);
+  if (hit && hit.staleExpires <= now) {
+    cache.delete(key);
+    hit = undefined;
+  }
   if (hit && hit.expires > now) return Promise.resolve(hit.data as T);
 
   // Deduplicate concurrent identical requests
@@ -34,7 +49,11 @@ function cached<T>(
 
   const p = fn()
     .then(data => {
-      cache.set(key, { data, expires: Date.now() + ttlMs });
+      cache.set(key, {
+        data,
+        expires: Date.now() + ttlMs,
+        staleExpires: Date.now() + Math.max(ttlMs, staleTtlMs),
+      });
       inflight.delete(key);
       return data;
     })
@@ -59,6 +78,150 @@ const TTL = {
   SETS: 60 * 60 * 1000, // 1h for sets list
   HIGH_VALUE: 30 * 60 * 1000, // 30min for high-value cards
 };
+
+const STALE_TTL = {
+  CARD: 30 * 24 * 60 * 60 * 1000,
+  SEARCH: 14 * 24 * 60 * 60 * 1000,
+  SETS: 30 * 24 * 60 * 60 * 1000,
+};
+
+const PROVIDER = "pokemontcg";
+const MAX_ATTEMPTS = 3;
+const REQUEST_TIMEOUT_MS = 8_000;
+const BREAKER_FAILURE_THRESHOLD = 2;
+const BREAKER_COOLDOWN_MS = 45_000;
+
+const breaker = {
+  consecutiveFailures: 0,
+  openUntil: 0,
+  lastAlertAt: 0,
+};
+
+let cacheWarningAt = 0;
+
+class PokemonTcgHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly path: string
+  ) {
+    super(`PokémonTCG upstream returned ${status}`);
+  }
+}
+
+export class CardCatalogUnavailableError extends Error {
+  constructor() {
+    super("Card catalog is temporarily unavailable. Please try again shortly.");
+    this.name = "CardCatalogUnavailableError";
+  }
+}
+
+export function shouldRetryPokemonStatus(status: number) {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+export function pokemonRetryDelayMs(attempt: number, jitter = Math.random()) {
+  const base = [350, 1_100][Math.max(0, Math.min(attempt, 1))];
+  return Math.round(base + Math.max(0, Math.min(1, jitter)) * 200);
+}
+
+function warnCacheFailure(error: unknown) {
+  const now = Date.now();
+  if (now - cacheWarningAt < 60_000) return;
+  cacheWarningAt = now;
+  console.warn("[Card catalog] Persistent cache unavailable", error);
+}
+
+function recordUpstreamSuccess() {
+  breaker.consecutiveFailures = 0;
+  breaker.openUntil = 0;
+}
+
+function recordUpstreamFailure(error: unknown) {
+  breaker.consecutiveFailures += 1;
+  if (breaker.consecutiveFailures < BREAKER_FAILURE_THRESHOLD) return;
+  const now = Date.now();
+  breaker.openUntil = now + BREAKER_COOLDOWN_MS;
+  console.error("[Card catalog] Circuit opened after upstream failures", error);
+  if (now - breaker.lastAlertAt >= 30 * 60 * 1000) {
+    breaker.lastAlertAt = now;
+    void notifyOwner({
+      title: "RarityGrid: card catalog provider degraded",
+      content:
+        "The Pokémon TCG catalog provider failed repeatedly. RarityGrid opened its circuit breaker and is serving last-known-good cached data when available.",
+    }).catch(alertError =>
+      console.error("[Card catalog] Owner alert failed", alertError)
+    );
+  }
+}
+
+async function persistentResponse<T>(input: {
+  requestKey: string;
+  freshForMs: number;
+  staleForMs: number;
+  fetchPrimary: () => Promise<T>;
+  fetchSecondary?: () => Promise<T | null>;
+}): Promise<T> {
+  let saved: Awaited<ReturnType<typeof readExternalApiCache<T>>> = null;
+  try {
+    saved = await readExternalApiCache<T>(PROVIDER, input.requestKey);
+    if (saved?.isFresh) return saved.data;
+  } catch (error) {
+    warnCacheFailure(error);
+  }
+
+  try {
+    const data = await input.fetchPrimary();
+    try {
+      await writeExternalApiCache({
+        provider: PROVIDER,
+        requestKey: input.requestKey,
+        data,
+        freshForMs: input.freshForMs,
+        staleForMs: input.staleForMs,
+      });
+    } catch (error) {
+      warnCacheFailure(error);
+    }
+    return data;
+  } catch (primaryError) {
+    if (saved) {
+      console.warn(
+        `[Card catalog] Serving persistent stale data for ${input.requestKey}`
+      );
+      return saved.data;
+    }
+    if (input.fetchSecondary) {
+      try {
+        const secondary = await input.fetchSecondary();
+        if (secondary) {
+          console.warn(
+            `[Card catalog] Serving secondary provider for ${input.requestKey}`
+          );
+          try {
+            await writeExternalApiCache({
+              provider: PROVIDER,
+              requestKey: input.requestKey,
+              data: secondary,
+              freshForMs: input.freshForMs,
+              staleForMs: input.staleForMs,
+            });
+          } catch (error) {
+            warnCacheFailure(error);
+          }
+          return secondary;
+        }
+      } catch (secondaryError) {
+        console.error(
+          "[Card catalog] Secondary provider failed",
+          secondaryError
+        );
+      }
+    }
+    throw primaryError instanceof CardCatalogUnavailableError
+      ? primaryError
+      : new CardCatalogUnavailableError();
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -162,28 +325,56 @@ export interface SearchCardsResult {
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string): Promise<T> {
+  if (breaker.openUntil > Date.now()) {
+    throw new CardCatalogUnavailableError();
+  }
   let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  let lastFailureWasRetryable = true;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12_000);
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       const res = await fetch(`${BASE_URL}${path}`, {
         headers,
         signal: controller.signal,
       });
-      if (!res.ok)
-        throw new Error(`PokémonTCG API error ${res.status}: ${path}`);
-      return (await res.json()) as T;
+      if (!res.ok) throw new PokemonTcgHttpError(res.status, path);
+      const data = (await res.json()) as T;
+      recordUpstreamSuccess();
+      return data;
     } catch (error) {
       lastError = error;
-      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 250));
+      const retryable =
+        !(error instanceof PokemonTcgHttpError) ||
+        shouldRetryPokemonStatus(error.status);
+      lastFailureWasRetryable = retryable;
+      console.warn("[Card catalog] Upstream request failed", {
+        attempt: attempt + 1,
+        status: error instanceof PokemonTcgHttpError ? error.status : "network",
+        path: path.slice(0, 240),
+      });
+      if (!retryable) break;
+      if (attempt < MAX_ATTEMPTS - 1) {
+        await new Promise(resolve =>
+          setTimeout(resolve, pokemonRetryDelayMs(attempt))
+        );
+      }
     } finally {
       clearTimeout(timer);
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("PokémonTCG API request failed");
+  if (lastFailureWasRetryable) recordUpstreamFailure(lastError);
+  throw new CardCatalogUnavailableError();
+}
+
+/** Test isolation for the module-level cache and circuit breaker. */
+export function resetPokemonTcgResilienceForTests() {
+  cache.clear();
+  inflight.clear();
+  breaker.consecutiveFailures = 0;
+  breaker.openUntil = 0;
+  breaker.lastAlertAt = 0;
+  cacheWarningAt = 0;
 }
 
 /** Slim field set for card grids — cuts payload ~70% vs full card objects. */
@@ -201,20 +392,58 @@ export async function searchCards(
   if (params.select) qs.set("select", params.select);
 
   const key = `search:${qs.toString()}`;
-  return cached(key, TTL.SEARCH, () =>
-    apiFetch<SearchCardsResult>(`/cards?${qs.toString()}`)
+  return cached(
+    key,
+    TTL.SEARCH,
+    () =>
+      persistentResponse<SearchCardsResult>({
+        requestKey: key,
+        freshForMs: TTL.SEARCH,
+        staleForMs: STALE_TTL.SEARCH,
+        fetchPrimary: () =>
+          apiFetch<SearchCardsResult>(`/cards?${qs.toString()}`),
+        // Blank catalog browsing is the high-traffic failure seen in
+        // production. RapidAPI is attempted only with no saved response and
+        // after all primary retries, preserving both providers' quotas.
+        fetchSecondary:
+          !params.q && process.env.RAPIDAPI_KEY?.trim()
+            ? async () => {
+                const { searchCMCardsGrid } =
+                  await import("../cardmarketApi.js");
+                const result = await searchCMCardsGrid(
+                  "",
+                  params.page ?? 1,
+                  params.pageSize ?? 24
+                );
+                return result?.data.length ? result : null;
+              }
+            : undefined,
+      }),
+    STALE_TTL.SEARCH
   );
 }
 
 export async function getCardById(id: string): Promise<PtcgCard | null> {
-  return cached(`card:${id}`, TTL.CARD, async () => {
-    try {
-      const res = await apiFetch<{ data: PtcgCard }>(`/cards/${id}`);
-      return res.data;
-    } catch {
-      return null;
-    }
-  });
+  const key = `card:${id}`;
+  try {
+    return await cached(
+      key,
+      TTL.CARD,
+      () =>
+        persistentResponse<PtcgCard>({
+          requestKey: key,
+          freshForMs: TTL.CARD,
+          staleForMs: STALE_TTL.CARD,
+          fetchPrimary: async () => {
+            const res = await apiFetch<{ data: PtcgCard }>(`/cards/${id}`);
+            return res.data;
+          },
+        }),
+      STALE_TTL.CARD
+    );
+  } catch {
+    return null;
+  }
 }
 
 export async function getCardsByIds(ids: string[]): Promise<PtcgCard[]> {
@@ -228,23 +457,47 @@ export async function getCardsByIds(ids: string[]): Promise<PtcgCard[]> {
 }
 
 export async function getSets(): Promise<PtcgSet[]> {
-  return cached("sets:all", TTL.SETS, async () => {
-    const res = await apiFetch<{ data: PtcgSet[] }>(
-      "/sets?orderBy=-releaseDate&pageSize=500"
-    );
-    return res.data;
-  });
+  const key = "sets:all";
+  return cached(
+    key,
+    TTL.SETS,
+    () =>
+      persistentResponse<PtcgSet[]>({
+        requestKey: key,
+        freshForMs: TTL.SETS,
+        staleForMs: STALE_TTL.SETS,
+        fetchPrimary: async () => {
+          const res = await apiFetch<{ data: PtcgSet[] }>(
+            "/sets?orderBy=-releaseDate&pageSize=500"
+          );
+          return res.data;
+        },
+      }),
+    STALE_TTL.SETS
+  );
 }
 
 export async function getSetById(id: string): Promise<PtcgSet | null> {
-  return cached(`set:${id}`, TTL.SETS, async () => {
-    try {
-      const res = await apiFetch<{ data: PtcgSet }>(`/sets/${id}`);
-      return res.data;
-    } catch {
-      return null;
-    }
-  });
+  const key = `set:${id}`;
+  try {
+    return await cached(
+      key,
+      TTL.SETS,
+      () =>
+        persistentResponse<PtcgSet>({
+          requestKey: key,
+          freshForMs: TTL.SETS,
+          staleForMs: STALE_TTL.SETS,
+          fetchPrimary: async () => {
+            const res = await apiFetch<{ data: PtcgSet }>(`/sets/${id}`);
+            return res.data;
+          },
+        }),
+      STALE_TTL.SETS
+    );
+  } catch {
+    return null;
+  }
 }
 
 export async function getHighValueCards(page = 1): Promise<SearchCardsResult> {

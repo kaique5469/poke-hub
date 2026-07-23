@@ -22,9 +22,9 @@ const PRIVATE_PATHS = [
 
 const CLIENT_ROUTES = [
   /^\/$/,
-  /^\/(?:login|cards|scanner|market|sets|game|pokedex|metagame|decks|deck-builder|community|tournaments|binder|drops|shop|marketplace|cart|orders|auctions|bazaar|articles|sell|sell-card|open-store|dashboard|account|privacy|terms|contact|404)\/?$/,
+  /^\/(?:login|cards|scanner|market|sets|game|weekly-rules|pokedex|metagame|decks|deck-builder|community|tournaments|binder|drops|shop|marketplace|cart|orders|auctions|bazaar|articles|sell|sell-card|open-store|dashboard|account|privacy|terms|contact|404)\/?$/,
   /^\/(?:cards|sets|pokedex|shop|articles|store|profile)\/[^/]+\/?$/,
-  /^\/admin\/escrow\/?$/,
+  /^\/admin\/(?:escrow|game)\/?$/,
   /^\/decks\/builder\/?$/,
 ];
 
@@ -90,6 +90,11 @@ const PAGE_META: Record<string, Omit<RouteSeo, "canonicalPath">> = {
     title: "Guess the Pokémon Game — RarityGrid",
     description:
       "Play Guess the Pokémon in easy, medium or hard mode, earn points and test your Pokédex knowledge.",
+  },
+  "/weekly-rules": {
+    title: "Weekly Arena Rules & Active Prize — RarityGrid",
+    description:
+      "View the active RarityGrid Weekly Arena prize, eligibility, verified scoring, tie-break and claim rules.",
   },
 };
 
@@ -238,6 +243,7 @@ const STATIC_SITEMAP_ENTRIES: SitemapEntry[] = [
   { path: "/bazaar", changefreq: "daily", priority: 0.7 },
   { path: "/community", changefreq: "daily", priority: 0.6 },
   { path: "/game", changefreq: "weekly", priority: 0.6 },
+  { path: "/weekly-rules", changefreq: "weekly", priority: 0.5 },
   { path: "/drops", changefreq: "daily", priority: 0.6 },
   { path: "/privacy", changefreq: "monthly", priority: 0.2 },
   { path: "/terms", changefreq: "monthly", priority: 0.2 },
