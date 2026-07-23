@@ -5,6 +5,8 @@
 import crypto from "crypto";
 import {
   CHECKOUT_RESERVATION_MINUTES,
+  MARKETPLACE_COUNTRY,
+  MARKETPLACE_CURRENCY,
   type ShippingAddress,
 } from "@shared/marketplace";
 
@@ -31,7 +33,7 @@ export interface StripeSession {
 }
 
 export async function createCheckoutSession(opts: {
-  amountUsd: number;
+  amountBrl: number;
   description: string;
   orderIds: number[];
   buyerEmail?: string | null;
@@ -45,20 +47,21 @@ export async function createCheckoutSession(opts: {
   const params: Record<string, string | number> = {
     mode: "payment",
     "payment_method_types[0]": "card",
+    "payment_method_types[1]": "pix",
     "line_items[0][quantity]": 1,
-    "line_items[0][price_data][currency]": "usd",
-    "line_items[0][price_data][unit_amount]": Math.round(opts.amountUsd * 100),
+    "line_items[0][price_data][currency]": MARKETPLACE_CURRENCY.toLowerCase(),
+    "line_items[0][price_data][unit_amount]": Math.round(opts.amountBrl * 100),
     "line_items[0][price_data][product_data][name]": opts.description,
     success_url: `${opts.origin}/orders?payment=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/cart?payment=cancelled`,
     client_reference_id: checkoutReference,
     expires_at: Math.ceil(expiresAt.getTime() / 1000),
-    "shipping_address_collection[allowed_countries][0]": "US",
+    "shipping_address_collection[allowed_countries][0]": MARKETPLACE_COUNTRY,
     "phone_number_collection[enabled]": "true",
     billing_address_collection: "auto",
     "payment_intent_data[transfer_group]": checkoutReference,
     "custom_text[shipping_address][message]":
-      "Free tracked US shipping is included in marketplace listing prices.",
+      "O frete rastreado dentro do Brasil deve estar incluído no preço do anúncio.",
     "metadata[orderIds]": opts.orderIds.join(","),
   };
   if (opts.buyerEmail) params["customer_email"] = opts.buyerEmail;
@@ -91,7 +94,13 @@ export async function expireCheckoutSession(sessionId: string): Promise<void> {
 export interface StripeEvent {
   id: string;
   type: string;
-  data: { object: { id: string; metadata?: Record<string, string> } };
+  data: {
+    object: {
+      id: string;
+      payment_status?: "paid" | "unpaid" | "no_payment_required";
+      metadata?: Record<string, string>;
+    };
+  };
 }
 
 export interface StripePaymentDetails {
@@ -210,6 +219,8 @@ export async function createConnectAccount(
 ): Promise<string> {
   const params: Record<string, string | number> = {
     type: "express",
+    country: MARKETPLACE_COUNTRY,
+    business_type: "individual",
     "capabilities[card_payments][requested]": "true",
     "capabilities[transfers][requested]": "true",
   };
@@ -233,6 +244,8 @@ export async function createAccountLink(
 }
 
 export interface ConnectStatus {
+  country: string | null;
+  chargesEnabled: boolean;
   payoutsEnabled: boolean;
   detailsSubmitted: boolean;
 }
@@ -242,6 +255,8 @@ export async function getAccountStatus(
 ): Promise<ConnectStatus> {
   const data = await stripeGet(`/accounts/${accountId}`);
   return {
+    country: typeof data.country === "string" ? data.country : null,
+    chargesEnabled: !!data.charges_enabled,
     payoutsEnabled: !!data.payouts_enabled,
     detailsSubmitted: !!data.details_submitted,
   };
@@ -313,7 +328,7 @@ export async function createTransfer(opts: {
     "/transfers",
     {
       amount: opts.amountCents,
-      currency: "usd",
+      currency: MARKETPLACE_CURRENCY.toLowerCase(),
       destination: opts.destination,
       source_transaction: opts.sourceCharge,
       description: opts.description,

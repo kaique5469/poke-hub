@@ -128,6 +128,7 @@ import {
 import { marketRouter } from "./marketRouter";
 import { ENV } from "./_core/env";
 import { dedupeArticlesByTitle } from "./lib/articleQuality";
+import { getPortugueseCard, searchPortugueseCards } from "./lib/tcgdex";
 
 export const appRouter = router({
   system: systemRouter,
@@ -161,9 +162,17 @@ export const appRouter = router({
           type: z.string().optional(),
           rarity: z.string().optional(),
           supertype: z.string().optional(),
+          language: z.enum(["en", "pt-BR"]).default("en"),
         })
       )
       .query(async ({ input }) => {
+        if (input.language === "pt-BR") {
+          return searchPortugueseCards({
+            q: input.q,
+            page: input.page,
+            pageSize: input.pageSize,
+          });
+        }
         const buildFilters = () => {
           const parts: string[] = [];
           if (input.set) parts.push(`set.id:${input.set}`);
@@ -255,10 +264,13 @@ export const appRouter = router({
     getById: publicProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
-        const card = await getCardById(input.id);
+        const isPortuguese = input.id.startsWith("ptbr:");
+        const card = isPortuguese
+          ? await getPortugueseCard(input.id.slice(5))
+          : await getCardById(input.id);
         if (!card)
           throw new TRPCError({ code: "NOT_FOUND", message: "Card not found" });
-        const price = getPriceFromCard(card);
+        const price = isPortuguese ? null : getPriceFromCard(card);
         return {
           ...card,
           isSpecialRare: isSpecialRare(card.rarity),
@@ -1162,6 +1174,7 @@ export const appRouter = router({
           condition: input.condition,
           language: input.language,
           priceUsd: input.priceUsd.toFixed(2),
+          currency: "BRL",
           notes: input.notes,
           status: "active",
         });
@@ -1181,7 +1194,7 @@ export const appRouter = router({
           tagline: z.string().max(256).optional(),
           description: z.string().max(4000).optional(),
           location: z.string().max(128).optional(),
-          paymentMethods: z.array(z.literal("card")).length(1),
+          paymentMethods: z.array(z.enum(["card", "pix"])).min(1),
           shipsFrom: z.string().max(128).optional(),
           handlingDays: z.number().int().min(1).max(10).default(2),
           shippingPolicy: z.string().max(4000).optional(),
@@ -1194,6 +1207,8 @@ export const appRouter = router({
           const { acceptSellerTerms: _accepted, ...store } = input;
           return await createStore(ctx.user.id, {
             ...store,
+            country: "BR",
+            businessType: "individual",
             sellerTermsVersion: MARKETPLACE_TERMS_VERSION,
             sellerTermsAcceptedAt: new Date(),
           });
@@ -1212,7 +1227,10 @@ export const appRouter = router({
           tagline: z.string().max(256).optional(),
           description: z.string().max(4000).optional(),
           location: z.string().max(128).optional(),
-          paymentMethods: z.array(z.literal("card")).length(1).optional(),
+          paymentMethods: z
+            .array(z.enum(["card", "pix"]))
+            .min(1)
+            .optional(),
           shipsFrom: z.string().max(128).optional(),
           handlingDays: z.number().int().min(1).max(10).optional(),
           shippingPolicy: z.string().max(4000).optional(),
@@ -1233,7 +1251,7 @@ export const appRouter = router({
           });
         }
         return updateStore(ctx.user.id, {
-          paymentMethods: ["card"],
+          paymentMethods: ["card", "pix"],
           sellerTermsVersion: MARKETPLACE_TERMS_VERSION,
           sellerTermsAcceptedAt: new Date(),
         });
@@ -1301,9 +1319,19 @@ export const appRouter = router({
         });
       try {
         let accountId = store.stripeAccountId;
+        if (accountId) {
+          const existingStatus = await getAccountStatus(accountId);
+          if (existingStatus.country && existingStatus.country !== "BR") {
+            accountId = null;
+          }
+        }
         if (!accountId) {
           accountId = await createConnectAccount(ctx.user.email);
-          await updateStore(ctx.user.id, { stripeAccountId: accountId });
+          await updateStore(ctx.user.id, {
+            stripeAccountId: accountId,
+            stripePayoutsEnabled: false,
+            stripeChargesEnabled: false,
+          });
         }
         const proto =
           (ctx.req.headers["x-forwarded-proto"] as string | undefined)?.split(
@@ -1328,6 +1356,7 @@ export const appRouter = router({
           hasStore: false,
           connected: false,
           payoutsEnabled: false,
+          chargesEnabled: false,
           termsAccepted: false,
         };
       const termsAccepted =
@@ -1338,20 +1367,30 @@ export const appRouter = router({
           hasStore: true,
           connected: false,
           payoutsEnabled: false,
+          chargesEnabled: false,
           termsAccepted,
         };
       }
       try {
         const status = await getAccountStatus(store.stripeAccountId);
-        if (status.payoutsEnabled !== store.stripePayoutsEnabled) {
+        const isBrazilianAccount = status.country === "BR";
+        const payoutsEnabled = status.payoutsEnabled && isBrazilianAccount;
+        const chargesEnabled = status.chargesEnabled && isBrazilianAccount;
+        if (
+          payoutsEnabled !== store.stripePayoutsEnabled ||
+          chargesEnabled !== store.stripeChargesEnabled
+        ) {
           await updateStore(ctx.user.id, {
-            stripePayoutsEnabled: status.payoutsEnabled,
+            stripePayoutsEnabled: payoutsEnabled,
+            stripeChargesEnabled: chargesEnabled,
           });
         }
         return {
           hasStore: true,
           connected: true,
-          payoutsEnabled: status.payoutsEnabled,
+          payoutsEnabled,
+          chargesEnabled,
+          country: status.country,
           detailsSubmitted: status.detailsSubmitted,
           termsAccepted,
         };
@@ -1360,6 +1399,8 @@ export const appRouter = router({
           hasStore: true,
           connected: true,
           payoutsEnabled: store.stripePayoutsEnabled,
+          chargesEnabled: store.stripeChargesEnabled,
+          country: store.country,
           termsAccepted,
         };
       }

@@ -53,6 +53,15 @@ const money = (value: number | string | null | undefined) =>
         maximumFractionDigits: 2,
       }).format(Number(value));
 
+const marketplaceMoney = (value: number | string | null | undefined) =>
+  value == null
+    ? "—"
+    : new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+        maximumFractionDigits: 2,
+      }).format(Number(value));
+
 const compact = (value: number) =>
   new Intl.NumberFormat("en-US", { notation: "compact" }).format(value);
 
@@ -419,8 +428,8 @@ export default function MarketPulse() {
             <SummaryCard
               icon={Activity}
               label="RarityGrid volume"
-              value={money(data?.summary.volume30d ?? 0)}
-              note="Paid card volume on RarityGrid · 30d"
+              value={marketplaceMoney(data?.summary.volume30d ?? 0)}
+              note="Paid Brazilian card volume on RarityGrid · 30d"
             />
           </div>
           {data?.summary.lastUpdated && (
@@ -702,7 +711,7 @@ export default function MarketPulse() {
                     <DemandRow
                       key={item.cardId}
                       item={item}
-                      metric={`${item.units} sold · ${money(item.volume)}`}
+                      metric={`${item.units} sold · ${marketplaceMoney(item.volume)}`}
                       icon={ShoppingBag}
                     />
                   ))
@@ -748,7 +757,7 @@ export default function MarketPulse() {
                   </span>
                   <span className="text-right">
                     <span className="block text-sm font-black text-emerald-700">
-                      {money(sale.totalUsd)}
+                      {marketplaceMoney(sale.totalUsd)}
                     </span>
                     <span className="block text-[10px] text-slate-400">
                       {sale.soldAt

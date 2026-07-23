@@ -152,6 +152,7 @@ export const productsRouter = router({
         return createProductListing({
           ...input,
           priceUsd: input.priceUsd.toFixed(2),
+          currency: "BRL",
           sellerId: ctx.user.id,
         });
       })
@@ -276,14 +277,14 @@ export const cartRouter = router({
       if (!stripeEnabled()) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Card payments are not available yet",
+          message: "Pagamentos por Pix e cartão ainda não estão disponíveis",
         });
       }
       const notReady = await getUnpayableCartSellers(ctx.user.id);
       if (notReady.length > 0) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: `Checkout unavailable: ${notReady.join(", ")} ${notReady.length > 1 ? "haven't" : "hasn't"} completed payout setup. Remove those items and try again.`,
+          message: `Checkout indisponível: ${notReady.join(", ")} ainda não concluiu a verificação de recebimentos no Brasil.`,
         });
       }
       const result = await rethrow(() =>
@@ -298,7 +299,7 @@ export const cartRouter = router({
         null;
       try {
         session = await createCheckoutSession({
-          amountUsd: result.totalUsd,
+          amountBrl: result.totalBrl,
           description: `RarityGrid order (${result.orderIds.length} item${result.orderIds.length > 1 ? "s" : ""})`,
           orderIds: result.orderIds,
           buyerEmail: ctx.user.email,

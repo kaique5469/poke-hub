@@ -25,74 +25,56 @@ const INK = "#0B1220";
 const PAYMENT_OPTIONS = [
   {
     value: "card",
-    label: "Card (on-platform)",
+    label: "Cartão e Pix (na plataforma)",
     icon: <CreditCard size={18} />,
-    desc: "Stripe secure checkout — funds are held in escrow and released to you when the buyer confirms delivery.",
+    desc: "Checkout seguro Stripe em reais. Seus dados de CPF e conta bancária são informados diretamente ao Stripe.",
+    recommended: true,
+  },
+  {
+    value: "pix",
+    label: "Pix",
+    icon: <CreditCard size={18} />,
+    desc: "Confirmação pelo Stripe. O pedido só é liberado para envio depois que o pagamento for confirmado.",
     recommended: true,
   },
 ] as const;
 
 type PayMethod = (typeof PAYMENT_OPTIONS)[number]["value"];
 
-const US_STATES = [
+const BR_STATES = [
+  "AC",
   "AL",
-  "AK",
-  "AZ",
-  "AR",
-  "CA",
-  "CO",
-  "CT",
-  "DE",
-  "FL",
-  "GA",
-  "HI",
-  "ID",
-  "IL",
-  "IN",
-  "IA",
-  "KS",
-  "KY",
-  "LA",
-  "ME",
-  "MD",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
   "MA",
-  "MI",
-  "MN",
-  "MS",
-  "MO",
   "MT",
-  "NE",
-  "NV",
-  "NH",
-  "NJ",
-  "NM",
-  "NY",
-  "NC",
-  "ND",
-  "OH",
-  "OK",
-  "OR",
+  "MS",
+  "MG",
   "PA",
-  "RI",
-  "SC",
-  "SD",
-  "TN",
-  "TX",
-  "UT",
-  "VT",
-  "VA",
-  "WA",
-  "WV",
-  "WI",
-  "WY",
-  "DC",
+  "PB",
   "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
 ] as const;
 
 const STEPS = [
-  { n: 1, label: "Identity" },
-  { n: 2, label: "Payments & shipping" },
-  { n: 3, label: "Review & launch" },
+  { n: 1, label: "Identidade" },
+  { n: 2, label: "Pagamento e envio" },
+  { n: 3, label: "Revisão" },
 ] as const;
 
 const inputCls =
@@ -117,15 +99,15 @@ export default function OpenStore() {
   const [location, setLocation] = useState("");
 
   // Step 2 — payments & shipping
-  const payments: PayMethod[] = ["card"];
+  const payments: PayMethod[] = ["card", "pix"];
   const [shipCity, setShipCity] = useState("");
   const [shipState, setShipState] = useState("");
   const [handlingDays, setHandlingDays] = useState(2);
   const [shippingPolicy, setShippingPolicy] = useState(
-    "Free tracked shipping is included in every listing price. We ship anywhere in the United States within the stated handling time. Cards are sleeved, protected and packed securely."
+    "O frete rastreado para todo o Brasil está incluído no preço do anúncio. As cartas são enviadas com sleeve, proteção rígida e embalagem segura."
   );
   const [returnPolicy, setReturnPolicy] = useState(
-    "Returns accepted within 7 days if the item is not as described. Buyer pays return shipping unless the listing was inaccurate."
+    "O comprador pode exercer o direito de arrependimento nos prazos legais. Produto diferente do anúncio ou danificado será tratado pela proteção ao comprador."
   );
 
   // Step 3 — terms
@@ -144,7 +126,9 @@ export default function OpenStore() {
   const createStore = trpc.store.create.useMutation({
     onSuccess: () => {
       utils.store.mine.invalidate();
-      toast.success("Store created. Complete payout verification to publish listings.");
+      toast.success(
+        "Loja criada. Conclua a verificação de CPF no Stripe para publicar anúncios."
+      );
       connectOnboard.mutate();
     },
     onError: e => toast.error(e.message),
@@ -158,14 +142,14 @@ export default function OpenStore() {
           className="text-2xl font-black"
           style={{ color: INK, fontFamily: "var(--font-display)" }}
         >
-          Sign in to open your store
+          Entre para abrir sua loja
         </h1>
         <a
           href={getLoginUrl()}
           className="text-white font-black rounded-full px-8 py-3 text-sm uppercase"
           style={{ background: VIOLET }}
         >
-          Sign in
+          Entrar
         </a>
       </div>
     );
@@ -183,7 +167,7 @@ export default function OpenStore() {
           className="text-2xl font-black"
           style={{ color: INK, fontFamily: "var(--font-display)" }}
         >
-          You already have a store
+          Você já tem uma loja
         </h1>
         <Link
           href={ready ? `/store/${myStore.data.slug}` : "/dashboard"}
@@ -191,8 +175,8 @@ export default function OpenStore() {
           style={{ background: VIOLET }}
         >
           {ready
-            ? `Go to ${myStore.data.storeName}`
-            : "Complete payout setup"}
+            ? `Ir para ${myStore.data.storeName}`
+            : "Concluir verificação de recebimentos"}
         </Link>
       </div>
     );
@@ -204,14 +188,14 @@ export default function OpenStore() {
   const shipsFrom = [shipCity.trim(), shipState].filter(Boolean).join(", ");
 
   const submit = () => {
-    if (!agreed) return toast.error("Please accept the seller terms");
+    if (!agreed) return toast.error("Aceite os termos do vendedor");
     createStore.mutate({
       storeName: storeName.trim(),
       tagline: tagline.trim() || undefined,
       description: description.trim() || undefined,
       location: location.trim() || undefined,
       paymentMethods: payments,
-      shipsFrom: shipsFrom ? `${shipsFrom}, USA` : undefined,
+      shipsFrom: shipsFrom ? `${shipsFrom}, Brasil` : undefined,
       handlingDays,
       shippingPolicy: shippingPolicy.trim() || undefined,
       returnPolicy: returnPolicy.trim() || undefined,
@@ -228,10 +212,10 @@ export default function OpenStore() {
             className="text-2xl md:text-3xl font-black"
             style={{ color: INK, fontFamily: "var(--font-display)" }}
           >
-            Open your store
+            Abra sua loja
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Free to open. You can edit everything later.
+            Grátis para abrir. Marketplace exclusivo para vendedores no Brasil.
           </p>
         </div>
         <div className="flex items-start justify-center mb-8">
@@ -317,7 +301,7 @@ export default function OpenStore() {
                   className={inputCls}
                   value={location}
                   onChange={e => setLocation(e.target.value)}
-                  placeholder="City, State — e.g. Miami, FL"
+                  placeholder="Cidade, Estado — ex.: São Paulo, SP"
                   maxLength={128}
                 />
               </div>
@@ -340,12 +324,14 @@ export default function OpenStore() {
                 className="flex items-center gap-2 font-black"
                 style={{ color: INK }}
               >
-                <CreditCard size={18} style={{ color: VIOLET }} /> Payments &
-                shipping
+                <CreditCard size={18} style={{ color: VIOLET }} /> Pagamentos e
+                envio
               </div>
 
               <div>
-                <label className={labelCls}>Secure payment method *</label>
+                <label className={labelCls}>
+                  Formas de pagamento seguras *
+                </label>
                 <div className="grid sm:grid-cols-2 gap-3">
                   {PAYMENT_OPTIONS.map(opt => {
                     const active = payments.includes(opt.value);
@@ -363,7 +349,7 @@ export default function OpenStore() {
                           {opt.label}
                           {"recommended" in opt && opt.recommended && (
                             <span className="text-[9px] font-black bg-[#F5B301] text-black rounded-full px-1.5 py-px uppercase">
-                              Best
+                              Ativo
                             </span>
                           )}
                         </div>
@@ -380,22 +366,23 @@ export default function OpenStore() {
                 <Truck size={18} className="text-emerald-600 mt-0.5 shrink-0" />
                 <div className="text-xs text-emerald-900 leading-relaxed">
                   <span className="font-black uppercase">
-                    Nationwide shipping — USA
+                    Envio nacional — Brasil
                   </span>
                   <p className="mt-0.5">
-                    Every public listing includes tracked shipping in the item price and ships anywhere in the United States.
+                    Todo anúncio público inclui frete rastreado no preço e deve
+                    atender endereços no Brasil.
                   </p>
                 </div>
               </div>
 
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>
-                  <label className={labelCls}>Ships from — city</label>
+                  <label className={labelCls}>Cidade de origem</label>
                   <input
                     className={inputCls}
                     value={shipCity}
                     onChange={e => setShipCity(e.target.value)}
-                    placeholder="e.g. Orlando"
+                    placeholder="Ex.: Campinas"
                     maxLength={100}
                   />
                 </div>
@@ -407,7 +394,7 @@ export default function OpenStore() {
                     onChange={e => setShipState(e.target.value)}
                   >
                     <option value="">Select…</option>
-                    {US_STATES.map(s => (
+                    {BR_STATES.map(s => (
                       <option key={s} value={s}>
                         {s}
                       </option>
@@ -508,21 +495,21 @@ export default function OpenStore() {
                   {shipsFrom && ` from ${shipsFrom}`}
                 </div>
                 <div>
-                  <span className="font-bold">Ships to:</span> United States —
-                  nationwide with tracked shipping included
+                  <span className="font-bold">Entrega:</span> todo o Brasil, com
+                  rastreamento incluído
                 </div>
               </div>
 
               <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-xs text-violet-900 leading-relaxed">
                 <div className="flex items-center gap-1.5 font-black uppercase mb-1">
-                  <LockKeyhole size={13} /> Seller terms
+                  <LockKeyhole size={13} /> Termos do vendedor
                 </div>
-                Opening a store is free. A 5% commission applies to completed
-                on-platform card payments. Payments are held in escrow and
-                released to you when the buyer confirms delivery (or
-                automatically after the protection window). You commit to including tracked US shipping in every listing price, shipping within your handling time, describing card
-                conditions accurately and honoring your return policy. Repeated
-                disputes may pause your store.
+                Abrir a loja é grátis. A comissão da plataforma é de 5% sobre
+                pagamentos concluídos por cartão ou Pix. O saldo fica protegido
+                e é liberado conforme o fluxo do pedido. O vendedor deve usar
+                dados brasileiros válidos, incluir frete rastreado no preço,
+                descrever corretamente o estado do item e cumprir a legislação
+                brasileira de consumo.
               </div>
 
               <label className="flex items-start gap-2.5 cursor-pointer text-sm text-gray-700">
@@ -533,7 +520,14 @@ export default function OpenStore() {
                   className="mt-0.5 accent-violet-600 w-4 h-4"
                 />
                 <span>
-                  I agree to the <Link href="/terms" className="font-bold text-violet-700 hover:underline">seller terms</Link> and confirm my listings will be accurate.
+                  Concordo com os{" "}
+                  <Link
+                    href="/terms"
+                    className="font-bold text-violet-700 hover:underline"
+                  >
+                    termos do vendedor
+                  </Link>{" "}
+                  e confirmo que meus anúncios serão verdadeiros.
                 </span>
               </label>
 
@@ -545,7 +539,9 @@ export default function OpenStore() {
                   <ArrowLeft size={15} /> Back
                 </button>
                 <button
-                  disabled={!agreed || createStore.isPending || connectOnboard.isPending}
+                  disabled={
+                    !agreed || createStore.isPending || connectOnboard.isPending
+                  }
                   onClick={submit}
                   className="inline-flex items-center gap-2 text-white font-black rounded-full px-8 py-3 text-sm uppercase disabled:opacity-40 shadow-lg"
                   style={{
@@ -553,8 +549,8 @@ export default function OpenStore() {
                   }}
                 >
                   {createStore.isPending || connectOnboard.isPending
-                    ? "Connecting Stripe..."
-                    : "Open store & connect payouts"}{" "}
+                    ? "Conectando ao Stripe..."
+                    : "Abrir loja e verificar CPF"}{" "}
                   <Store size={15} />
                 </button>
               </div>
@@ -564,13 +560,13 @@ export default function OpenStore() {
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[11px] text-gray-400">
           <span className="flex items-center gap-1.5">
-            <LockKeyhole size={12} /> Payments processed by Stripe
+            <LockKeyhole size={12} /> Pagamentos processados pelo Stripe
           </span>
           <span className="flex items-center gap-1.5">
-            <ShieldCheck size={12} /> Escrow protection on every order
+            <ShieldCheck size={12} /> Proteção em todos os pedidos
           </span>
           <span className="flex items-center gap-1.5">
-            <Truck size={12} /> Nationwide US shipping
+            <Truck size={12} /> Envio para todo o Brasil
           </span>
         </div>
       </div>

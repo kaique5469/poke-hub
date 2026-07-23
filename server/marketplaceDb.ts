@@ -36,6 +36,8 @@ import {
   type InsertWantListItem,
 } from "../drizzle/schema";
 import {
+  MARKETPLACE_COUNTRY,
+  MARKETPLACE_CURRENCY,
   MARKETPLACE_TERMS_VERSION,
   type OrderDisputeReason,
 } from "@shared/marketplace";
@@ -60,6 +62,7 @@ function readyStoreWhere() {
   return and(
     eq(sellerStores.status, "active"),
     eq(sellerStores.stripePayoutsEnabled, true),
+    eq(sellerStores.country, MARKETPLACE_COUNTRY),
     isNotNull(sellerStores.stripeAccountId),
     isNotNull(sellerStores.sellerTermsAcceptedAt),
     eq(sellerStores.sellerTermsVersion, MARKETPLACE_TERMS_VERSION)
@@ -90,6 +93,7 @@ export async function searchListings(input: SearchListingsInput) {
 
   const where = and(
     eq(listings.status, "active"),
+    eq(listings.currency, MARKETPLACE_CURRENCY),
     input.cardId ? eq(listings.cardId, input.cardId) : undefined,
     input.sellerId ? eq(listings.sellerId, input.sellerId) : undefined,
     input.q ? like(listings.cardName, `%${input.q}%`) : undefined,
@@ -148,6 +152,7 @@ export async function getListingsByCardWithSeller(cardId: string) {
       and(
         eq(listings.cardId, cardId),
         eq(listings.status, "active"),
+        eq(listings.currency, MARKETPLACE_CURRENCY),
         readyStoreWhere()
       )
     )
@@ -194,6 +199,7 @@ function verifiedOrSellerListedProduct() {
         on ${sellerStores.userId} = ${productListings.sellerId}
       where ${productListings.productId} = ${products.id}
         and ${productListings.status} = 'active'
+        and ${productListings.currency} = ${MARKETPLACE_CURRENCY}
         and ${sellerStores.status} = 'active'
         and ${sellerStores.stripePayoutsEnabled} = true
         and ${sellerStores.stripeAccountId} is not null
@@ -358,6 +364,7 @@ export async function getProductListings(productId: number) {
       and(
         eq(productListings.productId, productId),
         eq(productListings.status, "active"),
+        eq(productListings.currency, MARKETPLACE_CURRENCY),
         readyStoreWhere()
       )
     )
@@ -369,6 +376,7 @@ export async function createProductListing(data: {
   productId: number;
   sellerId: number;
   priceUsd: string;
+  currency?: "BRL";
   quantity: number;
   condition?: Condition;
   language?: string;
@@ -417,7 +425,21 @@ export async function getCartWithDetails(userId: number) {
       eq(cartItems.productListingId, productListings.id)
     )
     .leftJoin(products, eq(productListings.productId, products.id))
-    .where(eq(cartItems.userId, userId))
+    .where(
+      and(
+        eq(cartItems.userId, userId),
+        or(
+          and(
+            isNotNull(cartItems.listingId),
+            eq(listings.currency, MARKETPLACE_CURRENCY)
+          ),
+          and(
+            isNotNull(cartItems.productListingId),
+            eq(productListings.currency, MARKETPLACE_CURRENCY)
+          )
+        )
+      )
+    )
     .orderBy(desc(cartItems.addedAt));
 
   // Attach seller info in one extra query
@@ -456,6 +478,50 @@ export async function addToCart(
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+
+  const target = ref.listingId
+    ? await db
+        .select({
+          sellerId: listings.sellerId,
+          stock: listings.quantity,
+          status: listings.status,
+          currency: listings.currency,
+        })
+        .from(listings)
+        .where(eq(listings.id, ref.listingId))
+        .limit(1)
+    : await db
+        .select({
+          sellerId: productListings.sellerId,
+          stock: productListings.quantity,
+          status: productListings.status,
+          currency: productListings.currency,
+        })
+        .from(productListings)
+        .where(eq(productListings.id, ref.productListingId!))
+        .limit(1);
+  const listing = target[0];
+  if (
+    !listing ||
+    listing.status !== "active" ||
+    listing.currency !== MARKETPLACE_CURRENCY
+  ) {
+    throw new Error("Este anúncio não está disponível no marketplace Brasil");
+  }
+  if (listing.sellerId === userId) {
+    throw new Error("Você não pode comprar o próprio anúncio");
+  }
+  const [readyStore] = await db
+    .select({ userId: sellerStores.userId })
+    .from(sellerStores)
+    .where(and(eq(sellerStores.userId, listing.sellerId), readyStoreWhere()))
+    .limit(1);
+  if (!readyStore) {
+    throw new Error(
+      "O recebimento deste vendedor está temporariamente indisponível"
+    );
+  }
+
   const where = and(
     eq(cartItems.userId, userId),
     ref.listingId ? eq(cartItems.listingId, ref.listingId) : undefined,
@@ -464,10 +530,14 @@ export async function addToCart(
       : undefined
   );
   const existing = await db.select().from(cartItems).where(where).limit(1);
+  const desiredQuantity = (existing[0]?.quantity ?? 0) + quantity;
+  if (desiredQuantity > listing.stock) {
+    throw new Error("Quantidade maior que o estoque disponível");
+  }
   if (existing[0]) {
     await db
       .update(cartItems)
-      .set({ quantity: existing[0].quantity + quantity })
+      .set({ quantity: desiredQuantity })
       .where(eq(cartItems.id, existing[0].id));
   } else {
     await db.insert(cartItems).values({
@@ -510,7 +580,26 @@ export async function getCartCount(userId: number): Promise<number> {
   const rows = await db
     .select({ count: sql<number>`coalesce(sum(quantity), 0)` })
     .from(cartItems)
-    .where(eq(cartItems.userId, userId));
+    .leftJoin(listings, eq(cartItems.listingId, listings.id))
+    .leftJoin(
+      productListings,
+      eq(cartItems.productListingId, productListings.id)
+    )
+    .where(
+      and(
+        eq(cartItems.userId, userId),
+        or(
+          and(
+            isNotNull(cartItems.listingId),
+            eq(listings.currency, MARKETPLACE_CURRENCY)
+          ),
+          and(
+            isNotNull(cartItems.productListingId),
+            eq(productListings.currency, MARKETPLACE_CURRENCY)
+          )
+        )
+      )
+    );
   return Number(rows[0]?.count ?? 0);
 }
 
@@ -518,7 +607,8 @@ export async function getCartCount(userId: number): Promise<number> {
 
 export interface CheckoutResult {
   orderIds: number[];
-  totalUsd: number;
+  totalBrl: number;
+  sellerId: number;
   skipped: { reason: string; cartItemId: number }[];
 }
 
@@ -545,7 +635,8 @@ export async function checkoutCart(
 
     const orderIds: number[] = [];
     const skipped: CheckoutResult["skipped"] = [];
-    let totalUsd = 0;
+    let totalBrl = 0;
+    let checkoutSellerId: number | null = null;
     for (const item of items) {
       if (item.listingId) {
         const [l] = await tx
@@ -553,7 +644,12 @@ export async function checkoutCart(
           .from(listings)
           .where(eq(listings.id, item.listingId))
           .for("update");
-        if (!l || l.status !== "active" || l.quantity < item.quantity) {
+        if (
+          !l ||
+          l.status !== "active" ||
+          l.currency !== MARKETPLACE_CURRENCY ||
+          l.quantity < item.quantity
+        ) {
           skipped.push({
             cartItemId: item.id,
             reason: "Listing unavailable or insufficient stock",
@@ -579,6 +675,12 @@ export async function checkoutCart(
           });
           continue;
         }
+        if (checkoutSellerId !== null && checkoutSellerId !== l.sellerId) {
+          throw new Error(
+            "Finalize um vendedor por vez. Remova os itens dos outros vendedores deste carrinho."
+          );
+        }
+        checkoutSellerId = l.sellerId;
         const lineTotal = parseFloat(String(l.priceUsd)) * item.quantity;
         const [res] = await tx.insert(orders).values({
           buyerId,
@@ -586,13 +688,15 @@ export async function checkoutCart(
           listingId: l.id,
           quantity: item.quantity,
           totalUsd: lineTotal.toFixed(2),
+          currency: MARKETPLACE_CURRENCY,
+          marketCountry: MARKETPLACE_COUNTRY,
           status: "pending",
           notes: notes ?? null,
           buyerTermsVersion,
           buyerTermsAcceptedAt: new Date(),
         });
         orderIds.push(res.insertId);
-        totalUsd += lineTotal;
+        totalBrl += lineTotal;
 
         const remaining = l.quantity - item.quantity;
         await tx
@@ -608,7 +712,12 @@ export async function checkoutCart(
           .from(productListings)
           .where(eq(productListings.id, item.productListingId))
           .for("update");
-        if (!pl || pl.status !== "active" || pl.quantity < item.quantity) {
+        if (
+          !pl ||
+          pl.status !== "active" ||
+          pl.currency !== MARKETPLACE_CURRENCY ||
+          pl.quantity < item.quantity
+        ) {
           skipped.push({
             cartItemId: item.id,
             reason: "Listing unavailable or insufficient stock",
@@ -634,6 +743,12 @@ export async function checkoutCart(
           });
           continue;
         }
+        if (checkoutSellerId !== null && checkoutSellerId !== pl.sellerId) {
+          throw new Error(
+            "Finalize um vendedor por vez. Remova os itens dos outros vendedores deste carrinho."
+          );
+        }
+        checkoutSellerId = pl.sellerId;
         const lineTotal = parseFloat(String(pl.priceUsd)) * item.quantity;
         const [res] = await tx.insert(orders).values({
           buyerId,
@@ -641,13 +756,15 @@ export async function checkoutCart(
           productListingId: pl.id,
           quantity: item.quantity,
           totalUsd: lineTotal.toFixed(2),
+          currency: MARKETPLACE_CURRENCY,
+          marketCountry: MARKETPLACE_COUNTRY,
           status: "pending",
           notes: notes ?? null,
           buyerTermsVersion,
           buyerTermsAcceptedAt: new Date(),
         });
         orderIds.push(res.insertId);
-        totalUsd += lineTotal;
+        totalBrl += lineTotal;
 
         const remaining = pl.quantity - item.quantity;
         await tx
@@ -664,7 +781,7 @@ export async function checkoutCart(
       throw new Error(skipped[0]?.reason ?? "No purchasable items in cart");
     }
 
-    return { orderIds, totalUsd, skipped };
+    return { orderIds, totalBrl, sellerId: checkoutSellerId!, skipped };
   });
 }
 

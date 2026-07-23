@@ -237,7 +237,7 @@ export default function Sell() {
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {[
               {
-                big: "$0",
+                big: "R$ 0",
                 label: "To open a store",
                 desc: "Free forever. No monthly subscription.",
               },
@@ -346,7 +346,7 @@ export default function Sell() {
         <div className="space-y-3">
           <Faq
             q="How much does it cost to sell?"
-            a="Opening a store and listing items is free. A 5% marketplace fee applies to completed card orders and supports checkout, escrow and buyer protection. Tracked US shipping must be included in each listing price."
+            a="Abrir a loja e anunciar é grátis. A taxa de 5% incide sobre pedidos concluídos e financia checkout e proteção ao comprador. O frete rastreado no Brasil deve estar incluído no preço."
           />
           <Faq
             q="When do I get paid?"
