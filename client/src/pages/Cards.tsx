@@ -76,6 +76,9 @@ export default function Cards() {
   const [rarity, setRarity] = useState(params.get("rarity") ?? "");
   const [supertype, setSupertype] = useState("");
   const [set, setSet] = useState(params.get("set") ?? "");
+  const [language, setLanguage] = useState<"en" | "pt-BR">(
+    params.get("language") === "pt-BR" ? "pt-BR" : "en"
+  );
   const recordMarketEvent = trpc.market.recordEvent.useMutation();
 
   // Keep filters in sync when the URL query changes (e.g. Home → set card)
@@ -85,6 +88,7 @@ export default function Cards() {
     setType(params.get("type") ?? "");
     setRarity(params.get("rarity") ?? "");
     setSet(params.get("set") ?? "");
+    setLanguage(params.get("language") === "pt-BR" ? "pt-BR" : "en");
     setPage(1);
   }, [params]);
   const [showFilters, setShowFilters] = useState(false);
@@ -105,6 +109,7 @@ export default function Cards() {
       rarity: rarity || undefined,
       supertype: supertype || undefined,
       set: set || undefined,
+      language,
     });
 
   // Accumulate cards across pages
@@ -174,10 +179,12 @@ export default function Cards() {
     setRarity("");
     setSupertype("");
     setSet("");
+    setLanguage("en");
     resetFilters();
   };
 
-  const hasFilters = q || type || rarity || supertype || set;
+  const hasFilters =
+    q || type || rarity || supertype || set || language !== "en";
 
   return (
     <div className="container py-8">
@@ -229,6 +236,32 @@ export default function Cards() {
             <span className="hidden sm:inline">Filters</span>
           </Button>
         </form>
+        <div className="flex gap-2" role="group" aria-label="Idioma das cartas">
+          <Button
+            type="button"
+            variant={language === "en" ? "default" : "outline"}
+            onClick={() => {
+              setLanguage("en");
+              resetFilters();
+            }}
+          >
+            Inglês · referência USD
+          </Button>
+          <Button
+            type="button"
+            variant={language === "pt-BR" ? "default" : "outline"}
+            onClick={() => {
+              setLanguage("pt-BR");
+              setType("");
+              setRarity("");
+              setSupertype("");
+              setSet("");
+              resetFilters();
+            }}
+          >
+            Português (Brasil) · anúncios BRL
+          </Button>
+        </div>
 
         {/* Filter panel */}
         {showFilters && (

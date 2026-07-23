@@ -3,7 +3,7 @@ import { Mail, ShieldCheck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
-const updated = "July 18, 2026";
+const updated = "20 de julho de 2026";
 
 const privacySections = [
   [
@@ -16,7 +16,7 @@ const privacySections = [
   ],
   [
     "Payments",
-    "Payment details are handled by Stripe. RarityGrid does not store full card numbers.",
+    "Dados de pagamento, CPF e conta bancária são tratados pelo Stripe. O RarityGrid não armazena número completo do cartão nem CPF do vendedor.",
   ],
   [
     "Third-party services",
@@ -39,7 +39,7 @@ const privacySections = [
 const termsSections = [
   [
     "Marketplace role",
-    "RarityGrid provides tools that connect independent buyers and sellers. Sellers are responsible for accurate descriptions, authenticity, condition, fulfillment and applicable taxes.",
+    "O RarityGrid conecta compradores e vendedores independentes no Brasil. O vendedor responde pela autenticidade, descrição, condição, envio e obrigações fiscais aplicáveis. A plataforma mantém os deveres previstos na legislação brasileira de consumo.",
   ],
   [
     "Pricing data",
@@ -47,15 +47,15 @@ const termsSections = [
   ],
   [
     "Orders and disputes",
-    "Card payments are processed by Stripe and the seller share is held while an order is fulfilled. Buyers and sellers must provide truthful information and supporting evidence during a cancellation, delivery claim or dispute.",
+    "Pagamentos por cartão e Pix são processados pelo Stripe em reais. Compradores e vendedores devem fornecer informações verdadeiras e provas em cancelamentos, reclamações de entrega ou disputas.",
   ],
   [
     "Inventory reservations and shipping",
-    "Checkout reserves inventory for 30 minutes. If payment is not completed, the reservation expires and inventory returns to sale. Marketplace listing prices include tracked shipping within the United States; sellers must ship to the address collected at secure checkout.",
+    "O checkout reserva o estoque por 30 minutos. Se o pagamento não for confirmado, a reserva expira. O preço do anúncio inclui frete rastreado para o Brasil e o vendedor deve enviar ao endereço coletado no checkout.",
   ],
   [
     "Fees, refunds and payouts",
-    "RarityGrid deducts a 5% marketplace fee from completed orders. Eligible refunds return the affected order amount to the original payment method. Seller payouts are released after confirmed fulfillment or the applicable protection window.",
+    "O RarityGrid desconta 5% de pedidos concluídos. Reembolsos elegíveis retornam ao meio de pagamento original. Os recebimentos do vendedor seguem a confirmação do envio e a janela de proteção aplicável.",
   ],
   [
     "Prohibited activity",

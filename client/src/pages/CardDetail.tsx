@@ -3,6 +3,7 @@ import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { formatMarketplaceMoney } from "@shared/marketplace";
 import {
   ShoppingCart,
   Heart,
@@ -418,7 +419,11 @@ export default function CardDetail() {
   const { data: externalPrices, isLoading: pricesLoading } =
     trpc.cards.getExternalPrices.useQuery(
       { id: id! },
-      { enabled: !!id, retry: false, staleTime: 60 * 60 * 1000 }
+      {
+        enabled: !!id && !id.startsWith("ptbr:"),
+        retry: false,
+        staleTime: 60 * 60 * 1000,
+      }
     );
 
   const { data: marketData } = trpc.market.card.useQuery(
@@ -531,7 +536,7 @@ export default function CardDetail() {
             offers: listings.length
               ? {
                   "@type": "AggregateOffer",
-                  priceCurrency: "USD",
+                  priceCurrency: "BRL",
                   lowPrice: Math.min(
                     ...listings.map(listing => Number(listing.priceUsd))
                   ),
@@ -635,7 +640,11 @@ export default function CardDetail() {
           </Link>
           <ChevronRight size={14} />
           <Link
-            href={`/sets/${card.set?.id}`}
+            href={
+              id?.startsWith("ptbr:")
+                ? `/cards?language=pt-BR&q=${encodeURIComponent(card.name)}`
+                : `/sets/${card.set?.id}`
+            }
             className="hover:text-blue-600 transition-colors"
           >
             {card.set?.name}
@@ -1435,7 +1444,7 @@ export default function CardDetail() {
                                 {l.quantity}
                               </td>
                               <td className="px-4 py-3 text-right font-black text-blue-600">
-                                ${Number(l.priceUsd).toFixed(2)}
+                                {formatMarketplaceMoney(l.priceUsd)}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <Button

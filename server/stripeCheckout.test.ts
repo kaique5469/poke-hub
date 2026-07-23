@@ -33,13 +33,13 @@ describe("Stripe marketplace checkout", () => {
     delete process.env.STRIPE_WEBHOOK_SECRET;
   });
 
-  it("collects US shipping and creates a 30-minute card reservation", async () => {
+  it("collects Brazilian shipping and creates a BRL card/Pix reservation", async () => {
     fetchMock.mockResolvedValueOnce(
       stripeResponse({ id: "cs_test_1", url: "https://checkout.stripe.test/1" })
     );
     const before = Date.now();
     const session = await createCheckoutSession({
-      amountUsd: 19.99,
+      amountBrl: 19.99,
       description: "RarityGrid order",
       orderIds: [41, 42],
       buyerEmail: "buyer@example.com",
@@ -49,9 +49,11 @@ describe("Stripe marketplace checkout", () => {
     const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = new URLSearchParams(String(request.body));
     expect(body.get("payment_method_types[0]")).toBe("card");
+    expect(body.get("payment_method_types[1]")).toBe("pix");
     expect(body.get("shipping_address_collection[allowed_countries][0]")).toBe(
-      "US"
+      "BR"
     );
+    expect(body.get("line_items[0][price_data][currency]")).toBe("brl");
     expect(body.get("line_items[0][price_data][unit_amount]")).toBe("1999");
     expect(body.get("metadata[orderIds]")).toBe("41,42");
     expect(request.headers).toMatchObject({
@@ -76,6 +78,8 @@ describe("Stripe marketplace checkout", () => {
     const body = new URLSearchParams(String(request.body));
     expect(url.endsWith("/accounts")).toBe(true);
     expect(body.get("type")).toBe("express");
+    expect(body.get("country")).toBe("BR");
+    expect(body.get("business_type")).toBe("individual");
     expect(body.get("email")).toBe("seller@example.com");
     expect(body.get("capabilities[card_payments][requested]")).toBe("true");
     expect(body.get("capabilities[transfers][requested]")).toBe("true");

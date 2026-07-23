@@ -20,6 +20,7 @@ import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatMarketplaceMoney } from "@shared/marketplace";
 
 const tabs = [
   ["overview", "Overview", BarChart2],
@@ -40,7 +41,7 @@ const statusStyle: Record<string, string> = {
   sold: "bg-indigo-100 text-indigo-800",
 };
 const money = (value: number | string | null | undefined) =>
-  `$${Number(value ?? 0).toFixed(2)}`;
+  formatMarketplaceMoney(value ?? 0);
 const shortDate = (value: string | Date) =>
   new Date(value).toLocaleDateString("en-US", {
     month: "short",
@@ -60,7 +61,7 @@ function PayoutsCard() {
   const acceptTerms = trpc.store.acceptTerms.useMutation({
     onSuccess: () => {
       toast.success(
-        "Seller terms accepted. Your store can publish after payout verification."
+        "Termos aceitos. Sua loja poderá publicar após a verificação brasileira do Stripe."
       );
       void utils.store.connectStatus.invalidate();
       void utils.store.mine.invalidate();
@@ -75,14 +76,14 @@ function PayoutsCard() {
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h3 className="font-black text-gray-950">
-              Start selling on RarityGrid
+              Comece a vender no RarityGrid Brasil
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              Open a store before publishing marketplace inventory.
+              Abra uma loja antes de publicar anúncios no marketplace.
             </p>
           </div>
           <Link href="/open-store">
-            <Button>Open your store</Button>
+            <Button>Abrir minha loja</Button>
           </Link>
         </div>
       </Panel>
@@ -92,23 +93,25 @@ function PayoutsCard() {
       <Panel>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h3 className="font-black text-gray-950">Updated seller terms</h3>
+            <h3 className="font-black text-gray-950">
+              Termos do vendedor atualizados
+            </h3>
             <p className="mt-1 max-w-xl text-sm text-gray-500">
-              Review the current marketplace, tracked-shipping, escrow and
-              buyer-protection rules before publishing inventory.
+              Revise as regras brasileiras de marketplace, frete rastreado e
+              proteção ao comprador.
             </p>
             <Link
               href="/terms"
               className="mt-2 inline-block text-sm font-bold text-violet-700 hover:underline"
             >
-              Read Marketplace Terms
+              Ler termos do Marketplace
             </Link>
           </div>
           <Button
             disabled={acceptTerms.isPending}
             onClick={() => acceptTerms.mutate({ acceptSellerTerms: true })}
           >
-            {acceptTerms.isPending ? "Saving…" : "Accept seller terms"}
+            {acceptTerms.isPending ? "Salvando…" : "Aceitar termos"}
           </Button>
         </div>
       </Panel>
@@ -119,16 +122,18 @@ function PayoutsCard() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-black text-gray-950">Seller payouts</h3>
+            <h3 className="font-black text-gray-950">Recebimentos no Brasil</h3>
             <Status
               value={current.payoutsEnabled ? "active" : "pending"}
-              label={current.payoutsEnabled ? "Active" : "Setup required"}
+              label={
+                current.payoutsEnabled ? "Ativo" : "Verificação necessária"
+              }
             />
           </div>
           <p className="mt-2 max-w-xl text-sm text-gray-500">
             {current.payoutsEnabled
-              ? "Your Stripe account can receive marketplace payouts."
-              : "Complete Stripe onboarding to receive buyer payments safely."}
+              ? "Sua conta Stripe brasileira pode receber vendas em reais."
+              : "Conclua a verificação com CPF e conta bancária brasileira diretamente no Stripe."}
           </p>
         </div>
         {!current.payoutsEnabled ? (
@@ -136,15 +141,15 @@ function PayoutsCard() {
             {onboard.isPending
               ? "Redirecting…"
               : current.connected
-                ? "Finish setup"
-                : "Connect Stripe"}
+                ? "Concluir verificação"
+                : "Verificar CPF no Stripe"}
           </Button>
         ) : (
           <Button
             variant="outline"
             onClick={() => void utils.store.connectStatus.invalidate()}
           >
-            Refresh status
+            Atualizar status
           </Button>
         )}
       </div>

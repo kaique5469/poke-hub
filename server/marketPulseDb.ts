@@ -501,6 +501,8 @@ export async function getMarketOverview(periodDays: 1 | 7 | 30) {
   const periodCutoff = new Date(now - periodDays * DAY_MS);
   const paidOrderWhere = and(
     eq(orders.paymentStatus, "paid"),
+    eq(orders.currency, "BRL"),
+    eq(orders.marketCountry, "BR"),
     gte(orders.createdAt, monthAgo)
   );
 
@@ -646,6 +648,7 @@ export async function getMarketOverview(periodDays: 1 | 7 | 30) {
       views24h: eventCounts.get("card_view") ?? 0,
       sales30d: Number(salesSummary[0]?.sales ?? 0),
       volume30d: money(salesSummary[0]?.volume),
+      salesCurrency: "BRL" as const,
       lastUpdated:
         cards
           .map(card => card.updatedAt)
@@ -675,11 +678,13 @@ export async function getMarketOverview(periodDays: 1 | 7 | 30) {
         ...row,
         units: Number(row.units ?? 0),
         volume: money(row.volume),
+        currency: "BRL" as const,
       })
     ),
     recentSales: recentSales.map(row => ({
       ...row,
       totalUsd: money(row.totalUsd),
+      currency: "BRL" as const,
       soldAt: iso(row.soldAt),
     })),
     marketIndex: marketIndexFrom(grouped),

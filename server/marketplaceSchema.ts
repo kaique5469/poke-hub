@@ -91,6 +91,38 @@ export function ensureMarketplaceSchema() {
     await addColumn(
       "ALTER TABLE seller_stores ADD COLUMN sellerTermsAcceptedAt timestamp NULL"
     );
+    await addColumn(
+      "ALTER TABLE seller_stores ADD COLUMN country varchar(2) NOT NULL DEFAULT 'BR'"
+    );
+    await addColumn(
+      "ALTER TABLE seller_stores ADD COLUMN businessType varchar(32) NOT NULL DEFAULT 'individual'"
+    );
+    await addColumn(
+      "ALTER TABLE seller_stores ADD COLUMN stripeChargesEnabled boolean NOT NULL DEFAULT false"
+    );
+    await addColumn(
+      "ALTER TABLE listings ADD COLUMN currency varchar(3) NOT NULL DEFAULT 'USD'"
+    );
+    await addColumn(
+      "ALTER TABLE product_listings ADD COLUMN currency varchar(3) NOT NULL DEFAULT 'USD'"
+    );
+    await addColumn(
+      "ALTER TABLE orders ADD COLUMN currency varchar(3) NOT NULL DEFAULT 'USD'"
+    );
+    await addColumn(
+      "ALTER TABLE orders ADD COLUMN marketCountry varchar(2) NOT NULL DEFAULT 'BR'"
+    );
+    await db.execute(
+      sql.raw("ALTER TABLE listings ALTER COLUMN currency SET DEFAULT 'BRL'")
+    );
+    await db.execute(
+      sql.raw(
+        "ALTER TABLE product_listings ALTER COLUMN currency SET DEFAULT 'BRL'"
+      )
+    );
+    await db.execute(
+      sql.raw("ALTER TABLE orders ALTER COLUMN currency SET DEFAULT 'BRL'")
+    );
     await addIndex(
       "ALTER TABLE orders ADD INDEX orders_stripe_session_idx (stripeSessionId)"
     );
@@ -143,7 +175,9 @@ export function ensureMarketplaceSchema() {
     // Existing sellers explicitly accept the current version in their
     // dashboard before their inventory becomes public again.
     await db.execute(
-      sql.raw("UPDATE seller_stores SET paymentMethods = JSON_ARRAY('card')")
+      sql.raw(
+        "UPDATE seller_stores SET paymentMethods = JSON_ARRAY('card','pix'), country = 'BR', businessType = 'individual'"
+      )
     );
   })().catch(error => {
     ready = null;

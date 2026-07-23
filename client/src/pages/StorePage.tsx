@@ -4,6 +4,7 @@
  */
 import { Link, useRoute } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { formatMarketplaceMoney } from "@shared/marketplace";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BadgeCheck,
@@ -228,7 +229,8 @@ export default function StorePage() {
                   )}
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <ShoppingBag size={14} /> {data.trustMetrics.successfulOrders} successful orders
+                  <ShoppingBag size={14} /> {data.trustMetrics.successfulOrders}{" "}
+                  successful orders
                 </span>
                 {store.location && (
                   <span className="inline-flex items-center gap-1">
@@ -382,7 +384,7 @@ export default function StorePage() {
                         className="text-sm font-black"
                         style={{ color: VIOLET }}
                       >
-                        ${parseFloat(String(l.priceUsd)).toFixed(2)}
+                        {formatMarketplaceMoney(l.priceUsd)}
                       </span>
                     </div>
                   </div>
@@ -433,7 +435,7 @@ export default function StorePage() {
                       className="text-sm font-black mt-1.5"
                       style={{ color: VIOLET }}
                     >
-                      ${parseFloat(String(p.listing.priceUsd)).toFixed(2)}
+                      {formatMarketplaceMoney(p.listing.priceUsd)}
                     </div>
                   </div>
                 </Link>

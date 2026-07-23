@@ -122,7 +122,11 @@ async function startServer() {
         if (await wasEventProcessed(event.id)) {
           return res.json({ received: true, duplicate: true });
         }
-        if (event.type === "checkout.session.completed") {
+        if (
+          (event.type === "checkout.session.completed" &&
+            event.data.object.payment_status === "paid") ||
+          event.type === "checkout.session.async_payment_succeeded"
+        ) {
           // ESCROW: only mark paid + hold funds. Seller payout happens at
           // release time (buyer confirms receipt or auto-release after delivery).
           const n = await markOrdersPaid(event.data.object.id);

@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CONDITIONS, ConditionPill } from "@/components/ConditionPill";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { formatMarketplaceMoney } from "@shared/marketplace";
 
 function SellDialog({
   productId,
@@ -71,7 +72,8 @@ function SellDialog({
           <DialogTitle>Sell: {productName}</DialogTitle>
         </DialogHeader>
         {sellerStatus.data &&
-        (!sellerStatus.data.payoutsEnabled || !sellerStatus.data.termsAccepted) ? (
+        (!sellerStatus.data.payoutsEnabled ||
+          !sellerStatus.data.termsAccepted) ? (
           <div className="rounded-xl border border-violet-200 bg-violet-50 p-5 text-center">
             <ShieldCheck className="mx-auto h-9 w-9 text-violet-600" />
             <p className="mt-3 font-black text-gray-900">
@@ -84,79 +86,83 @@ function SellDialog({
             <p className="mt-1 text-sm text-gray-600">
               Only verified sellers can publish inventory.
             </p>
-            <Link href={!sellerStatus.data.hasStore ? "/open-store" : "/dashboard"}>
+            <Link
+              href={!sellerStatus.data.hasStore ? "/open-store" : "/dashboard"}
+            >
               <Button className="mt-4 w-full">Continue seller setup</Button>
             </Link>
           </div>
         ) : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-semibold">Price (USD)</label>
-              <Input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={price}
-                onChange={e => setPrice(e.target.value)}
-                placeholder="0.00"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Include tracked US shipping in the listing price.
-              </p>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-semibold">
+                  Preço de venda (BRL)
+                </label>
+                <Input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={price}
+                  onChange={e => setPrice(e.target.value)}
+                  placeholder="0.00"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Inclua o frete rastreado no Brasil no preço do anúncio.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold">Quantity</label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="999"
+                  value={quantity}
+                  onChange={e => setQuantity(e.target.value)}
+                />
+              </div>
             </div>
             <div>
-              <label className="text-sm font-semibold">Quantity</label>
-              <Input
-                type="number"
-                min="1"
-                max="999"
-                value={quantity}
-                onChange={e => setQuantity(e.target.value)}
+              <label className="text-sm font-semibold">Condition</label>
+              <div className="flex gap-1.5 mt-1 flex-wrap">
+                {CONDITIONS.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setCondition(c)}
+                    className={
+                      condition === c ? "ring-2 ring-blue-500 rounded-full" : ""
+                    }
+                  >
+                    <ConditionPill condition={c} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-semibold">Notes (optional)</label>
+              <Textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Sealed, ships in a box, etc."
+                maxLength={1000}
               />
             </div>
+            <Button
+              className="w-full"
+              disabled={create.isPending || !price || Number(price) <= 0}
+              onClick={() =>
+                create.mutate({
+                  productId,
+                  priceUsd: Number(price),
+                  quantity: Math.max(1, Number(quantity) || 1),
+                  condition,
+                  notes: notes.trim() || undefined,
+                })
+              }
+            >
+              {create.isPending ? "Publishing…" : "Publish listing"}
+            </Button>
           </div>
-          <div>
-            <label className="text-sm font-semibold">Condition</label>
-            <div className="flex gap-1.5 mt-1 flex-wrap">
-              {CONDITIONS.map(c => (
-                <button
-                  key={c}
-                  onClick={() => setCondition(c)}
-                  className={
-                    condition === c ? "ring-2 ring-blue-500 rounded-full" : ""
-                  }
-                >
-                  <ConditionPill condition={c} />
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-semibold">Notes (optional)</label>
-            <Textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Sealed, ships in a box, etc."
-              maxLength={1000}
-            />
-          </div>
-          <Button
-            className="w-full"
-            disabled={create.isPending || !price || Number(price) <= 0}
-            onClick={() =>
-              create.mutate({
-                productId,
-                priceUsd: Number(price),
-                quantity: Math.max(1, Number(quantity) || 1),
-                condition,
-                notes: notes.trim() || undefined,
-              })
-            }
-          >
-            {create.isPending ? "Publishing…" : "Publish listing"}
-          </Button>
-        </div>
         )}
       </DialogContent>
     </Dialog>
@@ -195,7 +201,7 @@ export default function ProductDetail() {
             offers: data.sellers.length
               ? {
                   "@type": "AggregateOffer",
-                  priceCurrency: "USD",
+                  priceCurrency: "BRL",
                   lowPrice: Math.min(
                     ...data.sellers.map(seller =>
                       Number(seller.listing.priceUsd)
@@ -428,7 +434,7 @@ export default function ProductDetail() {
                         className="font-black text-lg"
                         style={{ color: "oklch(0.18 0.02 240)" }}
                       >
-                        ${Number(s.listing.priceUsd).toFixed(2)}
+                        {formatMarketplaceMoney(s.listing.priceUsd)}
                       </span>
                       {isAuthenticated ? (
                         <Button

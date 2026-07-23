@@ -26,6 +26,7 @@ import {
 import { ConditionPill } from "@/components/ConditionPill";
 import {
   ORDER_DISPUTE_REASONS,
+  formatMarketplaceMoney,
   type OrderDisputeReason,
 } from "@shared/marketplace";
 import {
@@ -607,7 +608,7 @@ function OrderCard({
             className="font-black"
             style={{ color: "oklch(0.18 0.02 240)" }}
           >
-            ${Number(o.totalUsd).toFixed(2)}
+            {formatMarketplaceMoney(o.totalUsd)}
           </span>
         </div>
       </div>

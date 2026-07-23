@@ -26,6 +26,7 @@ import {
   stripeEnabled,
 } from "./lib/stripe";
 import { MARKETPLACE_TERMS_VERSION } from "@shared/marketplace";
+import { MARKETPLACE_COUNTRY } from "@shared/marketplace";
 
 export function slugify(name: string): string {
   return name
@@ -66,9 +67,12 @@ export async function requireSellerReady(userId: number): Promise<SellerStore> {
   if (
     !stripeEnabled() ||
     !store.stripeAccountId ||
-    !store.stripePayoutsEnabled
+    !store.stripePayoutsEnabled ||
+    store.country !== MARKETPLACE_COUNTRY
   ) {
-    throw new Error("Complete Stripe payout setup before publishing inventory");
+    throw new Error(
+      "Conclua a verificação brasileira do Stripe antes de publicar anúncios"
+    );
   }
   return store;
 }
@@ -95,6 +99,7 @@ export async function getStoreBySlug(slug: string) {
         eq(sellerStores.slug, slug),
         eq(sellerStores.status, "active"),
         eq(sellerStores.stripePayoutsEnabled, true),
+        eq(sellerStores.country, MARKETPLACE_COUNTRY),
         isNotNull(sellerStores.stripeAccountId),
         isNotNull(sellerStores.sellerTermsAcceptedAt),
         eq(sellerStores.sellerTermsVersion, MARKETPLACE_TERMS_VERSION)
@@ -158,7 +163,11 @@ export async function getStoreListings(sellerId: number) {
       .select()
       .from(listings)
       .where(
-        and(eq(listings.sellerId, sellerId), eq(listings.status, "active"))
+        and(
+          eq(listings.sellerId, sellerId),
+          eq(listings.status, "active"),
+          eq(listings.currency, "BRL")
+        )
       )
       .orderBy(desc(listings.createdAt))
       .limit(60),
@@ -174,7 +183,8 @@ export async function getStoreListings(sellerId: number) {
       .where(
         and(
           eq(productListings.sellerId, sellerId),
-          eq(productListings.status, "active")
+          eq(productListings.status, "active"),
+          eq(productListings.currency, "BRL")
         )
       )
       .orderBy(desc(productListings.createdAt))
@@ -670,6 +680,7 @@ export async function getUnpayableCartSellers(
       store.status !== "active" ||
       !store.stripeAccountId ||
       !store.stripePayoutsEnabled ||
+      store.country !== MARKETPLACE_COUNTRY ||
       !store.sellerTermsAcceptedAt ||
       store.sellerTermsVersion !== MARKETPLACE_TERMS_VERSION
     ) {
@@ -687,8 +698,8 @@ export async function getUnpayableCartSellers(
 const PLATFORM_FEE = 0.05;
 
 /** 95% of the order total, computed in integer cents (no float drift). */
-export function sellerShareCents(totalUsd: string | number): number {
-  const totalCents = Math.round(parseFloat(String(totalUsd)) * 100);
+export function sellerShareCents(totalBrl: string | number): number {
+  const totalCents = Math.round(parseFloat(String(totalBrl)) * 100);
   return totalCents - Math.round(totalCents * PLATFORM_FEE);
 }
 
@@ -800,7 +811,7 @@ export async function releaseOrder(orderId: number): Promise<boolean> {
       userId: order.sellerId,
       type: "order_update",
       title: "Payout sent",
-      message: `$${(amountCents / 100).toFixed(2)} for order #${orderId} was sent to your Stripe account (95% of the sale — 5% platform fee).`,
+      message: `R$ ${(amountCents / 100).toFixed(2).replace(".", ",")} do pedido #${orderId} foram enviados à sua conta Stripe (95% da venda — 5% de taxa da plataforma).`,
       entityType: "order",
       entityId: String(orderId),
     });

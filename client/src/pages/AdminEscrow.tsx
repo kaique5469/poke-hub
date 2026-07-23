@@ -14,7 +14,10 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+const money = (cents: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    cents / 100
+  );
 const fmtDate = (d: string | Date | null | undefined) =>
   d ? new Date(d).toLocaleDateString() : "—";
 
@@ -432,7 +435,8 @@ export default function AdminEscrow() {
                     >
                       <div className="flex-1 min-w-[200px]">
                         <p className="font-bold text-sm">
-                          Order #{o.id} — ${Number(o.totalUsd).toFixed(2)}
+                          Pedido #{o.id} —{" "}
+                          {money(Math.round(Number(o.totalUsd) * 100))}
                         </p>
                         <p className="text-xs text-gray-500">
                           Buyer #{o.buyerId} · Seller #{o.sellerId} ·{" "}
@@ -499,7 +503,8 @@ export default function AdminEscrow() {
                     >
                       <div className="flex-1 min-w-[200px]">
                         <p className="font-bold text-sm">
-                          Order #{o.id} — ${Number(o.totalUsd).toFixed(2)}
+                          Pedido #{o.id} —{" "}
+                          {money(Math.round(Number(o.totalUsd) * 100))}
                         </p>
                         <p className="text-xs text-gray-500">
                           Status: <b>{o.status}</b> · Buyer #{o.buyerId} ·

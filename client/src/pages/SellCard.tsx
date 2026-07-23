@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatMarketplaceMoney } from "@shared/marketplace";
 import { toast } from "sonner";
 import {
   ChevronRight,
@@ -83,18 +84,21 @@ export default function SellCard() {
 
   // Step 1 — Card Search
   const [searchQuery, setSearchQuery] = useState("");
+  const [catalogLanguage, setCatalogLanguage] = useState<"en" | "pt-BR">(
+    "pt-BR"
+  );
   const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null);
 
   // Step 2 — Listing Details
   const [condition, setCondition] = useState<Condition>("NM");
-  const [language, setLanguage] = useState("English");
+  const [language, setLanguage] = useState("Portuguese");
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState("");
   const [notes, setNotes] = useState("");
 
   const { data: searchResults, isLoading: isSearching } =
     trpc.cards.search.useQuery(
-      { q: searchQuery, page: 1, pageSize: 12 },
+      { q: searchQuery, page: 1, pageSize: 12, language: catalogLanguage },
       { enabled: searchQuery.length >= 2 }
     );
   const scannedCard = trpc.cards.getById.useQuery(
@@ -140,7 +144,9 @@ export default function SellCard() {
         imageUrl: card.images.small,
         price: computedPrice,
       });
-      if (computedPrice) setPrice(computedPrice.toFixed(2));
+      // The English catalog price is a USD reference. Marketplace listings are
+      // BRL, so never copy it into the seller's price field automatically.
+      setPrice("");
       setStep(2);
     },
     []
@@ -156,7 +162,7 @@ export default function SellCard() {
     if (!selectedCard) return;
     const priceNum = parseFloat(price);
     if (isNaN(priceNum) || priceNum <= 0) {
-      toast.error("Please enter a valid price.");
+      toast.error("Informe um preço válido em reais.");
       return;
     }
     createListingMutation.mutate({
@@ -298,11 +304,36 @@ export default function SellCard() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">
-                Find Your Card
+                Encontre sua carta
               </h2>
               <p className="text-sm text-gray-500">
-                Search by card name to find the exact card you want to sell.
+                Escolha o idioma do catálogo e procure a edição exata.
               </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={catalogLanguage === "pt-BR" ? "default" : "outline"}
+                onClick={() => {
+                  setCatalogLanguage("pt-BR");
+                  setLanguage("Portuguese");
+                }}
+              >
+                Português (Brasil)
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={catalogLanguage === "en" ? "default" : "outline"}
+                onClick={() => {
+                  setCatalogLanguage("en");
+                  setLanguage("English");
+                }}
+              >
+                Inglês
+              </Button>
             </div>
 
             <div className="relative">
@@ -310,7 +341,7 @@ export default function SellCard() {
               <Input
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="e.g. Charizard, Pikachu VMAX, Mewtwo ex..."
+                placeholder="Ex.: Charizard, Pikachu VMAX, Mewtwo ex..."
                 className="pl-9 border-gray-200 focus:border-blue-400"
               />
             </div>
@@ -352,7 +383,7 @@ export default function SellCard() {
                           card.tcgplayer?.prices?.normal?.market ??
                           card.tcgplayer?.prices?.reverseHolofoil?.market) && (
                           <p className="text-xs font-bold text-green-600 mt-0.5">
-                            $
+                            Ref. US${" "}
                             {(card.tcgplayer?.prices?.holofoil?.market ??
                               card.tcgplayer?.prices?.normal?.market ??
                               card.tcgplayer?.prices?.reverseHolofoil
@@ -366,7 +397,7 @@ export default function SellCard() {
                   <div className="text-center py-8 text-gray-400">
                     <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
                     <p className="text-sm">
-                      No cards found for "{searchQuery}"
+                      Nenhuma carta encontrada para "{searchQuery}"
                     </p>
                   </div>
                 )}
@@ -376,7 +407,9 @@ export default function SellCard() {
             {searchQuery.length === 0 && (
               <div className="text-center py-10 text-gray-400">
                 <Tag className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">Start typing a card name to search</p>
+                <p className="text-sm">
+                  Digite o nome de uma carta para buscar
+                </p>
               </div>
             )}
           </div>
@@ -461,7 +494,7 @@ export default function SellCard() {
                 {/* Price */}
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Price (USD) <span className="text-red-500">*</span>
+                    Preço (BRL) <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -475,20 +508,17 @@ export default function SellCard() {
                       className="pl-8 border-gray-200 focus:border-blue-400"
                     />
                   </div>
-                  {selectedCard.price && parseFloat(price) > 0 && (
-                    <p
-                      className={`text-xs mt-1 ${parseFloat(price) < selectedCard.price * 0.7 ? "text-orange-500" : parseFloat(price) > selectedCard.price * 1.5 ? "text-red-500" : "text-green-600"}`}
-                    >
-                      {parseFloat(price) < selectedCard.price * 0.7
-                        ? "⚠ Below market value"
-                        : parseFloat(price) > selectedCard.price * 1.5
-                          ? "⚠ Above market value"
-                          : "✓ Fair market price"}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Informe o valor em reais já incluindo o frete com
+                    rastreamento dentro do Brasil.
+                  </p>
+                  {selectedCard.price && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      Referência internacional: US${" "}
+                      {selectedCard.price.toFixed(2)}. Não é uma conversão para
+                      reais.
                     </p>
                   )}
-                  <p className="mt-1 text-xs text-gray-500">
-                    Include the cost of tracked US shipping in this price.
-                  </p>
                 </div>
 
                 {/* Quantity */}
@@ -513,7 +543,7 @@ export default function SellCard() {
                 {/* Language */}
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Language
+                    Idioma da carta
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {[
@@ -581,17 +611,19 @@ export default function SellCard() {
                     >
                       {CONDITIONS.find(c => c.value === condition)?.label}
                     </Badge>
-                    <span className="text-gray-500">Price:</span>
+                    <span className="text-gray-500">Preço:</span>
                     <span className="font-bold text-green-600">
-                      ${parseFloat(price).toFixed(2)} × {quantity}
+                      {formatMarketplaceMoney(parseFloat(price))} × {quantity}
                     </span>
                     <span className="text-gray-500">Language:</span>
                     <span className="font-medium text-gray-800">
                       {language}
                     </span>
-                    <span className="text-gray-500">Estimated payout:</span>
+                    <span className="text-gray-500">Repasse estimado:</span>
                     <span className="font-bold text-violet-700">
-                      ${(parseFloat(price) * quantity * 0.95).toFixed(2)}
+                      {formatMarketplaceMoney(
+                        parseFloat(price) * quantity * 0.95
+                      )}
                     </span>
                   </div>
                 </div>

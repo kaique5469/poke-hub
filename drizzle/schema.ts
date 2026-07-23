@@ -164,6 +164,8 @@ export const listings = mysqlTable("listings", {
   ]).notNull(),
   language: varchar("language", { length: 32 }).default("English").notNull(),
   priceUsd: decimal("priceUsd", { precision: 10, scale: 2 }).notNull(),
+  /** Listing price currency; priceUsd is retained as a legacy column name. */
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
   quantity: int("quantity").default(1).notNull(),
   isFoil: boolean("isFoil").default(false).notNull(),
   isAltered: boolean("isAltered").default(false).notNull(),
@@ -408,6 +410,8 @@ export const productListings = mysqlTable("product_listings", {
   productId: int("productId").notNull(),
   sellerId: int("sellerId").notNull(),
   priceUsd: decimal("priceUsd", { precision: 10, scale: 2 }).notNull(),
+  /** Listing price currency; priceUsd is retained as a legacy column name. */
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
   quantity: int("quantity").default(1).notNull(),
   condition: mysqlEnum("condition", ["M", "NM", "SP", "MP", "HP", "D"])
     .default("NM")
@@ -449,6 +453,11 @@ export const orders = mysqlTable(
     productListingId: int("productListingId"),
     quantity: int("quantity").default(1).notNull(),
     totalUsd: decimal("totalUsd", { precision: 10, scale: 2 }).notNull(),
+    /** Currency of totalUsd. New marketplace orders are BRL. */
+    currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+    marketCountry: varchar("marketCountry", { length: 2 })
+      .default("BR")
+      .notNull(),
     status: mysqlEnum("status", [
       "pending",
       "paid",
@@ -862,9 +871,16 @@ export const sellerStores = mysqlTable("seller_stores", {
   location: varchar("location", { length: 128 }),
   /** Current marketplace checkout method: ["card"]. */
   paymentMethods: json("paymentMethods"),
+  country: varchar("country", { length: 2 }).default("BR").notNull(),
+  businessType: varchar("businessType", { length: 32 })
+    .default("individual")
+    .notNull(),
   /** Stripe Connect account used after escrow release. */
   stripeAccountId: varchar("stripeAccountId", { length: 255 }),
   stripePayoutsEnabled: boolean("stripePayoutsEnabled")
+    .default(false)
+    .notNull(),
+  stripeChargesEnabled: boolean("stripeChargesEnabled")
     .default(false)
     .notNull(),
   shipsFrom: varchar("shipsFrom", { length: 128 }),
