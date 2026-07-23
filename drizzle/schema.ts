@@ -690,6 +690,27 @@ export const priceCache = mysqlTable("price_cache", {
 
 export type PriceCache = typeof priceCache.$inferSelect;
 
+// ─── External API response cache ────────────────────────────────────────────
+
+/**
+ * Last-known-good responses from catalog providers. Unlike the in-process
+ * cache, these rows survive Railway restarts and short upstream outages.
+ */
+export const externalApiCache = mysqlTable(
+  "external_api_cache",
+  {
+    cacheKey: varchar("cacheKey", { length: 64 }).primaryKey(),
+    provider: varchar("provider", { length: 48 }).notNull(),
+    payload: json("payload").notNull(),
+    freshUntil: timestamp("freshUntil").notNull(),
+    staleUntil: timestamp("staleUntil").notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("external_api_cache_stale_idx").on(table.staleUntil)]
+);
+
+export type ExternalApiCache = typeof externalApiCache.$inferSelect;
+
 // ─── Price History ────────────────────────────────────────────────────────────
 
 export const priceHistory = mysqlTable("price_history", {
@@ -856,6 +877,111 @@ export const gameStats = mysqlTable("game_stats", {
 });
 
 export type GameStats = typeof gameStats.$inferSelect;
+
+export const gameWeeklyScores = mysqlTable(
+  "game_weekly_scores",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    weekKey: varchar("weekKey", { length: 10 }).notNull(),
+    points: int("points").default(0).notNull(),
+    wins: int("wins").default(0).notNull(),
+    hardWins: int("hardWins").default(0).notNull(),
+    scoredRounds: int("scoredRounds").default(0).notNull(),
+    lastScoredAt: timestamp("lastScoredAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("game_weekly_scores_user_week_unique").on(
+      table.userId,
+      table.weekKey
+    ),
+    index("game_weekly_scores_rank_idx").on(
+      table.weekKey,
+      table.points,
+      table.hardWins,
+      table.lastScoredAt
+    ),
+  ]
+);
+
+export type GameWeeklyScore = typeof gameWeeklyScores.$inferSelect;
+
+export const gameWeeklyCompetitions = mysqlTable(
+  "game_weekly_competitions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    weekKey: varchar("weekKey", { length: 10 }).notNull().unique(),
+    prizeTitle: varchar("prizeTitle", { length: 160 }).notNull(),
+    prizeDescription: text("prizeDescription"),
+    prizeImageUrl: text("prizeImageUrl"),
+    rulesUrl: text("rulesUrl").notNull(),
+    authorizationReference: varchar("authorizationReference", {
+      length: 160,
+    }).notNull(),
+    eligibleCountry: varchar("eligibleCountry", { length: 2 })
+      .default("BR")
+      .notNull(),
+    status: mysqlEnum("status", [
+      "draft",
+      "active",
+      "closed",
+      "fulfilled",
+      "cancelled",
+    ])
+      .default("draft")
+      .notNull(),
+    startsAt: timestamp("startsAt").notNull(),
+    endsAt: timestamp("endsAt").notNull(),
+    winnerUserId: int("winnerUserId"),
+    finalizedAt: timestamp("finalizedAt"),
+    claimDeadline: timestamp("claimDeadline"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("game_weekly_competitions_status_end_idx").on(
+      table.status,
+      table.endsAt
+    ),
+  ]
+);
+
+export type GameWeeklyCompetition = typeof gameWeeklyCompetitions.$inferSelect;
+
+export const gamePrizeClaims = mysqlTable(
+  "game_prize_claims",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    competitionId: int("competitionId").notNull().unique(),
+    userId: int("userId").notNull(),
+    fullName: varchar("fullName", { length: 160 }).notNull(),
+    email: varchar("email", { length: 320 }).notNull(),
+    phone: varchar("phone", { length: 32 }),
+    postalCode: varchar("postalCode", { length: 16 }).notNull(),
+    addressLine1: varchar("addressLine1", { length: 200 }).notNull(),
+    addressNumber: varchar("addressNumber", { length: 32 }).notNull(),
+    addressLine2: varchar("addressLine2", { length: 160 }),
+    neighborhood: varchar("neighborhood", { length: 120 }).notNull(),
+    city: varchar("city", { length: 120 }).notNull(),
+    state: varchar("state", { length: 2 }).notNull(),
+    country: varchar("country", { length: 2 }).default("BR").notNull(),
+    status: mysqlEnum("status", ["submitted", "shipped", "delivered"])
+      .default("submitted")
+      .notNull(),
+    trackingCode: varchar("trackingCode", { length: 120 }),
+    claimedAt: timestamp("claimedAt").defaultNow().notNull(),
+    shippedAt: timestamp("shippedAt"),
+    deliveredAt: timestamp("deliveredAt"),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("game_prize_claims_status_idx").on(table.status, table.claimedAt),
+  ]
+);
+
+export type GamePrizeClaim = typeof gamePrizeClaims.$inferSelect;
 
 // ─── Seller Stores ────────────────────────────────────────────────────────────
 

@@ -1,0 +1,16 @@
+name: Finalize weekly game
+
+on:
+  schedule:
+    - cron: "5 3 * * 1" # Monday 00:05 in Sao Paulo (UTC-3)
+  workflow_dispatch:
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Finalize ranking and notify winner
+        run: |
+          curl -sf -X POST "${{ secrets.APP_URL }}/api/scheduled/weekly-game" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "content-type: application/json"

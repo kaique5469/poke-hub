@@ -100,7 +100,7 @@ export default function Cards() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const { data: setsData } = trpc.sets.list.useQuery();
-  const { data, isLoading, isFetching, isError, error, refetch } =
+  const { data, isLoading, isFetching, isError, refetch } =
     trpc.cards.search.useQuery({
       q: q || undefined,
       page,
@@ -434,12 +434,9 @@ export default function Cards() {
             Card data is temporarily unavailable
           </p>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            The external card source did not answer in time. Your filters are
-            still here, and no empty result is being shown as if it were real.
+            We could not reach the live catalog or a recent saved copy. Your
+            filters are still here; please try again in a moment.
           </p>
-          {error?.message ? (
-            <p className="mt-2 text-xs text-amber-700">{error.message}</p>
-          ) : null}
           <Button className="mt-5" onClick={() => refetch()}>
             Try again
           </Button>

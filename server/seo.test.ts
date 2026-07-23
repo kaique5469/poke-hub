@@ -35,6 +35,8 @@ describe("SEO metadata", () => {
   it("recognizes public detail routes but not arbitrary paths", () => {
     expect(isKnownClientRoute("/cards/sv4-198")).toBe(true);
     expect(isKnownClientRoute("/articles/market-update")).toBe(true);
+    expect(isKnownClientRoute("/weekly-rules")).toBe(true);
+    expect(isKnownClientRoute("/admin/game")).toBe(true);
     expect(isKnownClientRoute("/not-a-real-route")).toBe(false);
   });
 });

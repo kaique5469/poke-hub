@@ -43,6 +43,8 @@ const PlayerProfile = lazy(() => import("./pages/PlayerProfile"));
 const ProfileEdit = lazy(() => import("./pages/ProfileEdit"));
 const UserDashboard = lazy(() => import("./pages/UserDashboard"));
 const AdminEscrow = lazy(() => import("./pages/AdminEscrow"));
+const AdminGame = lazy(() => import("./pages/AdminGame"));
+const WeeklyRules = lazy(() => import("./pages/WeeklyRules"));
 const Login = lazy(() => import("./pages/Login"));
 const MarketPulse = lazy(() => import("./pages/MarketPulse"));
 const Legal = lazy(() => import("./pages/Legal"));
@@ -115,6 +117,8 @@ function Router() {
           <Route path="/profile/:username" component={PlayerProfile} />
           <Route path="/dashboard" component={UserDashboard} />
           <Route path="/admin/escrow" component={AdminEscrow} />
+          <Route path="/admin/game" component={AdminGame} />
+          <Route path="/weekly-rules" component={WeeklyRules} />
           <Route path="/account" component={UserDashboard} />
           <Route path="/privacy" component={Legal} />
           <Route path="/terms" component={Legal} />

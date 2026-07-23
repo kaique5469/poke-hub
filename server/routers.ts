@@ -88,6 +88,14 @@ import {
   recordResult,
   saveRoundProgress,
 } from "./gameDb";
+import {
+  activateCompetition,
+  getCompetitionAdminOverview,
+  getMyPrizeClaim,
+  getWeeklyLeaderboard,
+  markPrizeShipped,
+  submitPrizeClaim,
+} from "./gameCompetitionDb";
 import { toggleAuctionWatch, getUserWatchedAuctionIds } from "./db";
 import {
   createNotification,
@@ -1578,8 +1586,15 @@ export const appRouter = router({
           generation: number;
           region: string;
         } | null = null;
+        let weeklyResult: Awaited<ReturnType<typeof recordResult>> = null;
         if (won || outOfAttempts) {
-          await recordResult(user.id, won, roundScore, attempt);
+          weeklyResult = await recordResult(
+            user.id,
+            won,
+            roundScore,
+            attempt,
+            state.difficulty
+          );
           const t = await getDexEntry(round.targetId);
           if (t) {
             reveal = {
@@ -1608,6 +1623,7 @@ export const appRouter = router({
               ? ("lost" as const)
               : ("active" as const),
           roundScore,
+          weeklyResult: weeklyResult ?? null,
           reveal,
         };
       }),
@@ -1625,6 +1641,103 @@ export const appRouter = router({
           .default({ limit: 20 })
       )
       .query(({ input }) => getLeaderboard(input.limit)),
+
+    weeklyLeaderboard: publicProcedure
+      .input(
+        z
+          .object({ limit: z.number().int().min(1).max(50).default(20) })
+          .default({ limit: 20 })
+      )
+      .query(async ({ ctx, input }) => {
+        const user = ctx.user
+          ? await getUserByOpenId(ctx.user.openId)
+          : undefined;
+        return getWeeklyLeaderboard(input.limit, user?.id);
+      }),
+
+    myPrizeClaim: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return getMyPrizeClaim(user.id);
+    }),
+
+    claimPrize: protectedProcedure
+      .input(
+        z.object({
+          fullName: z.string().trim().min(3).max(160),
+          email: z.string().trim().email().max(320),
+          phone: z.string().trim().max(32).optional(),
+          postalCode: z
+            .string()
+            .trim()
+            .regex(/^\d{5}-?\d{3}$/),
+          addressLine1: z.string().trim().min(3).max(200),
+          addressNumber: z.string().trim().min(1).max(32),
+          addressLine2: z.string().trim().max(160).optional(),
+          neighborhood: z.string().trim().min(2).max(120),
+          city: z.string().trim().min(2).max(120),
+          state: z.string().trim().length(2),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        try {
+          return await submitPrizeClaim(user.id, input);
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error ? error.message : "Unable to claim prize",
+          });
+        }
+      }),
+  }),
+
+  gameAdmin: router({
+    overview: adminProcedure.query(() => getCompetitionAdminOverview()),
+    activate: adminProcedure
+      .input(
+        z.object({
+          weekOffset: z.union([z.literal(0), z.literal(1)]),
+          prizeTitle: z.string().trim().min(3).max(160),
+          prizeDescription: z.string().trim().max(2000).optional(),
+          prizeImageUrl: z.string().trim().url().optional().or(z.literal("")),
+          rulesUrl: z.string().trim().url(),
+          authorizationReference: z.string().trim().min(3).max(160),
+          legalConfirmed: z.literal(true),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          return await activateCompetition({
+            weekOffset: input.weekOffset,
+            prizeTitle: input.prizeTitle,
+            prizeDescription: input.prizeDescription,
+            prizeImageUrl: input.prizeImageUrl || undefined,
+            rulesUrl: input.rulesUrl,
+            authorizationReference: input.authorizationReference,
+          });
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Unable to activate competition",
+          });
+        }
+      }),
+    markShipped: adminProcedure
+      .input(
+        z.object({
+          claimId: z.number().int().positive(),
+          trackingCode: z.string().trim().min(5).max(120),
+        })
+      )
+      .mutation(({ input }) =>
+        markPrizeShipped(input.claimId, input.trackingCode)
+      ),
   }),
 
   pokemon: router({

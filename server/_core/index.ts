@@ -13,9 +13,12 @@ import { tcgNewsHandler } from "../scheduledTcgNews";
 import { autoReleaseHandler } from "../scheduledRelease";
 import { scrydexSyncHandler } from "../scheduledScrydex";
 import { marketSnapshotHandler } from "../scheduledMarket";
+import { weeklyGameHandler } from "../scheduledWeeklyGame";
 import { ensureMarketPulseSchema } from "../marketSchema";
 import { ensureMarketplaceSchema } from "../marketplaceSchema";
 import { ensureGrowthSchema } from "../growthSchema";
+import { ensureGameCompetitionSchema } from "../gameCompetitionSchema";
+import { ensureExternalApiCacheSchema } from "../externalApiCacheSchema";
 import { verifyWebhook } from "../lib/stripe";
 import {
   cancelCheckoutSessionOrders,
@@ -84,6 +87,8 @@ async function startServer() {
   await ensureMarketplaceSchema();
   await ensureGrowthSchema();
   await ensureMarketPulseSchema();
+  await ensureGameCompetitionSchema();
+  await ensureExternalApiCacheSchema();
   const app = express();
   const server = createServer(app);
   app.disable("x-powered-by");
@@ -173,6 +178,7 @@ async function startServer() {
   app.post("/api/scheduled/auto-release", autoReleaseHandler);
   app.post("/api/scheduled/scrydex-sync", scrydexSyncHandler);
   app.post("/api/scheduled/market-snapshot", marketSnapshotHandler);
+  app.post("/api/scheduled/weekly-game", weeklyGameHandler);
   // tRPC API
   app.use("/api/trpc", apiRateLimit);
   app.use(
