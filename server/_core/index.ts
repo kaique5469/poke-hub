@@ -87,8 +87,18 @@ async function startServer() {
   await ensureMarketplaceSchema();
   await ensureGrowthSchema();
   await ensureMarketPulseSchema();
-  await ensureGameCompetitionSchema();
-  await ensureExternalApiCacheSchema();
+  await ensureGameCompetitionSchema().catch(error => {
+    console.error(
+      "[startup] Weekly game schema is temporarily unavailable; continuing without competition persistence",
+      error
+    );
+  });
+  await ensureExternalApiCacheSchema().catch(error => {
+    console.error(
+      "[startup] External API cache schema is temporarily unavailable; continuing with in-memory resilience",
+      error
+    );
+  });
   const app = express();
   const server = createServer(app);
   app.disable("x-powered-by");
