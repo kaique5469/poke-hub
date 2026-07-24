@@ -67,7 +67,7 @@ const termsSections = [
   ],
   [
     "Weekly Arena",
-    "The skill leaderboard resets weekly. Only a limited number of daily wins score to reduce automated abuse. A physical prize exists only when an authorized competition, public official rules, eligibility and authorization reference are displayed on the game page. No purchase is necessary.",
+    "The skill leaderboard resets weekly. Only a limited number of daily wins score to reduce automated abuse. A physical prize exists only when an authorized competition, public official rules, eligibility and authorization reference are displayed on the game page. Active prize rounds may cover eligible residents of the United States and Brazil as stated in their official rules. No purchase is necessary and winners are never charged to claim.",
   ],
   [
     "Third-party purchases",
