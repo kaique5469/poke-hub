@@ -10,6 +10,12 @@ export default function WeeklyRules() {
   );
   const weekly = trpc.game.weeklyLeaderboard.useQuery({ limit: 3 });
   const competition = weekly.data?.competition;
+  const eligibleTerritory =
+    competition?.eligibleCountry === "US"
+      ? "United States"
+      : competition?.eligibleCountry === "BR"
+        ? "Brazil"
+        : "United States and Brazil";
   return (
     <main className="min-h-screen bg-[#f6f7fb] py-14">
       <div className="container max-w-4xl">
@@ -49,18 +55,18 @@ export default function WeeklyRules() {
               </p>
             )}
             <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
-              <Rule label="Eligible territory" value="Brazil" />
+              <Rule label="Eligible territory" value={eligibleTerritory} />
               <Rule
                 label="Authorization reference"
                 value={competition.authorizationReference}
               />
               <Rule
                 label="Start"
-                value={new Date(competition.startsAt).toLocaleString("pt-BR")}
+                value={new Date(competition.startsAt).toLocaleString()}
               />
               <Rule
                 label="End"
-                value={new Date(competition.endsAt).toLocaleString("pt-BR")}
+                value={new Date(competition.endsAt).toLocaleString()}
               />
             </dl>
             <a
@@ -78,7 +84,7 @@ export default function WeeklyRules() {
           {[
             [
               "Entry and eligibility",
-              "Participation is free and requires a valid RarityGrid account. No purchase is necessary. Eligibility for a physical prize is limited to residents of Brazil who satisfy the active authorized rules.",
+              "Participation is free and requires a valid RarityGrid account. No purchase is necessary. Physical-prize eligibility is limited to residents of the United States or Brazil who satisfy every requirement in the active official rules, including any age or state restrictions.",
             ],
             [
               "Scoring",
@@ -94,7 +100,7 @@ export default function WeeklyRules() {
             ],
             [
               "Claim and delivery",
-              "The winner is notified by email and in the account. The prize must be claimed within 7 days through the private form. Shipping details are used only for fulfillment and are never public.",
+              "The winner is notified by email and in the account. The prize must be claimed within 7 days through the private form. RarityGrid covers prize delivery; a winner is never charged to claim. Shipping details are used only for fulfillment and are never public.",
             ],
           ].map(([title, body]) => (
             <section key={title} className="rounded-2xl border bg-white p-6">
