@@ -37,7 +37,7 @@ export function ensureGameCompetitionSchema() {
         prizeImageUrl text NULL,
         rulesUrl text NOT NULL,
         authorizationReference varchar(160) NOT NULL,
-        eligibleCountry varchar(2) NOT NULL DEFAULT 'BR',
+        eligibleCountry varchar(8) NOT NULL DEFAULT 'BR,US',
         status enum('draft','active','closed','fulfilled','cancelled') NOT NULL DEFAULT 'draft',
         startsAt timestamp NOT NULL,
         endsAt timestamp NOT NULL,
@@ -48,6 +48,12 @@ export function ensureGameCompetitionSchema() {
         updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX game_weekly_competitions_status_end_idx (status, endsAt)
       )
+    `)
+    );
+    await db.execute(
+      sql.raw(`
+      ALTER TABLE game_weekly_competitions
+      MODIFY COLUMN eligibleCountry varchar(8) NOT NULL DEFAULT 'BR,US'
     `)
     );
     await db.execute(
