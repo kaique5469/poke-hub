@@ -920,8 +920,8 @@ export const gameWeeklyCompetitions = mysqlTable(
     authorizationReference: varchar("authorizationReference", {
       length: 160,
     }).notNull(),
-    eligibleCountry: varchar("eligibleCountry", { length: 2 })
-      .default("BR")
+    eligibleCountry: varchar("eligibleCountry", { length: 8 })
+      .default("BR,US")
       .notNull(),
     status: mysqlEnum("status", [
       "draft",

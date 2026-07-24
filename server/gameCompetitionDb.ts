@@ -14,7 +14,23 @@ import { ENV } from "./_core/env";
 import { escapeHtml, notifyOwner, sendEmail } from "./_core/notification";
 
 export const DAILY_SCORED_WIN_LIMIT = 10;
+export const ELIGIBLE_PRIZE_COUNTRIES = ["BR", "US"] as const;
+export const ELIGIBLE_PRIZE_COUNTRY_VALUE =
+  ELIGIBLE_PRIZE_COUNTRIES.join(",");
 const BRAZIL_UTC_OFFSET_HOURS = -3;
+
+export type EligiblePrizeCountry =
+  (typeof ELIGIBLE_PRIZE_COUNTRIES)[number];
+
+export function isValidPrizePostalCode(
+  country: EligiblePrizeCountry,
+  postalCode: string
+) {
+  const normalized = postalCode.trim();
+  return country === "BR"
+    ? /^\d{5}-?\d{3}$/.test(normalized)
+    : /^\d{5}(?:-\d{4})?$/.test(normalized);
+}
 
 export function getWeekWindow(date = new Date()) {
   const brazilWallClock = new Date(
@@ -216,6 +232,7 @@ export async function getMyPrizeClaim(userId: number) {
 }
 
 export interface PrizeClaimInput {
+  country: EligiblePrizeCountry;
   fullName: string;
   email: string;
   phone?: string;
@@ -223,7 +240,7 @@ export interface PrizeClaimInput {
   addressLine1: string;
   addressNumber: string;
   addressLine2?: string;
-  neighborhood: string;
+  neighborhood?: string;
   city: string;
   state: string;
 }
@@ -238,8 +255,9 @@ export async function submitPrizeClaim(userId: number, input: PrizeClaimInput) {
     competitionId: prize.competition.id,
     userId,
     ...input,
+    neighborhood: input.neighborhood?.trim() || "",
     state: input.state.toUpperCase(),
-    country: "BR",
+    country: input.country,
   });
   await notifyOwner({
     title: `Weekly prize claimed — ${prize.competition.prizeTitle}`,
@@ -283,7 +301,7 @@ export async function activateCompetition(input: CompetitionInput) {
       prizeImageUrl: input.prizeImageUrl,
       rulesUrl: input.rulesUrl,
       authorizationReference: input.authorizationReference,
-      eligibleCountry: "BR",
+      eligibleCountry: ELIGIBLE_PRIZE_COUNTRY_VALUE,
       startsAt: window.startsAt,
       endsAt: window.endsAt,
       status: "active",
@@ -295,7 +313,7 @@ export async function activateCompetition(input: CompetitionInput) {
         prizeImageUrl: input.prizeImageUrl,
         rulesUrl: input.rulesUrl,
         authorizationReference: input.authorizationReference,
-        eligibleCountry: "BR",
+        eligibleCountry: ELIGIBLE_PRIZE_COUNTRY_VALUE,
         startsAt: window.startsAt,
         endsAt: window.endsAt,
         status: "active",

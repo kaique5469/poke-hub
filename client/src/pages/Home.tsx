@@ -177,7 +177,7 @@ export default function Home() {
                     </p>
                     <p className="mt-1 text-xs leading-5 text-slate-400">
                       {weekly.data?.competition
-                        ? "Brazil-only prize. No purchase necessary. Official rules apply."
+                        ? "Prize eligibility covers the United States and Brazil. No purchase necessary. Official rules apply."
                         : "Prize rounds appear only after official rules and authorization are active."}
                     </p>
                   </div>

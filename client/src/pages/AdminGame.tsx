@@ -150,9 +150,10 @@ export default function AdminGame() {
                 className="mt-1"
               />
               I confirm a legal entity is responsible for this promotion, the
-              complete rules are public, eligibility is Brazil-only, the
-              promotion has the required authorization, and the prize can be
-              fulfilled as described.
+              complete rules are public, eligibility is limited to the United
+              States and Brazil, every applicable jurisdiction requirement has
+              been reviewed, the promotion has the required authorization, and
+              the prize can be fulfilled as described.
             </label>
             <div className="md:col-span-2">
               <Button
@@ -194,8 +195,12 @@ export default function AdminGame() {
                           ? ` — ${row.claim.addressLine2}`
                           : ""}
                         <br />
-                        {row.claim.neighborhood} · {row.claim.city}/
-                        {row.claim.state} · CEP {row.claim.postalCode}
+                        {row.claim.neighborhood
+                          ? `${row.claim.neighborhood} · `
+                          : ""}
+                        {row.claim.city}, {row.claim.state} ·{" "}
+                        {row.claim.country === "BR" ? "CEP" : "ZIP"}{" "}
+                        {row.claim.postalCode} · {row.claim.country}
                         {row.claim.phone ? ` · ${row.claim.phone}` : ""}
                       </p>
                     </div>

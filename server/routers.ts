@@ -93,6 +93,7 @@ import {
   getCompetitionAdminOverview,
   getMyPrizeClaim,
   getWeeklyLeaderboard,
+  isValidPrizePostalCode,
   markPrizeShipped,
   submitPrizeClaim,
 } from "./gameCompetitionDb";
@@ -1663,21 +1664,42 @@ export const appRouter = router({
 
     claimPrize: protectedProcedure
       .input(
-        z.object({
-          fullName: z.string().trim().min(3).max(160),
-          email: z.string().trim().email().max(320),
-          phone: z.string().trim().max(32).optional(),
-          postalCode: z
-            .string()
-            .trim()
-            .regex(/^\d{5}-?\d{3}$/),
-          addressLine1: z.string().trim().min(3).max(200),
-          addressNumber: z.string().trim().min(1).max(32),
-          addressLine2: z.string().trim().max(160).optional(),
-          neighborhood: z.string().trim().min(2).max(120),
-          city: z.string().trim().min(2).max(120),
-          state: z.string().trim().length(2),
-        })
+        z
+          .object({
+            country: z.enum(["BR", "US"]),
+            fullName: z.string().trim().min(3).max(160),
+            email: z.string().trim().email().max(320),
+            phone: z.string().trim().max(32).optional(),
+            postalCode: z.string().trim().min(5).max(16),
+            addressLine1: z.string().trim().min(3).max(200),
+            addressNumber: z.string().trim().min(1).max(32),
+            addressLine2: z.string().trim().max(160).optional(),
+            neighborhood: z.string().trim().max(120).optional(),
+            city: z.string().trim().min(2).max(120),
+            state: z.string().trim().length(2),
+          })
+          .superRefine((value, context) => {
+            if (!isValidPrizePostalCode(value.country, value.postalCode)) {
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["postalCode"],
+                message:
+                  value.country === "BR"
+                    ? "Enter a valid Brazilian CEP."
+                    : "Enter a valid US ZIP code.",
+              });
+            }
+            if (
+              value.country === "BR" &&
+              (!value.neighborhood || value.neighborhood.length < 2)
+            ) {
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["neighborhood"],
+                message: "Neighborhood is required for delivery in Brazil.",
+              });
+            }
+          })
       )
       .mutation(async ({ ctx, input }) => {
         const user = await getUserByOpenId(ctx.user.openId);
