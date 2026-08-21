@@ -1,3 +1,5 @@
+import { isDropRetailer } from "../../shared/drops";
+
 export const ENV = {
   /** MySQL connection string, e.g. mysql://user:pass@host:3306/db */
   databaseUrl: process.env.DATABASE_URL ?? "",
@@ -29,6 +31,37 @@ export const ENV = {
   /** Server-only Scrydex credentials for real sealed products and USD prices. */
   scrydexApiKey: process.env.SCRYDEX_API_KEY ?? "",
   scrydexTeamId: process.env.SCRYDEX_TEAM_ID ?? "",
+  /**
+   * Authorized inventory provider. Retailer pages are never scraped directly
+   * by this application. The provider must return the normalized contract
+   * documented in docs/DROP_MONITOR.md.
+   */
+  dropProviderUrl: process.env.DROP_PROVIDER_URL ?? "",
+  dropProviderApiKey: process.env.DROP_PROVIDER_API_KEY ?? "",
+  dropProviderRetailers: (process.env.DROP_PROVIDER_RETAILERS ?? "")
+    .split(",")
+    .map(value => value.trim())
+    .filter(isDropRetailer),
+  dropProviderWebhookSecret: process.env.DROP_PROVIDER_WEBHOOK_SECRET ?? "",
+  dropWorkerEnabled: process.env.DROP_WORKER_ENABLED !== "false",
+  dropNormalIntervalSeconds: Math.max(
+    30,
+    Number.parseInt(process.env.DROP_NORMAL_INTERVAL_SECONDS ?? "300", 10) ||
+      300
+  ),
+  dropBurstIntervalSeconds: Math.max(
+    3,
+    Number.parseInt(process.env.DROP_BURST_INTERVAL_SECONDS ?? "5", 10) || 5
+  ),
+  /** Fast shared channels for the owner's private drop group. */
+  dropDiscordWebhookUrl: process.env.DROP_DISCORD_WEBHOOK_URL ?? "",
+  dropTelegramBotToken: process.env.DROP_TELEGRAM_BOT_TOKEN ?? "",
+  dropTelegramChatId: process.env.DROP_TELEGRAM_CHAT_ID ?? "",
+  dropVapidPublicKey: process.env.DROP_VAPID_PUBLIC_KEY ?? "",
+  dropVapidPrivateKey: process.env.DROP_VAPID_PRIVATE_KEY ?? "",
+  dropVapidSubject:
+    process.env.DROP_VAPID_SUBJECT ??
+    `mailto:${process.env.SUPPORT_EMAIL ?? process.env.OWNER_EMAIL ?? "support@raritygrid.com"}`,
   isProduction: process.env.NODE_ENV === "production",
 };
 

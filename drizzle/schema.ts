@@ -675,6 +675,195 @@ export const dropAlerts = mysqlTable("drop_alerts", {
 export type DropAlert = typeof dropAlerts.$inferSelect;
 export type InsertDropAlert = typeof dropAlerts.$inferInsert;
 
+/** Live monitor state; the legacy drop_alerts table only stores labels. */
+export const dropMonitors = mysqlTable(
+  "drop_monitors",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    legacyAlertId: int("legacyAlertId"),
+    userId: int("userId").notNull(),
+    retailer: varchar("retailer", { length: 32 }).notNull(),
+    productName: varchar("productName", { length: 512 }).notNull(),
+    productUrl: text("productUrl"),
+    searchQuery: varchar("searchQuery", { length: 512 }).notNull(),
+    maxPriceCents: int("maxPriceCents"),
+    currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+    desiredQuantity: int("desiredQuantity").default(1).notNull(),
+    monitorMode: varchar("monitorMode", { length: 24 })
+      .default("always")
+      .notNull(),
+    handoffMode: varchar("handoffMode", { length: 24 })
+      .default("open_product")
+      .notNull(),
+    isActive: boolean("isActive").default(true).notNull(),
+    lastStockState: varchar("lastStockState", { length: 24 })
+      .default("unknown")
+      .notNull(),
+    lastPriceCents: int("lastPriceCents"),
+    lastCheckedAt: timestamp("lastCheckedAt"),
+    lastTriggeredAt: timestamp("lastTriggeredAt"),
+    lastError: varchar("lastError", { length: 512 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("drop_monitors_legacy_alert_unique").on(table.legacyAlertId),
+    index("drop_monitors_user_active_idx").on(table.userId, table.isActive),
+    index("drop_monitors_due_idx").on(table.isActive, table.lastCheckedAt),
+  ]
+);
+
+export type DropMonitor = typeof dropMonitors.$inferSelect;
+export type InsertDropMonitor = typeof dropMonitors.$inferInsert;
+
+export const dropReleaseWindows = mysqlTable(
+  "drop_release_windows",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    retailer: varchar("retailer", { length: 32 }).notNull(),
+    label: varchar("label", { length: 160 }).notNull(),
+    timezone: varchar("timezone", { length: 64 })
+      .default("America/New_York")
+      .notNull(),
+    weekday: int("weekday").notNull(),
+    startMinute: int("startMinute").notNull(),
+    endMinute: int("endMinute").notNull(),
+    burstIntervalSeconds: int("burstIntervalSeconds").default(5).notNull(),
+    isActive: boolean("isActive").default(true).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("drop_release_windows_user_retailer_idx").on(
+      table.userId,
+      table.retailer,
+      table.isActive
+    ),
+  ]
+);
+
+export type DropReleaseWindow = typeof dropReleaseWindows.$inferSelect;
+export type InsertDropReleaseWindow = typeof dropReleaseWindows.$inferInsert;
+
+export const dropProductStates = mysqlTable(
+  "drop_product_states",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    monitorId: int("monitorId").notNull(),
+    retailerProductId: varchar("retailerProductId", { length: 192 }).notNull(),
+    title: varchar("title", { length: 512 }).notNull(),
+    productUrl: text("productUrl").notNull(),
+    stockState: varchar("stockState", { length: 24 })
+      .default("unknown")
+      .notNull(),
+    priceCents: int("priceCents"),
+    currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+    firstSeenAt: timestamp("firstSeenAt").defaultNow().notNull(),
+    lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+    lastTriggeredAt: timestamp("lastTriggeredAt"),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("drop_product_states_monitor_product_unique").on(
+      table.monitorId,
+      table.retailerProductId
+    ),
+    index("drop_product_states_monitor_seen_idx").on(
+      table.monitorId,
+      table.lastSeenAt
+    ),
+  ]
+);
+
+export type DropProductState = typeof dropProductStates.$inferSelect;
+
+export const dropEvents = mysqlTable(
+  "drop_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    monitorId: int("monitorId").notNull(),
+    userId: int("userId").notNull(),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    eventType: varchar("eventType", { length: 24 }).notNull(),
+    retailer: varchar("retailer", { length: 32 }).notNull(),
+    retailerProductId: varchar("retailerProductId", { length: 192 }).notNull(),
+    title: varchar("title", { length: 512 }).notNull(),
+    productUrl: text("productUrl").notNull(),
+    imageUrl: text("imageUrl"),
+    priceCents: int("priceCents"),
+    currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+    source: varchar("source", { length: 64 }).notNull(),
+    observedAt: timestamp("observedAt").notNull(),
+    detectedAt: timestamp("detectedAt").defaultNow().notNull(),
+    notifiedAt: timestamp("notifiedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex("drop_events_fingerprint_unique").on(table.fingerprint),
+    index("drop_events_user_detected_idx").on(table.userId, table.detectedAt),
+    index("drop_events_monitor_detected_idx").on(
+      table.monitorId,
+      table.detectedAt
+    ),
+  ]
+);
+
+export type DropEvent = typeof dropEvents.$inferSelect;
+export type InsertDropEvent = typeof dropEvents.$inferInsert;
+
+export const dropPushSubscriptions = mysqlTable(
+  "drop_push_subscriptions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    endpointHash: varchar("endpointHash", { length: 64 }).notNull(),
+    endpoint: text("endpoint").notNull(),
+    p256dh: varchar("p256dh", { length: 192 }).notNull(),
+    auth: varchar("auth", { length: 64 }).notNull(),
+    userAgent: varchar("userAgent", { length: 512 }),
+    failureCount: int("failureCount").default(0).notNull(),
+    lastSuccessAt: timestamp("lastSuccessAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("drop_push_subscriptions_endpoint_unique").on(
+      table.endpointHash
+    ),
+    index("drop_push_subscriptions_user_idx").on(table.userId),
+  ]
+);
+
+export type DropPushSubscription = typeof dropPushSubscriptions.$inferSelect;
+
+export const dropCompanionTokens = mysqlTable(
+  "drop_companion_tokens",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+    lastUsedAt: timestamp("lastUsedAt"),
+    expiresAt: timestamp("expiresAt"),
+    revokedAt: timestamp("revokedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex("drop_companion_tokens_hash_unique").on(table.tokenHash),
+    index("drop_companion_tokens_user_idx").on(table.userId, table.revokedAt),
+  ]
+);
+
+export type DropCompanionToken = typeof dropCompanionTokens.$inferSelect;
+
+export const dropWorkerLeases = mysqlTable("drop_worker_leases", {
+  leaseKey: varchar("leaseKey", { length: 64 }).primaryKey(),
+  holder: varchar("holder", { length: 64 }).notNull(),
+  lockedUntil: timestamp("lockedUntil").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 // ─── Price Cache ──────────────────────────────────────────────────────────────
 
 export const priceCache = mysqlTable("price_cache", {

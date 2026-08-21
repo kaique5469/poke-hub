@@ -28,6 +28,7 @@ export async function sendEmail(input: EmailInput): Promise<boolean> {
         html: input.html,
         text: input.text,
       }),
+      signal: AbortSignal.timeout(8_000),
     });
     if (!response.ok) {
       console.error(
