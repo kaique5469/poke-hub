@@ -138,10 +138,12 @@ import { marketRouter } from "./marketRouter";
 import { ENV } from "./_core/env";
 import { dedupeArticlesByTitle } from "./lib/articleQuality";
 import { getPortugueseCard, searchPortugueseCards } from "./lib/tcgdex";
+import { dropMonitorRouter } from "./dropMonitorRouter";
 
 export const appRouter = router({
   system: systemRouter,
   market: marketRouter,
+  dropMonitor: dropMonitorRouter,
   site: router({
     info: publicProcedure.query(() => ({
       contactEmail: ENV.supportEmail || null,

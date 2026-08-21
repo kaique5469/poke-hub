@@ -19,6 +19,10 @@ import { ensureMarketplaceSchema } from "../marketplaceSchema";
 import { ensureGrowthSchema } from "../growthSchema";
 import { ensureGameCompetitionSchema } from "../gameCompetitionSchema";
 import { ensureExternalApiCacheSchema } from "../externalApiCacheSchema";
+import { ensureDropMonitorSchema } from "../dropMonitorSchema";
+import { startDropMonitorWorker } from "../dropMonitor";
+import { dropProviderWebhookHandler } from "../dropProviderWebhook";
+import { dropCompanionNextHandler } from "../dropCompanion";
 import { verifyWebhook } from "../lib/stripe";
 import {
   cancelCheckoutSessionOrders,
@@ -99,6 +103,12 @@ async function startServer() {
       error
     );
   });
+  await ensureDropMonitorSchema().catch(error => {
+    console.error(
+      "[startup] Drop monitor schema is temporarily unavailable; continuing without live monitoring",
+      error
+    );
+  });
   const app = express();
   const server = createServer(app);
   app.disable("x-powered-by");
@@ -163,6 +173,12 @@ async function startServer() {
       }
     }
   );
+  app.post(
+    "/api/drop-provider/webhook",
+    apiRateLimit,
+    express.raw({ type: "application/json", limit: "256kb" }),
+    dropProviderWebhookHandler
+  );
 
   // Scanner images use a small dedicated binary endpoint. It is registered
   // before the global JSON parser so photos never become oversized JSON.
@@ -174,6 +190,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "1mb", extended: true }));
   registerSeoRoutes(app);
   registerAuthRoutes(app);
+  app.get("/api/drop-companion/next", apiRateLimit, dropCompanionNextHandler);
   // Uploaded files (covers, etc.) — persist DATA_DIR on a Railway volume
   app.use(
     "/uploads",
@@ -214,6 +231,9 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    if (startDropMonitorWorker()) {
+      console.log("[drop-monitor] authorized provider worker started");
+    }
   });
 }
 
