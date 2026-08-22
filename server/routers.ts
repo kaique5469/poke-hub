@@ -12,8 +12,8 @@ import {
 } from "./_core/trpc";
 import {
   getCMCardByTcgId,
+  getCMCardByNameAndSet,
   getCMPriceHistory,
-  searchCMCardsGrid,
 } from "./cardmarketApi.js";
 import {
   addBinderCard,
@@ -136,9 +136,31 @@ import {
 } from "./marketplaceRouter";
 import { marketRouter } from "./marketRouter";
 import { ENV } from "./_core/env";
-import { dedupeArticlesByTitle } from "./lib/articleQuality";
-import { getPortugueseCard, searchPortugueseCards } from "./lib/tcgdex";
+import {
+  dedupeArticlesByTitle,
+  isPublicEditorialArticle,
+  isSourceVerifiedArticle,
+} from "./lib/articleQuality";
+import {
+  getJapaneseCard,
+  getPortugueseCard,
+  searchJapaneseCards,
+  searchPortugueseCards,
+} from "./lib/tcgdex";
 import { dropMonitorRouter } from "./dropMonitorRouter";
+import { searchCardCatalog } from "./lib/cardCatalogSearch";
+import { getHistoricCard, getHistoricPsaComps } from "./lib/historicCards";
+import {
+  expandedCatalogConfigured,
+  getExpandedCatalogCard,
+  getLookupPsaComps,
+} from "./lib/tcgPriceLookup";
+import {
+  correctSearchText,
+  findBestSetMatch,
+  rankSearchResult,
+  searchCoreTerms,
+} from "./lib/searchRelevance";
 
 export const appRouter = router({
   system: systemRouter,
@@ -173,115 +195,55 @@ export const appRouter = router({
           type: z.string().optional(),
           rarity: z.string().optional(),
           supertype: z.string().optional(),
-          language: z.enum(["en", "pt-BR"]).default("en"),
+          language: z.enum(["en", "pt-BR", "ja"]).default("en"),
         })
       )
       .query(async ({ input }) => {
-        if (input.language === "pt-BR") {
-          return searchPortugueseCards({
-            q: input.q,
-            page: input.page,
-            pageSize: input.pageSize,
-          });
+        if (input.language === "pt-BR" || input.language === "ja") {
+          const result = await (input.language === "ja"
+            ? searchJapaneseCards({
+                q: input.q,
+                page: input.page,
+                pageSize: input.pageSize,
+              })
+            : searchPortugueseCards({
+                q: input.q,
+                page: input.page,
+                pageSize: input.pageSize,
+              }));
+          return {
+            ...result,
+            searchMeta: {
+              originalQuery: input.q ?? "",
+              correctedQuery: null,
+              searchedAs: input.q ?? "",
+              matchedSet: null,
+              matchMode: input.q ? ("exact" as const) : ("browse" as const),
+              expandedCatalog: false,
+            },
+          };
         }
-        const buildFilters = () => {
-          const parts: string[] = [];
-          if (input.set) parts.push(`set.id:${input.set}`);
-          if (input.type) parts.push(`types:${input.type}`);
-          if (input.rarity) parts.push(`rarity:"${input.rarity}"`);
-          if (input.supertype) parts.push(`supertype:${input.supertype}`);
-          return parts;
-        };
-        const run = (extra: string[]) => {
-          const q = [...extra, ...buildFilters()].join(" ");
-          return searchCards({
-            q: q || undefined,
-            page: input.page,
-            pageSize: input.pageSize,
-            orderBy: "-set.releaseDate",
-            select: GRID_SELECT,
-          });
-        };
-
-        const raw = (input.q ?? "").trim();
-        // Strip leading zeros from a collector number, keeping letter suffixes ("025" → "25", "012a" → "12a")
-        const cleanNum = (n: string) => n.replace(/^0+(?=\d)/, "");
-
-        // ── Card-code detection (before hitting any API) ──
-        const idMatch = raw.match(/^([a-z0-9.]+)-(\d+[a-zA-Z]*|[A-Z]+\d+)$/i); // "sv7-45"
-        const numMatch = raw.match(/^(\d{1,3}[a-zA-Z]?)\s*\/\s*(\d{1,3})$/); // "25/102", "025/086"
-        const setCodeMatch = raw.match(
-          /^([a-zA-Z]{2,6})[\s-]+(\d{1,3}[a-zA-Z]?)$/
-        ); // "PAL 123"
-
-        let codeQuery: string[] | null = null;
-        if (idMatch) codeQuery = [`id:${raw.toLowerCase()}`];
-        else if (numMatch)
-          codeQuery = [
-            `number:${cleanNum(numMatch[1])}`,
-            `set.printedTotal:${parseInt(numMatch[2], 10)}`,
-          ];
-        else if (setCodeMatch)
-          codeQuery = [
-            `set.ptcgoCode:${setCodeMatch[1].toUpperCase()}`,
-            `number:${cleanNum(setCodeMatch[2])}`,
-          ];
-
-        // "25/102" and "sv7-45" formats only exist on pokemontcg.io — skip RapidAPI for those
-        const rapidQuery = numMatch
-          ? null
-          : setCodeMatch
-            ? `${setCodeMatch[1].toUpperCase()} ${cleanNum(setCodeMatch[2])}` // matches card_code_number "PAL 123"
-            : idMatch
-              ? null
-              : raw;
-
-        // ── Primary: RapidAPI (CardMarket API TCG). Falls back on quota/error/empty ──
-        const hasFilters = !!(
-          input.set ||
-          input.type ||
-          input.rarity ||
-          input.supertype
-        );
-        if (rapidQuery && !hasFilters) {
-          try {
-            const rapid = await searchCMCardsGrid(
-              rapidQuery,
-              input.page,
-              input.pageSize
-            );
-            if (rapid && rapid.count > 0) return rapid;
-          } catch {
-            // fall through to pokemontcg.io
-          }
-        }
-
-        // ── Fallback: pokemontcg.io — code + name in parallel; code wins when it has results ──
-        if (codeQuery) {
-          const [byCode, byName] = await Promise.allSettled([
-            run(codeQuery),
-            run([`name:"${raw}*"`]),
-          ]);
-          if (byCode.status === "fulfilled" && byCode.value.totalCount > 0)
-            return byCode.value;
-          if (byName.status === "fulfilled") return byName.value;
-          if (byCode.status === "fulfilled") return byCode.value;
-          throw byName.reason;
-        }
-
-        return run(raw ? [`name:"${raw}*"`] : []);
+        return searchCardCatalog(input);
       }),
 
     getById: publicProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
         const isPortuguese = input.id.startsWith("ptbr:");
-        const card = isPortuguese
-          ? await getPortugueseCard(input.id.slice(5))
-          : await getCardById(input.id);
+        const isJapanese = input.id.startsWith("ja:");
+        const card = input.id.startsWith("historic:")
+          ? getHistoricCard(input.id)
+          : input.id.startsWith("tcgpl:")
+            ? await getExpandedCatalogCard(input.id)
+            : isPortuguese
+              ? await getPortugueseCard(input.id.slice(5))
+              : isJapanese
+                ? await getJapaneseCard(input.id.slice(3))
+                : await getCardById(input.id);
         if (!card)
           throw new TRPCError({ code: "NOT_FOUND", message: "Card not found" });
-        const price = isPortuguese ? null : getPriceFromCard(card);
+        const price =
+          isPortuguese || isJapanese ? null : getPriceFromCard(card);
         return {
           ...card,
           isSpecialRare: isSpecialRare(card.rarity),
@@ -292,6 +254,88 @@ export const appRouter = router({
             ebay: getEbayUrl(card.name, card.set.name),
             cardmarket: card.cardmarket?.url ?? getCardMarketUrl(card.name),
           },
+        };
+      }),
+
+    getGradedPrices: publicProcedure
+      .input(z.object({ id: z.string().min(1).max(160) }))
+      .query(async ({ input }) => {
+        const isHistoric = input.id.startsWith("historic:");
+        const isExpanded = input.id.startsWith("tcgpl:");
+        const isPortuguese = input.id.startsWith("ptbr:");
+        const isJapanese = input.id.startsWith("ja:");
+        const card = isHistoric
+          ? getHistoricCard(input.id)
+          : isExpanded
+            ? await getExpandedCatalogCard(input.id)
+            : isPortuguese
+              ? await getPortugueseCard(input.id.slice(5))
+              : isJapanese
+                ? await getJapaneseCard(input.id.slice(3))
+                : await getCardById(input.id);
+        if (!card) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Card not found" });
+        }
+
+        const historic = getHistoricPsaComps(input.id);
+        const live = await getLookupPsaComps({
+          externalId: input.id,
+          name: card.name,
+          setName: card.set?.name,
+        });
+        let fallback: Array<{
+          grade: number;
+          value: number;
+          currency: "EUR";
+          basis: "cardmarket_reference";
+          sourceName: string;
+          sourceUrl: string;
+          observedAt: string | null;
+          sampleSize: null;
+          note: string;
+        }> = [];
+        if (
+          !historic.length &&
+          !live.length &&
+          !isPortuguese &&
+          !isJapanese &&
+          !isExpanded
+        ) {
+          const reference = await getCMCardByNameAndSet(
+            card.name,
+            card.set?.name ?? ""
+          );
+          if (reference) {
+            fallback = [
+              [10, reference.cardmarket.graded_psa10],
+              [9, reference.cardmarket.graded_psa9],
+            ]
+              .filter(
+                (row): row is [number, number] =>
+                  typeof row[1] === "number" && row[1] > 0
+              )
+              .map(([grade, value]) => ({
+                grade,
+                value,
+                currency: "EUR" as const,
+                basis: "cardmarket_reference" as const,
+                sourceName: "CardMarket market reference",
+                sourceUrl: getCardMarketUrl(card.name),
+                observedAt: null,
+                sampleSize: null,
+                note: "Marketplace reference; it is not an official PSA appraisal or a guaranteed sale price.",
+              }));
+          }
+        }
+        const grades = [...historic, ...live, ...fallback].sort(
+          (a, b) => b.grade - a.grade
+        );
+        return {
+          grades,
+          providerConfigured: expandedCatalogConfigured(),
+          hasVerifiedComps: grades.length > 0,
+          disclaimer:
+            "Graded values are market observations, not official PSA appraisals. Missing grades are never estimated.",
         };
       }),
 
@@ -949,17 +993,34 @@ export const appRouter = router({
       .input(z.object({ q: z.string().trim().min(2).max(80) }))
       .query(async ({ input }) => {
         const term = input.q.replace(/["\\]/g, " ").trim();
+        const corrected = correctSearchText(term);
+        let knownSets: Awaited<ReturnType<typeof getSets>> = [];
+        try {
+          knownSets = await getSets();
+        } catch {
+          knownSets = [];
+        }
+        const matchedSet =
+          findBestSetMatch(searchCoreTerms(term), knownSets)?.set ?? null;
+        const productQuery = matchedSet?.name ?? searchCoreTerms(corrected);
         const [cardsResult, setsResult, productsResult, articlesResult] =
           await Promise.allSettled([
-            searchCards({
-              q: `name:"${term}*"`,
+            searchCardCatalog({
+              q: term,
               page: 1,
               pageSize: 4,
-              orderBy: "-set.releaseDate",
-              select: GRID_SELECT,
+              set: undefined,
+              type: undefined,
+              rarity: undefined,
+              supertype: undefined,
             }),
-            getSets(),
-            listProducts({ q: term, sort: "views", page: 1, pageSize: 4 }),
+            Promise.resolve(knownSets),
+            listProducts({
+              q: productQuery,
+              sort: "views",
+              page: 1,
+              pageSize: 12,
+            }),
             getPublishedArticles(40),
           ]);
 
@@ -978,18 +1039,21 @@ export const appRouter = router({
               })
             : [];
 
-        const needle = term.toLowerCase();
         const sets =
           setsResult.status === "fulfilled"
             ? setsResult.value
-                .filter(
-                  set =>
-                    set.name.toLowerCase().includes(needle) ||
-                    set.id.toLowerCase().includes(needle) ||
-                    set.ptcgoCode?.toLowerCase().includes(needle)
-                )
-                .slice(0, 4)
                 .map(set => ({
+                  set,
+                  score: rankSearchResult(corrected, [
+                    set.name,
+                    set.id,
+                    set.ptcgoCode,
+                  ]),
+                }))
+                .filter(item => item.score >= 0.45)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 4)
+                .map(({ set }) => ({
                   id: set.id,
                   name: set.name,
                   series: set.series,
@@ -1000,26 +1064,40 @@ export const appRouter = router({
 
         const products =
           productsResult.status === "fulfilled"
-            ? productsResult.value.items.slice(0, 4).map(product => ({
-                id: product.id,
-                name: product.name,
-                slug: product.slug,
-                image: product.imageUrl,
-                setName: product.setName,
-                price: product.avgPriceUsd ?? product.minPriceUsd,
-              }))
+            ? productsResult.value.items
+                .map(product => ({
+                  product,
+                  score: rankSearchResult(corrected, [
+                    product.name,
+                    product.setName,
+                  ]),
+                }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 4)
+                .map(({ product }) => ({
+                  id: product.id,
+                  name: product.name,
+                  slug: product.slug,
+                  image: product.imageUrl,
+                  setName: product.setName,
+                  price: product.avgPriceUsd ?? product.minPriceUsd,
+                }))
             : [];
 
         const articles =
           articlesResult.status === "fulfilled"
             ? articlesResult.value
-                .filter(
-                  article =>
-                    article.title.toLowerCase().includes(needle) ||
-                    article.subtitle?.toLowerCase().includes(needle)
-                )
-                .slice(0, 4)
                 .map(article => ({
+                  article,
+                  score: rankSearchResult(corrected, [
+                    article.title,
+                    article.subtitle,
+                  ]),
+                }))
+                .filter(item => item.score >= 0.42)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 4)
+                .map(({ article }) => ({
                   id: article.id,
                   title: article.title,
                   slug: article.slug,
@@ -1028,7 +1106,19 @@ export const appRouter = router({
                 }))
             : [];
 
-        return { cards, sets, products, articles };
+        return {
+          cards,
+          sets,
+          products,
+          articles,
+          searchMeta: {
+            originalQuery: term,
+            correctedQuery: corrected !== term.toLowerCase() ? corrected : null,
+            matchedSet: matchedSet
+              ? { id: matchedSet.id, name: matchedSet.name }
+              : null,
+          },
+        };
       }),
   }),
 
@@ -1048,7 +1138,7 @@ export const appRouter = router({
             input.limit * 3,
             input.category
           );
-          return dedupeArticlesByTitle(rows)
+          return dedupeArticlesByTitle(rows.filter(isPublicEditorialArticle))
             .slice(0, input.limit)
             .map(a => ({
               ...a,
@@ -1058,11 +1148,44 @@ export const appRouter = router({
             }));
         });
       }),
+    featured: publicProcedure.query(async () => {
+      const rows = (await getPublishedArticles(50)).filter(
+        article =>
+          isPublicEditorialArticle(article) && isSourceVerifiedArticle(article)
+      );
+      const article =
+        rows.find(
+          row => Array.isArray(row.tags) && row.tags.includes("featured")
+        ) ?? rows[0];
+      if (article) {
+        return {
+          kind: "article" as const,
+          title: article.title,
+          subtitle: article.subtitle,
+          image: article.coverImageUrl,
+          href: `/articles/${article.slug}`,
+          sourceName: "RarityGrid Editorial",
+          publishedAt:
+            article.publishedAt?.toISOString() ??
+            article.createdAt.toISOString(),
+        };
+      }
+      return {
+        kind: "official" as const,
+        title: "Pokémon TCG: 30th Celebration arrives worldwide September 16",
+        subtitle:
+          "The official anniversary expansion introduces an all-foil set, a new rarity and a coordinated global release.",
+        image: "/images/raritygrid-hero-v2.webp",
+        href: "https://www.pokemon.com/us/pokemon-news/get-ready-for-pokemon-tcg-30th-celebration",
+        sourceName: "Official Pokémon announcement",
+        publishedAt: "2026-06-01T00:00:00.000Z",
+      };
+    }),
     getBySlug: publicProcedure
       .input(z.object({ slug: z.string() }))
       .query(async ({ input }) => {
         const article = await getArticleBySlug(input.slug);
-        if (!article)
+        if (!article || !isPublicEditorialArticle(article))
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Article not found",

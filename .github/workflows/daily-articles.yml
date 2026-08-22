@@ -7,11 +7,13 @@
 # artigos pré-escritos no body) — deixe o workflow desativado ou envie
 # artigos manualmente via curl.
 
-name: Daily TCG Articles
+name: Verified TCG Editorial
 
 on:
   schedule:
-    - cron: "0 12 * * *" # todo dia às 12:00 UTC (9h em Brasília)
+    # O servidor publica no máximo três matérias verificadas por semana.
+    # A execução diária permite recuperar automaticamente uma falha ou pauta duplicada.
+    - cron: "0 12 * * *" # 12:00 UTC (9h em Brasília)
   workflow_dispatch: {}
 
 jobs:

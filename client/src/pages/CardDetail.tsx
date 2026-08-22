@@ -20,6 +20,7 @@ import {
   BellRing,
   Eye,
   Activity,
+  Award,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +87,167 @@ function MarketChange({ value }: { value: number | null | undefined }) {
       {positive ? "+" : ""}
       {value.toFixed(2)}%
     </span>
+  );
+}
+
+type GradedComp = {
+  grade: number;
+  value: number;
+  currency: "USD" | "EUR";
+  basis: string;
+  sourceName: string;
+  sourceUrl: string;
+  observedAt: string | null;
+  sampleSize?: number | null;
+  note?: string;
+};
+
+function GradedValuePanel({
+  grades,
+  loading,
+  providerConfigured,
+  disclaimer,
+}: {
+  grades: GradedComp[];
+  loading: boolean;
+  providerConfigured: boolean;
+  disclaimer?: string;
+}) {
+  const [selectedGrade, setSelectedGrade] = useState(10);
+  const selected = grades.find(comp => comp.grade === selectedGrade);
+  const availableGrades = useMemo(
+    () => new Set(grades.map(comp => comp.grade)),
+    [grades]
+  );
+  const formatter = useMemo(
+    () =>
+      new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: selected?.currency ?? "USD",
+        maximumFractionDigits: selected && selected.value >= 10_000 ? 0 : 2,
+      }),
+    [selected?.currency, selected?.value]
+  );
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-violet-50 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-amber-100 px-5 py-4">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-black text-gray-950">
+            <Award className="h-4 w-4 text-amber-600" /> PSA graded value
+            explorer
+          </p>
+          <p className="mt-1 text-xs leading-5 text-gray-500">
+            Choose a grade to see verified market observations. Missing grades
+            are never estimated.
+          </p>
+        </div>
+        <span className="rounded-full border border-amber-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-wide text-amber-800">
+          PSA 1–10
+        </span>
+      </div>
+
+      <div className="p-5">
+        <div
+          className="grid grid-cols-5 gap-2 sm:grid-cols-10"
+          role="group"
+          aria-label="Select PSA grade"
+        >
+          {Array.from({ length: 10 }, (_, index) => 10 - index).map(grade => {
+            const available = availableGrades.has(grade);
+            return (
+              <button
+                key={grade}
+                type="button"
+                onClick={() => setSelectedGrade(grade)}
+                aria-pressed={selectedGrade === grade}
+                className={cn(
+                  "relative rounded-xl border px-2 py-2 text-sm font-black transition",
+                  selectedGrade === grade
+                    ? "border-violet-600 bg-violet-600 text-white shadow-lg shadow-violet-200"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-violet-300",
+                  !available && selectedGrade !== grade && "text-gray-400"
+                )}
+              >
+                {grade}
+                <span
+                  className={cn(
+                    "absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full",
+                    available ? "bg-emerald-400" : "bg-gray-200"
+                  )}
+                />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-white bg-white/85 p-5 shadow-sm">
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-36" />
+              <Skeleton className="h-10 w-56" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ) : selected ? (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">
+                  PSA {selected.grade} market observation
+                </p>
+                <p className="mt-1 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">
+                  {formatter.format(selected.value)}
+                </p>
+                <p className="mt-2 max-w-2xl text-xs leading-5 text-gray-500">
+                  {selected.note ??
+                    (selected.basis === "ebay_7d"
+                      ? "Seven-day average from completed eBay sales."
+                      : selected.basis === "ebay_30d"
+                        ? "Thirty-day average from completed eBay sales."
+                        : "Current market reference from the named source.")}
+                </p>
+              </div>
+              <div className="text-left sm:text-right">
+                <a
+                  href={selected.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-black text-violet-700 hover:text-violet-900"
+                >
+                  {selected.sourceName} ↗
+                </a>
+                {selected.observedAt && (
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    Observed{" "}
+                    {new Date(selected.observedAt).toLocaleDateString("en-US")}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-lg font-black text-gray-900">
+                No verified PSA {selectedGrade} comp
+              </p>
+              <p className="mt-1 text-sm leading-6 text-gray-500">
+                We do not have enough sourced sales data for this card and
+                grade. The site will not calculate a value from another grade.
+              </p>
+              {!providerConfigured && (
+                <p className="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">
+                  Full graded coverage becomes available when the licensed
+                  pricing feed is connected.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        {disclaimer && (
+          <p className="mt-3 text-[10px] leading-4 text-gray-400">
+            {disclaimer}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -426,6 +588,12 @@ export default function CardDetail() {
       }
     );
 
+  const { data: gradedPrices, isLoading: gradedPricesLoading } =
+    trpc.cards.getGradedPrices.useQuery(
+      { id: id! },
+      { enabled: !!id, retry: false, staleTime: 6 * 60 * 60 * 1000 }
+    );
+
   const { data: marketData } = trpc.market.card.useQuery(
     { cardId: id!, days: 90 },
     { enabled: !!id, retry: false, staleTime: 60_000 }
@@ -517,7 +685,7 @@ export default function CardDetail() {
   usePageMeta(
     cardName ? `${cardName} · ${setName}` : undefined,
     cardName
-      ? `${cardName} from ${setName} — current API prices, sellers, verified price history and other printings on RarityGrid.`
+      ? `${cardName} from ${setName} — raw prices, verified PSA graded market observations, price history and related printings on RarityGrid.`
       : undefined,
     card?.images?.large ?? card?.images?.small,
     {
@@ -664,6 +832,9 @@ export default function CardDetail() {
                 alt={card.name}
                 className="w-full max-w-xs rounded-2xl shadow-2xl transition-transform group-hover:scale-105"
                 style={{ filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.15))" }}
+                onError={event => {
+                  event.currentTarget.src = "/card-placeholder.svg";
+                }}
               />
               {card.rarity && (
                 <Badge
@@ -812,23 +983,6 @@ export default function CardDetail() {
                   </div>
                 </div>
               )}
-
-              {/* PSA grades */}
-              {cmData?.graded_psa10 && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <div className="text-[10px] text-gray-400 font-semibold mb-2 uppercase tracking-wide">
-                    Graded (PSA)
-                  </div>
-                  <div className="flex gap-3 text-center justify-center">
-                    <div>
-                      <div className="text-xs font-black text-yellow-600">
-                        €{cmData.graded_psa10.toFixed(0)}
-                      </div>
-                      <div className="text-[10px] text-gray-400">PSA 10</div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -864,6 +1018,25 @@ export default function CardDetail() {
                 )}
               </div>
             </div>
+
+            {(card as any).catalogRecord && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-wide text-blue-900">
+                  Verified historic catalog record
+                </p>
+                <p className="mt-1 text-sm leading-6 text-blue-800">
+                  {(card as any).catalogRecord.note}
+                </p>
+                <a
+                  href={(card as any).catalogRecord.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex text-xs font-black text-blue-950 underline underline-offset-4"
+                >
+                  {(card as any).catalogRecord.sourceName} ↗
+                </a>
+              </div>
+            )}
 
             {/* Verified collector market signals */}
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950 text-white">
@@ -933,6 +1106,13 @@ export default function CardDetail() {
                 </div>
               </div>
             </div>
+
+            <GradedValuePanel
+              grades={(gradedPrices?.grades ?? []) as GradedComp[]}
+              loading={gradedPricesLoading}
+              providerConfigured={gradedPrices?.providerConfigured ?? false}
+              disclaimer={gradedPrices?.disclaimer}
+            />
 
             {/* Tabs */}
             <Tabs defaultValue="buy">
@@ -1172,37 +1352,6 @@ export default function CardDetail() {
                           </div>
                         ))}
                     </div>
-
-                    {/* Graded prices */}
-                    {(cmData.graded_psa10 || cmData.graded_psa9) && (
-                      <div className="px-4 pb-4">
-                        <div className="text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wide">
-                          Graded Prices
-                        </div>
-                        <div className="flex gap-3">
-                          {cmData.graded_psa10 && (
-                            <div className="bg-yellow-50 rounded-lg px-3 py-2 text-center border border-yellow-100">
-                              <div className="font-black text-yellow-700">
-                                €{cmData.graded_psa10.toFixed(0)}
-                              </div>
-                              <div className="text-[10px] text-gray-400">
-                                PSA 10
-                              </div>
-                            </div>
-                          )}
-                          {cmData.graded_psa9 && (
-                            <div className="bg-gray-50 rounded-lg px-3 py-2 text-center border border-gray-100">
-                              <div className="font-black text-gray-700">
-                                €{(cmData as any).graded_psa9?.toFixed(0)}
-                              </div>
-                              <div className="text-[10px] text-gray-400">
-                                PSA 9
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ) : null}
 

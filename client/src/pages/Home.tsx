@@ -52,8 +52,8 @@ function SafeImage({
 
 export default function Home() {
   usePageMeta(
-    "Pokémon TCG Marketplace & Price Guide",
-    "Search English Pokémon cards, real sealed products, current USD prices, sets and collector news."
+    "Pokémon Card Search, PSA Values & TCG News",
+    "Search Pokémon cards with typo correction, explore sets and historic promos, compare raw and PSA graded market references, and follow verified TCG news."
   );
   const sets = trpc.sets.recent.useQuery(
     { limit: 8 },
@@ -71,6 +71,10 @@ export default function Home() {
     { limit: 7 },
     { staleTime: 300_000, retry: false }
   );
+  const featured = trpc.articles.featured.useQuery(undefined, {
+    staleTime: 300_000,
+    retry: false,
+  });
   const weekly = trpc.game.weeklyLeaderboard.useQuery(
     { limit: 3 },
     { staleTime: 60_000, retry: false }
@@ -84,7 +88,9 @@ export default function Home() {
       <section className="relative isolate overflow-hidden bg-[#090d1c] text-white">
         <div
           className="absolute inset-0 -z-20 bg-cover bg-center"
-          style={{ backgroundImage: "url('/images/raritygrid-hero-v2.webp')" }}
+          style={{
+            backgroundImage: `url('${featured.data?.image ?? "/images/raritygrid-hero-v2.webp"}')`,
+          }}
           aria-hidden="true"
         />
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#070b18] via-[#080d1ce8] to-[#0a0d1a70]" />
@@ -92,32 +98,55 @@ export default function Home() {
         <div className="container relative grid min-h-[600px] gap-10 py-16 lg:grid-cols-[1.02fr_.98fr] lg:items-center">
           <div className="relative z-10">
             <p className="inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-400/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-200">
-              <Sparkles className="h-3.5 w-3.5" /> Built for collectors, not
-              clutter
+              <Sparkles className="h-3.5 w-3.5" /> Latest verified TCG update
             </p>
-            <h1 className="mt-6 max-w-3xl text-5xl font-black leading-[.98] tracking-tight text-white md:text-7xl">
-              Collect smarter.
-              <br />
-              <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-amber-200 bg-clip-text text-transparent">
-                Play for the top.
-              </span>
+            <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.02] tracking-tight text-white md:text-6xl">
+              {featured.isLoading
+                ? "Pokémon TCG news, grounded in real sources."
+                : (featured.data?.title ??
+                  "Search smarter. Collect with context.")}
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 md:text-lg">
-              Explore real cards and sealed products, follow the market and
-              climb a new skill-based leaderboard every week.
+              {featured.data?.subtitle ??
+                "Find cards even when the name is misspelled, compare sourced market values and follow the releases that matter."}
             </p>
+            {featured.data && (
+              <p className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-400">
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                {featured.data.sourceName}
+                <span aria-hidden="true">·</span>
+                {shortDate(featured.data.publishedAt)}
+              </p>
+            )}
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/game"
-                className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-900/30 transition hover:-translate-y-0.5 hover:bg-violet-500"
-              >
-                Play Weekly Arena <Gamepad2 className="h-4 w-4" />
-              </Link>
+              {featured.data?.kind === "official" ? (
+                <a
+                  href={featured.data.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-900/30 transition hover:-translate-y-0.5 hover:bg-violet-500"
+                >
+                  Read official update <ArrowRight className="h-4 w-4" />
+                </a>
+              ) : (
+                <Link
+                  href={featured.data?.href ?? "/articles"}
+                  className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-900/30 transition hover:-translate-y-0.5 hover:bg-violet-500"
+                >
+                  Read the story <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
               <Link
                 href="/cards"
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15"
+                className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-900/30 transition hover:-translate-y-0.5 hover:bg-violet-500"
               >
                 Search cards <Search className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/game"
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15"
+              >
+                Play Weekly Arena <Gamepad2 className="h-4 w-4" />
               </Link>
               <Link
                 href="/market"
@@ -129,7 +158,7 @@ export default function Home() {
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-xs font-bold text-slate-400">
               <span className="inline-flex items-center gap-1.5">
                 <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                Server-verified scoring
+                Sources shown with every major update
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Clock3 className="h-4 w-4 text-violet-300" />

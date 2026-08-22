@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPortugueseCard, searchPortugueseCards } from "./lib/tcgdex";
+import {
+  getJapaneseCard,
+  getPortugueseCard,
+  searchJapaneseCards,
+  searchPortugueseCards,
+} from "./lib/tcgdex";
 
 const fetchMock = vi.fn();
 
@@ -93,5 +98,40 @@ describe("TCGdex Portuguese catalog", () => {
   it("rejects unsafe card identifiers before calling the API", async () => {
     await expect(getPortugueseCard("../secret")).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("adapts the Japanese catalog with a distinct route prefix", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse([
+        {
+          id: "sv2a-025",
+          localId: "025",
+          name: "ピカチュウ",
+          image: "https://assets.tcgdex.net/ja/sv/sv2a/025",
+        },
+      ])
+    );
+    const result = await searchJapaneseCards({
+      q: "ピカチュウ",
+      page: 1,
+      pageSize: 12,
+    });
+    expect(result.data[0]).toMatchObject({
+      id: "ja:sv2a-025",
+      name: "ピカチュウ",
+    });
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/v2/ja/cards");
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: "sv2a-025",
+        localId: "025",
+        name: "ピカチュウ",
+        image: "https://assets.tcgdex.net/ja/sv/sv2a/025",
+      })
+    );
+    await expect(getJapaneseCard("sv2a-025")).resolves.toMatchObject({
+      id: "ja:sv2a-025",
+    });
   });
 });

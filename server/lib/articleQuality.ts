@@ -57,3 +57,95 @@ export function dedupeArticlesByTitle<T extends { title: string }>(
   }
   return result;
 }
+
+export type EditorialSource = { title: string; url: string };
+
+const PRIMARY_SOURCE_HOSTS = new Set([
+  "pokemon.com",
+  "www.pokemon.com",
+  "support.pokemon.com",
+  "press.pokemon.com",
+  "rk9.gg",
+  "www.rk9.gg",
+  "limitlesstcg.com",
+  "www.limitlesstcg.com",
+]);
+
+const BLOCKED_SOURCE_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "youtu.be",
+  "tiktok.com",
+  "www.tiktok.com",
+  "instagram.com",
+  "www.instagram.com",
+  "x.com",
+  "twitter.com",
+]);
+
+export function validateEditorialSources(sources: EditorialSource[]) {
+  const normalized = sources
+    .map(source => {
+      try {
+        const url = new URL(source.url);
+        if (url.protocol !== "https:" || BLOCKED_SOURCE_HOSTS.has(url.hostname))
+          return null;
+        return {
+          title: source.title.trim(),
+          url: url.toString(),
+          host: url.hostname.toLowerCase(),
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter((source): source is EditorialSource & { host: string } =>
+      Boolean(source?.title && source.title.length >= 3)
+    );
+  const unique = normalized.filter(
+    (source, index) =>
+      normalized.findIndex(item => item.url === source.url) === index
+  );
+  const uniqueHosts = new Set(unique.map(source => source.host));
+  const hasPrimarySource = unique.some(source =>
+    PRIMARY_SOURCE_HOSTS.has(source.host)
+  );
+  return {
+    valid: unique.length >= 2 && uniqueHosts.size >= 2 && hasPrimarySource,
+    sources: unique.slice(0, 5).map(({ title, url }) => ({ title, url })),
+    hasPrimarySource,
+    reason:
+      unique.length < 2 || uniqueHosts.size < 2
+        ? "at least two independent HTTPS sources on different domains are required"
+        : !hasPrimarySource
+          ? "an official Pokémon or primary tournament source is required"
+          : null,
+  };
+}
+
+export function stripGeneratedSourceSection(content: string) {
+  return content.replace(/\n+##\s+Sources\s*\n[\s\S]*$/i, "").trim();
+}
+
+const QUARANTINED_TITLE_PATTERNS = [
+  /\bbattle styles 2\.0\b/i,
+  /\belements unleashed\b/i,
+  /\beclipse of legends\b/i,
+  /\beternal legends\b/i,
+  /\brotation 2026 officially announced\b/i,
+];
+
+export function isPublicEditorialArticle(article: {
+  title: string;
+  tags?: unknown;
+}) {
+  if (QUARANTINED_TITLE_PATTERNS.some(pattern => pattern.test(article.title)))
+    return false;
+  return true;
+}
+
+export function isSourceVerifiedArticle(article: { tags?: unknown }) {
+  return (
+    Array.isArray(article.tags) && article.tags.includes("source-verified")
+  );
+}

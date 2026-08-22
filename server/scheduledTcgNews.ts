@@ -3,11 +3,11 @@
  *
  * Called daily by the AGENT cron. The agent researches the latest Pokémon TCG
  * news and POSTs a structured payload here. This handler validates the cron
- * auth, then uses the built-in LLM to enrich/format the content and persists
- * up to 3 new articles per run (idempotent by slug).
+ * auth, then publishes at most one source-verified article per run. The daily
+ * schedule can recover from a missed day, while the server caps automatic
+ * publishing at three verified articles per UTC week.
  *
- * It also accepts a direct POST from the AGENT cron with pre-written articles
- * in the body (articles array), which is the primary path used by the agent.
+ * It also accepts source-backed, pre-written articles in the request body.
  */
 
 import type { Request, Response } from "express";
@@ -15,6 +15,11 @@ import { invokeLLMWithWebSearch } from "./_core/llm";
 import { upsertArticleBySlug, getAdminUser, getPublishedArticles } from "./db";
 import { ENV } from "./_core/env";
 import { areArticleTitlesNearDuplicate } from "./lib/articleQuality";
+import {
+  isSourceVerifiedArticle,
+  stripGeneratedSourceSection,
+  validateEditorialSources,
+} from "./lib/articleQuality";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface IncomingArticle {
@@ -106,10 +111,28 @@ async function processArticles(
   {
     // Accept pre-written articles from the agent body, or generate via LLM
     let articlesToPublish: IncomingArticle[] = [];
+    const weekStart = new Date();
+    const weekday = weekStart.getUTCDay();
+    const daysSinceMonday = (weekday + 6) % 7;
+    weekStart.setUTCDate(weekStart.getUTCDate() - daysSinceMonday);
+    weekStart.setUTCHours(0, 0, 0, 0);
+    const publishedThisWeek = (await getPublishedArticles(30)).filter(
+      article => {
+        const publishedAt = article.publishedAt ?? article.createdAt;
+        return publishedAt >= weekStart && isSourceVerifiedArticle(article);
+      }
+    ).length;
+    const remainingThisWeek = Math.max(0, 3 - publishedThisWeek);
+    if (remainingThisWeek === 0) {
+      console.log(
+        "[tcg-news] Weekly verified editorial target already reached."
+      );
+      return;
+    }
 
     if (Array.isArray(body?.articles) && body.articles.length > 0) {
       // Agent sent pre-written articles — use them directly
-      articlesToPublish = body.articles.slice(0, 5);
+      articlesToPublish = body.articles.slice(0, remainingThisWeek);
     } else {
       // Research and generate today's TCG news digest
       const today = new Date().toLocaleDateString("en-US", {
@@ -118,9 +141,13 @@ async function processArticles(
         month: "long",
         day: "numeric",
       });
+      const topicRotation = [
+        "official Pokémon TCG set announcements, product releases, card reveals, rules or rotation updates",
+        "competitive Pokémon TCG strategy grounded in official rules and primary tournament deck or result data",
+        "collector education grounded in official product facts; do not make price claims unless a licensed market-data source is cited",
+      ];
       const topic =
-        body?.topic ??
-        "latest Pokémon TCG news, new set releases, tournament results, and card market trends";
+        body?.topic ?? topicRotation[publishedThisWeek % topicRotation.length];
 
       const jsonShape = `[
   {
@@ -148,7 +175,8 @@ Set "featured": true ONLY for major news that deserves the homepage hero banner 
         raw = await invokeLLMWithWebSearch(
           `You are a Pokémon TCG journalist writing for RarityGrid, a US marketplace for collectors and competitive players. Today is ${today}.
 First, SEARCH THE WEB for real Pokémon TCG news from the LAST 7 DAYS: ${topic}. Prioritize official Pokémon announcements, major tournament results, new set releases/reveals, and notable card price movements.
-Then write 2 news articles based ONLY on real facts you found (include real names, dates and numbers).
+Then write exactly 1 article based ONLY on facts supported by the cited pages (include real names, dates and numbers).
+You MUST cite at least 2 independent HTTPS sources, including Pokemon.com or a primary tournament source. Social posts and YouTube videos do not qualify as sources.
 Return ONLY a valid JSON array — no markdown, no code fences, no citations or annotations, no text before or after the JSON — with this exact shape:
 ${jsonShape}`
         );
@@ -177,7 +205,7 @@ ${jsonShape}`
       try {
         const parsed = JSON.parse(cleaned);
         if (Array.isArray(parsed)) {
-          articlesToPublish = parsed.slice(0, 3);
+          articlesToPublish = parsed.slice(0, 1);
         }
       } catch {
         console.error(
@@ -198,14 +226,11 @@ ${jsonShape}`
     for (const art of articlesToPublish) {
       if (!art.title || !art.content) continue;
 
-      const sources = (art.sources ?? [])
-        .filter(
-          source => source?.title && /^https:\/\//i.test(source.url ?? "")
-        )
-        .slice(0, 5);
-      if (sources.length === 0) {
+      const sourceValidation = validateEditorialSources(art.sources ?? []);
+      const sources = sourceValidation.sources;
+      if (!sourceValidation.valid) {
         console.warn(
-          `[tcg-news] Skipping ${art.title}: no verifiable sources.`
+          `[tcg-news] Skipping ${art.title}: ${sourceValidation.reason}.`
         );
         continue;
       }
@@ -242,7 +267,12 @@ ${jsonShape}`
 
       // "featured" travels as a tag — featured articles power the homepage hero banner
       const tags = Array.from(
-        new Set([...(art.featured ? ["featured"] : []), ...(art.tags ?? [])])
+        new Set([
+          "source-verified",
+          "auto-editorial",
+          ...(art.featured ? ["featured"] : []),
+          ...(art.tags ?? []),
+        ])
       );
 
       const sourceSection =
@@ -255,7 +285,7 @@ ${jsonShape}`
         title: art.title.slice(0, 512),
         subtitle: art.subtitle?.slice(0, 500) ?? null,
         slug,
-        content: `${art.content.trim()}${sourceSection}`,
+        content: `${stripGeneratedSourceSection(art.content)}${sourceSection}`,
         category: art.category ?? "news",
         tags,
         isPublished: true,
