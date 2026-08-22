@@ -11,6 +11,7 @@ interface PokéCardProps {
   types?: string[];
   price?: number | null;
   isSpecialRare?: boolean;
+  sourceLabel?: string;
   className?: string;
   onAddToBinder?: () => void;
 }
@@ -38,6 +39,7 @@ export default function PokéCard({
   types,
   price,
   isSpecialRare,
+  sourceLabel,
   className,
   onAddToBinder,
 }: PokéCardProps) {
@@ -48,7 +50,8 @@ export default function PokéCard({
           "group relative bg-card rounded-xl overflow-hidden border border-border",
           "transition-all duration-200 ease-out cursor-pointer",
           "hover:-translate-y-1.5 hover:shadow-[0_8px_32px_oklch(0_0_0/0.5)]",
-          isSpecialRare && "border-[oklch(0.78_0.18_85/0.4)] hover:border-[oklch(0.78_0.18_85/0.8)] hover:shadow-[0_8px_32px_oklch(0.78_0.18_85/0.2)]",
+          isSpecialRare &&
+            "border-[oklch(0.78_0.18_85/0.4)] hover:border-[oklch(0.78_0.18_85/0.8)] hover:shadow-[0_8px_32px_oklch(0.78_0.18_85/0.2)]",
           "card-shine",
           className
         )}
@@ -65,7 +68,16 @@ export default function PokéCard({
             alt={name}
             className="w-full h-full object-contain p-1 transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
+            onError={event => {
+              event.currentTarget.src = "/card-placeholder.svg";
+            }}
           />
+
+          {sourceLabel && (
+            <div className="absolute bottom-2 left-2 z-20 rounded-full border border-white/20 bg-slate-950/85 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-white shadow-lg backdrop-blur">
+              {sourceLabel}
+            </div>
+          )}
 
           {/* Special rare badge */}
           {isSpecialRare && (
@@ -80,7 +92,7 @@ export default function PokéCard({
           {/* Type badges */}
           {types && types.length > 0 && (
             <div className="absolute top-2 left-2 z-20 flex gap-1">
-              {types.slice(0, 2).map((type) => (
+              {types.slice(0, 2).map(type => (
                 <span
                   key={type}
                   className={cn(
@@ -98,7 +110,10 @@ export default function PokéCard({
           {onAddToBinder && (
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center z-30">
               <button
-                onClick={(e) => { e.preventDefault(); onAddToBinder(); }}
+                onClick={e => {
+                  e.preventDefault();
+                  onAddToBinder();
+                }}
                 className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg hover:bg-primary/90 transition-colors"
               >
                 + Add to Binder
@@ -109,15 +124,25 @@ export default function PokéCard({
 
         {/* Info */}
         <div className="p-2.5">
-          <p className="text-xs font-semibold text-foreground truncate leading-tight">{name}</p>
+          <p className="text-xs font-semibold text-foreground truncate leading-tight">
+            {name}
+          </p>
           {setName && (
-            <p className="text-[10px] text-muted-foreground truncate mt-0.5">{setName}</p>
+            <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+              {setName}
+            </p>
           )}
           {price != null && price > 0 && (
-            <p className={cn(
-              "text-xs font-bold mt-1.5",
-              price >= 50 ? "text-[oklch(0.78_0.18_85)]" : price >= 10 ? "text-[oklch(0.75_0.15_145)]" : "text-muted-foreground"
-            )}>
+            <p
+              className={cn(
+                "text-xs font-bold mt-1.5",
+                price >= 50
+                  ? "text-[oklch(0.78_0.18_85)]"
+                  : price >= 10
+                    ? "text-[oklch(0.75_0.15_145)]"
+                    : "text-muted-foreground"
+              )}
+            >
               ${price.toFixed(2)}
             </p>
           )}

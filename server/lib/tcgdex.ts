@@ -1,7 +1,7 @@
 import type { PtcgCard, PtcgSet, SearchCardsResult } from "./pokemontcg";
 
-const BASE_URL = "https://api.tcgdex.net/v2/pt-br";
 const PHYSICAL_ONLY = (image?: string) => !!image && !image.includes("/tcgp/");
+type TcgDexLocale = "pt-br" | "ja";
 
 interface TcgDexCardSummary {
   id: string;
@@ -27,11 +27,11 @@ interface TcgDexCard extends TcgDexCardSummary {
   };
 }
 
-async function tcgdexFetch<T>(path: string): Promise<T> {
+async function tcgdexFetch<T>(locale: TcgDexLocale, path: string): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
-    const response = await fetch(`${BASE_URL}${path}`, {
+    const response = await fetch(`https://api.tcgdex.net/v2/${locale}${path}`, {
       headers: { Accept: "application/json" },
       signal: controller.signal,
     });
@@ -46,11 +46,22 @@ function imageUrl(base: string | undefined, quality: "low" | "high") {
   return base ? `${base}/${quality}.webp` : "";
 }
 
-function adaptSet(set: TcgDexCard["set"]): PtcgSet {
+function localeMeta(locale: TcgDexLocale) {
+  return locale === "ja"
+    ? { prefix: "ja", label: "Japanese", series: "Japanese cards" }
+    : {
+        prefix: "ptbr",
+        label: "Pokémon TCG em português",
+        series: "Português (Brasil)",
+      };
+}
+
+function adaptSet(set: TcgDexCard["set"], locale: TcgDexLocale): PtcgSet {
+  const meta = localeMeta(locale);
   return {
-    id: `ptbr:${set?.id ?? "unknown"}`,
-    name: set?.name ?? "Pokémon TCG em português",
-    series: "Português (Brasil)",
+    id: `${meta.prefix}:${set?.id ?? "unknown"}`,
+    name: set?.name ?? meta.label,
+    series: meta.series,
     printedTotal: set?.cardCount?.official ?? 0,
     total: set?.cardCount?.total ?? set?.cardCount?.official ?? 0,
     releaseDate: "",
@@ -62,12 +73,13 @@ function adaptSet(set: TcgDexCard["set"]): PtcgSet {
   };
 }
 
-function adaptSummary(card: TcgDexCardSummary): PtcgCard {
+function adaptSummary(card: TcgDexCardSummary, locale: TcgDexLocale): PtcgCard {
+  const meta = localeMeta(locale);
   return {
-    id: `ptbr:${card.id}`,
+    id: `${meta.prefix}:${card.id}`,
     name: card.name,
     supertype: "Pokémon TCG",
-    set: adaptSet(undefined),
+    set: adaptSet(undefined, locale),
     number: card.localId,
     images: {
       small: imageUrl(card.image, "low"),
@@ -76,9 +88,9 @@ function adaptSummary(card: TcgDexCardSummary): PtcgCard {
   };
 }
 
-function adaptCard(card: TcgDexCard): PtcgCard {
+function adaptCard(card: TcgDexCard, locale: TcgDexLocale): PtcgCard {
   return {
-    ...adaptSummary(card),
+    ...adaptSummary(card, locale),
     supertype: card.category ?? "Pokémon TCG",
     hp: card.hp ? String(card.hp) : undefined,
     types: card.types,
@@ -86,23 +98,29 @@ function adaptCard(card: TcgDexCard): PtcgCard {
     rarity: card.rarity,
     flavorText: card.description,
     nationalPokedexNumbers: card.dexId,
-    set: adaptSet(card.set),
+    set: adaptSet(card.set, locale),
   };
 }
 
-export async function searchPortugueseCards(input: {
+export async function searchLocalizedCards(input: {
   q?: string;
   page: number;
   pageSize: number;
+  locale: TcgDexLocale;
 }): Promise<SearchCardsResult> {
   const qs = new URLSearchParams({
     "pagination:page": String(input.page),
     "pagination:itemsPerPage": String(Math.min(input.pageSize * 2, 100)),
   });
   if (input.q?.trim()) qs.set("name", `like:${input.q.trim()}`);
-  const rows = await tcgdexFetch<TcgDexCardSummary[]>(`/cards?${qs}`);
+  const rows = await tcgdexFetch<TcgDexCardSummary[]>(
+    input.locale,
+    `/cards?${qs}`
+  );
   const physical = rows.filter(card => PHYSICAL_ONLY(card.image));
-  const data = physical.slice(0, input.pageSize).map(adaptSummary);
+  const data = physical
+    .slice(0, input.pageSize)
+    .map(card => adaptSummary(card, input.locale));
   return {
     data,
     page: input.page,
@@ -116,12 +134,39 @@ export async function searchPortugueseCards(input: {
   };
 }
 
-export async function getPortugueseCard(id: string): Promise<PtcgCard | null> {
+export async function getLocalizedCard(
+  id: string,
+  locale: TcgDexLocale
+): Promise<PtcgCard | null> {
   if (!/^[A-Za-z0-9._-]+$/.test(id)) return null;
   try {
-    const card = await tcgdexFetch<TcgDexCard>(`/cards/${id}`);
-    return PHYSICAL_ONLY(card.image) ? adaptCard(card) : null;
+    const card = await tcgdexFetch<TcgDexCard>(locale, `/cards/${id}`);
+    return PHYSICAL_ONLY(card.image) ? adaptCard(card, locale) : null;
   } catch {
     return null;
   }
+}
+
+export async function searchPortugueseCards(input: {
+  q?: string;
+  page: number;
+  pageSize: number;
+}) {
+  return searchLocalizedCards({ ...input, locale: "pt-br" });
+}
+
+export async function searchJapaneseCards(input: {
+  q?: string;
+  page: number;
+  pageSize: number;
+}) {
+  return searchLocalizedCards({ ...input, locale: "ja" });
+}
+
+export function getPortugueseCard(id: string) {
+  return getLocalizedCard(id, "pt-br");
+}
+
+export function getJapaneseCard(id: string) {
+  return getLocalizedCard(id, "ja");
 }

@@ -94,11 +94,7 @@ export async function getUserByEmail(email: string) {
 export async function getUserById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1);
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return result[0];
 }
 
@@ -584,6 +580,7 @@ export async function getPublishedArticleSitemapRows(limit = 1_000) {
   if (!db) return [];
   return db
     .select({
+      title: articles.title,
       slug: articles.slug,
       publishedAt: articles.publishedAt,
       updatedAt: articles.updatedAt,

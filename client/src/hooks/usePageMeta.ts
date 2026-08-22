@@ -3,7 +3,7 @@ import { useEffect } from "react";
 const SITE = "RarityGrid";
 const SITE_URL = "https://raritygrid.com";
 const DEFAULT_DESC =
-  "Track English Pokémon card prices in USD, explore complete TCG sets, discover market trends and shop real collector listings.";
+  "Search Pokémon cards, compare sourced raw and PSA graded values, explore complete TCG sets and follow verified collector news.";
 const PRIVATE_PATH =
   /^\/(?:login|account|admin|binder|cart|dashboard|open-store|orders|profile\/edit|sell(?:-card)?)(?:\/|$)/;
 
@@ -58,7 +58,7 @@ export function usePageMeta(
   useEffect(() => {
     const fullTitle = title
       ? `${title} — ${SITE}`
-      : `${SITE} — Pokémon Card Prices, Sets & Marketplace`;
+      : `${SITE} — Pokémon Card Search, PSA Values & TCG News`;
     const desc = description ?? DEFAULT_DESC;
     const path = options.canonicalPath ?? window.location.pathname;
     const normalizedPath = path === "/" ? "/" : path.replace(/\/$/, "");
@@ -112,7 +112,7 @@ export function usePageMeta(
 
     return () => {
       document.getElementById("page-structured-data")?.remove();
-      document.title = `${SITE} — Pokémon Card Prices, Sets & Marketplace`;
+      document.title = `${SITE} — Pokémon Card Search, PSA Values & TCG News`;
     };
   }, [
     title,

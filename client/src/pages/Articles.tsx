@@ -91,11 +91,14 @@ export default function Articles() {
     "Pokémon TCG Articles",
     "Latest Pokémon TCG news, strategy, deck guides, set reviews and collector market coverage."
   );
-  const initial = new URLSearchParams(window.location.search);
-  const [query, setQuery] = useState(initial.get("q") ?? "");
-  const [category, setCategory] = useState(initial.get("category") ?? "all");
+  const [query, setQuery] = useState(
+    () => new URLSearchParams(window.location.search).get("q") ?? ""
+  );
+  const [category, setCategory] = useState(
+    () => new URLSearchParams(window.location.search).get("category") ?? "all"
+  );
   const articles = trpc.articles.list.useQuery(
-    { category: category === "all" ? undefined : category, limit: 100 },
+    { category: category === "all" ? undefined : category, limit: 50 },
     { staleTime: 300_000 }
   );
   const filtered = ((articles.data ?? []) as Article[]).filter(article => {
@@ -165,6 +168,24 @@ export default function Articles() {
               <Skeleton key={index} className="h-80 rounded-2xl" />
             ))}
           </div>
+        ) : articles.isError ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-16 text-center">
+            <BookOpen className="mx-auto h-10 w-10 text-amber-400" />
+            <h2 className="mt-4 text-xl font-black text-gray-900">
+              Editorial is temporarily unavailable
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              The archive could not be loaded. Try again without losing your
+              search.
+            </p>
+            <button
+              type="button"
+              onClick={() => articles.refetch()}
+              className="mt-5 rounded-full bg-gray-950 px-5 py-2.5 text-sm font-black text-white"
+            >
+              Try again
+            </button>
+          </div>
         ) : !lead ? (
           <div className="rounded-3xl border border-dashed border-gray-300 bg-white py-20 text-center">
             <BookOpen className="mx-auto h-10 w-10 text-gray-300" />
@@ -189,7 +210,10 @@ export default function Articles() {
                       {label(lead.category)}
                     </span>
                     <span className="text-xs font-bold text-gray-400">
-                      Lead story
+                      {Array.isArray(lead.tags) &&
+                      lead.tags.includes("source-verified")
+                        ? "Sources verified"
+                        : "Lead story"}
                     </span>
                   </div>
                   <h2 className="mt-5 text-3xl font-black leading-tight text-gray-950">

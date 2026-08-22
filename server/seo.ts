@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { getPublishedArticleSitemapRows } from "./db";
 import { getIndexableProductSitemapRows } from "./marketplaceDb";
+import { isPublicEditorialArticle } from "./lib/articleQuality";
 import { getSets } from "./lib/pokemontcg";
 
 export const SITE_URL = "https://raritygrid.com";
@@ -37,14 +38,14 @@ type RouteSeo = {
 
 const PAGE_META: Record<string, Omit<RouteSeo, "canonicalPath">> = {
   "/": {
-    title: "RarityGrid — Pokémon Card Prices, Sets & Marketplace",
+    title: "Pokémon Card Search, PSA Values & TCG News — RarityGrid",
     description:
-      "Track English Pokémon card prices in USD, explore every TCG set, discover market trends and shop real listings from collectors and trusted stores.",
+      "Search Pokémon cards with typo correction, explore sets and historic promos, compare raw and PSA graded market references, and read verified TCG news.",
   },
   "/cards": {
-    title: "Pokémon Card Database & USD Prices — RarityGrid",
+    title: "Pokémon Card Search & PSA Values — RarityGrid",
     description:
-      "Search English Pokémon TCG cards by name, set and rarity, then compare current USD market references and available listings.",
+      "Find Pokémon cards by name, set or collector number—even with typos—and compare sourced raw and PSA graded market observations.",
   },
   "/sets": {
     title: "All Pokémon TCG Sets & Expansions — RarityGrid",
@@ -117,14 +118,14 @@ export function getRouteSeo(pathname: string, status = 200): RouteSeo {
   const exact = PAGE_META[path];
   if (exact) return { ...exact, canonicalPath: path || "/" };
 
-  let title = "Pokémon TCG Cards, Prices & Marketplace — RarityGrid";
+  let title = "Pokémon TCG Cards, Sets, Prices & News — RarityGrid";
   let description =
-    "Explore English Pokémon TCG cards, sets, USD price references, collector tools and real marketplace listings on RarityGrid.";
+    "Explore Pokémon TCG cards, historic promos, sets, sourced price references, collector tools and verified editorial coverage on RarityGrid.";
 
   if (/^\/cards\/[^/]+$/.test(path)) {
-    title = "Pokémon Card Details & Price History — RarityGrid";
+    title = "Pokémon Card Details, PSA Values & Price History — RarityGrid";
     description =
-      "View this Pokémon card's set details, printings, verified USD price references, market history and available seller listings.";
+      "View this Pokémon card's set details, printings, sourced raw prices, PSA graded market observations and price history.";
   } else if (/^\/sets\/[^/]+$/.test(path)) {
     title = "Pokémon TCG Set Card List & Products — RarityGrid";
     description =
@@ -231,6 +232,11 @@ type SitemapEntry = {
 const STATIC_SITEMAP_ENTRIES: SitemapEntry[] = [
   { path: "/", changefreq: "daily", priority: 1 },
   { path: "/cards", changefreq: "daily", priority: 0.9 },
+  {
+    path: "/cards/historic:pikachu-illustrator-1998",
+    changefreq: "monthly",
+    priority: 0.8,
+  },
   { path: "/sets", changefreq: "daily", priority: 0.9 },
   { path: "/shop", changefreq: "daily", priority: 0.9 },
   { path: "/market", changefreq: "daily", priority: 0.8 },
@@ -306,7 +312,9 @@ async function buildSitemap() {
     }
   }
   if (articlesResult.status === "fulfilled") {
-    for (const article of articlesResult.value) {
+    for (const article of articlesResult.value.filter(
+      isPublicEditorialArticle
+    )) {
       entries.push({
         path: `/articles/${encodeURIComponent(article.slug)}`,
         lastmod: xmlDate(article.updatedAt ?? article.publishedAt),

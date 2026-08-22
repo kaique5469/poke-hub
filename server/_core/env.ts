@@ -28,6 +28,8 @@ export const ENV = {
   dataDir: process.env.DATA_DIR ?? "./data",
   /** Optional key for CardMarket price API via RapidAPI. */
   rapidApiKey: process.env.RAPIDAPI_KEY ?? "",
+  /** Optional commercial catalog with Japanese cards and PSA 1-10 sold comps. */
+  tcgPriceLookupApiKey: process.env.TCG_PRICE_LOOKUP_API_KEY ?? "",
   /** Server-only Scrydex credentials for real sealed products and USD prices. */
   scrydexApiKey: process.env.SCRYDEX_API_KEY ?? "",
   scrydexTeamId: process.env.SCRYDEX_TEAM_ID ?? "",

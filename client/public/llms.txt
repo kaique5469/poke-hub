@@ -1,0 +1,22 @@
+# RarityGrid
+
+RarityGrid is an independent Pokémon TCG research and collector-tools website.
+
+## Primary sections
+
+- Card search and sourced raw/graded market observations: https://raritygrid.com/cards
+- Pokémon TCG sets and expansion checklists: https://raritygrid.com/sets
+- Verified editorial coverage: https://raritygrid.com/articles
+- Collector market signals: https://raritygrid.com/market
+- Drop alerts: https://raritygrid.com/drops
+
+## Data and citation policy
+
+- A missing card price or PSA grade is shown as unavailable; it is not estimated.
+- Market observations identify their provider, currency, basis and freshness when available.
+- Automated editorial requires at least two HTTPS sources and one official Pokémon or primary tournament source.
+- RarityGrid is not affiliated with or endorsed by The Pokémon Company.
+
+## Crawling
+
+Public research pages may be indexed. Account, admin, cart, order and private collection routes must not be indexed.

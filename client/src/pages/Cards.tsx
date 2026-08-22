@@ -64,8 +64,8 @@ const SPECIAL_RARITIES = new Set([
 
 export default function Cards() {
   usePageMeta(
-    "Cards",
-    "Search every Pokémon TCG card ever printed with current API prices from TCGPlayer and CardMarket."
+    "Pokémon Card Search & PSA Values",
+    "Search Pokémon cards by name, set or collector number with typo correction, historic promo records and verified raw or graded market references."
   );
   const search = useSearch();
   const params = useMemo(() => new URLSearchParams(search), [search]);
@@ -76,8 +76,12 @@ export default function Cards() {
   const [rarity, setRarity] = useState(params.get("rarity") ?? "");
   const [supertype, setSupertype] = useState("");
   const [set, setSet] = useState(params.get("set") ?? "");
-  const [language, setLanguage] = useState<"en" | "pt-BR">(
-    params.get("language") === "pt-BR" ? "pt-BR" : "en"
+  const [language, setLanguage] = useState<"en" | "pt-BR" | "ja">(
+    params.get("language") === "pt-BR"
+      ? "pt-BR"
+      : params.get("language") === "ja"
+        ? "ja"
+        : "en"
   );
   const recordMarketEvent = trpc.market.recordEvent.useMutation();
 
@@ -88,7 +92,13 @@ export default function Cards() {
     setType(params.get("type") ?? "");
     setRarity(params.get("rarity") ?? "");
     setSet(params.get("set") ?? "");
-    setLanguage(params.get("language") === "pt-BR" ? "pt-BR" : "en");
+    setLanguage(
+      params.get("language") === "pt-BR"
+        ? "pt-BR"
+        : params.get("language") === "ja"
+          ? "ja"
+          : "en"
+    );
     setPage(1);
   }, [params]);
   const [showFilters, setShowFilters] = useState(false);
@@ -202,7 +212,7 @@ export default function Cards() {
               cards found
             </span>
           ) : (
-            "Browse 15,000+ Pokémon TCG cards with current API prices"
+            "Search English, Brazilian and historic Pokémon TCG records across multiple verified sources"
           )}
         </p>
       </div>
@@ -216,7 +226,7 @@ export default function Cards() {
               type="text"
               value={inputQ}
               onChange={e => setInputQ(e.target.value)}
-              placeholder="Search by name or code (e.g. PAL 123, 25/102)…"
+              placeholder="Try Pikachu Ilustrator, Cause Rising, PAL 123 or 25/102…"
               className="w-full pl-9 pr-4 py-2.5 bg-card border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-colors"
             />
           </div>
@@ -236,7 +246,11 @@ export default function Cards() {
             <span className="hidden sm:inline">Filters</span>
           </Button>
         </form>
-        <div className="flex gap-2" role="group" aria-label="Idioma das cartas">
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label="Idioma das cartas"
+        >
           <Button
             type="button"
             variant={language === "en" ? "default" : "outline"}
@@ -259,9 +273,55 @@ export default function Cards() {
               resetFilters();
             }}
           >
-            Português (Brasil) · anúncios BRL
+            Português (Brasil) · catálogo brasileiro
+          </Button>
+          <Button
+            type="button"
+            variant={language === "ja" ? "default" : "outline"}
+            onClick={() => {
+              setLanguage("ja");
+              setType("");
+              setRarity("");
+              setSupertype("");
+              setSet("");
+              resetFilters();
+            }}
+          >
+            日本語 · Japanese catalog
           </Button>
         </div>
+
+        {data?.searchMeta?.correctedQuery && (
+          <div
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950"
+            aria-live="polite"
+          >
+            <span className="font-semibold">Searching with correction:</span>
+            <button
+              type="button"
+              className="font-black underline decoration-violet-300 underline-offset-4"
+              onClick={() => {
+                setInputQ(data.searchMeta.correctedQuery ?? "");
+                setQ(data.searchMeta.correctedQuery ?? "");
+                resetFilters();
+              }}
+            >
+              {data.searchMeta.correctedQuery}
+            </button>
+            {data.searchMeta.matchedSet && (
+              <span className="text-violet-700">
+                · matched set {data.searchMeta.matchedSet.name}
+              </span>
+            )}
+          </div>
+        )}
+
+        {data?.searchMeta?.matchedSet && !data.searchMeta.correctedQuery && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+            Showing cards related to the set{" "}
+            <strong>{data.searchMeta.matchedSet.name}</strong>.
+          </div>
+        )}
 
         {/* Filter panel */}
         {showFilters && (
@@ -464,6 +524,13 @@ export default function Cards() {
                   types={card.types}
                   price={price}
                   isSpecialRare={SPECIAL_RARITIES.has(card.rarity ?? "")}
+                  sourceLabel={
+                    card.id.startsWith("historic:")
+                      ? "Historic record"
+                      : card.id.startsWith("tcgpl:")
+                        ? "Expanded catalog"
+                        : undefined
+                  }
                 />
               );
             })}
@@ -484,7 +551,8 @@ export default function Cards() {
                 No cards found
               </p>
               <p className="text-muted-foreground mb-6">
-                Try adjusting your search or filters
+                Try a shorter name, a set name, a collector number or another
+                language.
               </p>
               <Button variant="outline" onClick={clearFilters}>
                 Clear Filters

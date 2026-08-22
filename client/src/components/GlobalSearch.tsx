@@ -110,8 +110,8 @@ export default function GlobalSearch({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        placeholder="Search cards, sets, sealed products and articles"
-        aria-label="Search the marketplace"
+        placeholder="Search cards, sets, ETBs and articles — typos are OK"
+        aria-label="Search the Pokémon TCG database"
         className="w-full rounded-full border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-10 text-sm text-gray-900 outline-none transition focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-100"
       />
       {query && (
@@ -137,159 +137,173 @@ export default function GlobalSearch({
           ) : total === 0 ? (
             <div className="px-4 py-10 text-center">
               <Sparkles className="mx-auto mb-2 h-6 w-6 text-gray-300" />
-              <p className="font-bold text-gray-800">No exact match yet</p>
+              <p className="font-bold text-gray-800">No related result yet</p>
               <p className="mt-1 text-xs text-gray-500">
-                Try a Pokémon name, set code or product type.
+                Try a shorter Pokémon name, collector number or set.
               </p>
             </div>
           ) : (
-            <div className="grid gap-2 md:grid-cols-2">
-              {data?.cards.length ? (
-                <ResultGroup
-                  title="Cards"
-                  icon={<Sparkles className="h-4 w-4" />}
+            <>
+              {data?.searchMeta?.correctedQuery && (
+                <div
+                  className="mb-2 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-xs text-violet-900"
+                  aria-live="polite"
                 >
-                  {data.cards.map(card => (
-                    <Link
-                      key={card.id}
-                      href={`/cards/${card.id}`}
-                      onClick={() => navigateToCard(card)}
-                      className="flex items-center gap-3 rounded-xl p-2 hover:bg-violet-50"
-                    >
-                      <span className="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50">
-                        <ResultImage
-                          src={card.image}
-                          alt={card.name}
-                          fallback={
-                            <Sparkles className="h-5 w-5 text-gray-300" />
-                          }
-                        />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-bold text-gray-900">
-                          {card.name}
+                  Interpreted as{" "}
+                  <strong>{data.searchMeta.correctedQuery}</strong>
+                  {data.searchMeta.matchedSet
+                    ? ` · ${data.searchMeta.matchedSet.name}`
+                    : ""}
+                </div>
+              )}
+              <div className="grid gap-2 md:grid-cols-2">
+                {data?.cards.length ? (
+                  <ResultGroup
+                    title="Cards"
+                    icon={<Sparkles className="h-4 w-4" />}
+                  >
+                    {data.cards.map(card => (
+                      <Link
+                        key={card.id}
+                        href={`/cards/${card.id}`}
+                        onClick={() => navigateToCard(card)}
+                        className="flex items-center gap-3 rounded-xl p-2 hover:bg-violet-50"
+                      >
+                        <span className="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50">
+                          <ResultImage
+                            src={card.image}
+                            alt={card.name}
+                            fallback={
+                              <Sparkles className="h-5 w-5 text-gray-300" />
+                            }
+                          />
                         </span>
-                        <span className="block truncate text-xs text-gray-500">
-                          {card.setName} · #{card.number}
-                        </span>
-                        {card.price != null && (
-                          <span className="text-xs font-black text-emerald-700">
-                            ${Number(card.price).toFixed(2)}
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold text-gray-900">
+                            {card.name}
                           </span>
-                        )}
-                      </span>
-                    </Link>
-                  ))}
-                </ResultGroup>
-              ) : null}
-
-              {data?.sets.length ? (
-                <ResultGroup
-                  title="Sets"
-                  icon={<Layers3 className="h-4 w-4" />}
-                >
-                  {data.sets.map(set => (
-                    <Link
-                      key={set.id}
-                      href={`/sets/${set.id}`}
-                      onClick={navigate}
-                      className="flex items-center gap-3 rounded-xl p-2 hover:bg-violet-50"
-                    >
-                      <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50 p-1">
-                        <ResultImage
-                          src={set.logo}
-                          alt={set.name}
-                          fallback={
-                            <Layers3 className="h-5 w-5 text-gray-300" />
-                          }
-                        />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-bold text-gray-900">
-                          {set.name}
-                        </span>
-                        <span className="block truncate text-xs text-gray-500">
-                          {set.series} · {set.releaseDate}
-                        </span>
-                      </span>
-                    </Link>
-                  ))}
-                </ResultGroup>
-              ) : null}
-
-              {data?.products.length ? (
-                <ResultGroup
-                  title="Sealed products"
-                  icon={<Package className="h-4 w-4" />}
-                >
-                  {data.products.map(product => (
-                    <Link
-                      key={product.id}
-                      href={`/shop/${product.slug}`}
-                      onClick={navigate}
-                      className="flex items-center gap-3 rounded-xl p-2 hover:bg-violet-50"
-                    >
-                      <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50 p-1">
-                        <ResultImage
-                          src={product.image}
-                          alt={product.name}
-                          fallback={
-                            <Package className="h-5 w-5 text-gray-300" />
-                          }
-                        />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block line-clamp-2 text-sm font-bold text-gray-900">
-                          {product.name}
-                        </span>
-                        <span className="block truncate text-xs text-gray-500">
-                          {product.setName ?? "Official product"}
-                        </span>
-                        {product.price != null && (
-                          <span className="text-xs font-black text-emerald-700">
-                            ${Number(product.price).toFixed(2)}
+                          <span className="block truncate text-xs text-gray-500">
+                            {card.setName} · #{card.number}
                           </span>
-                        )}
-                      </span>
-                    </Link>
-                  ))}
-                </ResultGroup>
-              ) : null}
+                          {card.price != null && (
+                            <span className="text-xs font-black text-emerald-700">
+                              ${Number(card.price).toFixed(2)}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                    ))}
+                  </ResultGroup>
+                ) : null}
 
-              {data?.articles.length ? (
-                <ResultGroup
-                  title="Articles"
-                  icon={<BookOpen className="h-4 w-4" />}
-                >
-                  {data.articles.map(article => (
-                    <Link
-                      key={article.id}
-                      href={`/articles/${article.slug}`}
-                      onClick={navigate}
-                      className="flex items-center gap-3 rounded-xl p-2 hover:bg-violet-50"
-                    >
-                      <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50">
-                        <ResultImage
-                          src={article.image}
-                          alt={article.title}
-                          fallback={
-                            <BookOpen className="h-5 w-5 text-gray-300" />
-                          }
-                        />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block line-clamp-2 text-sm font-bold text-gray-900">
-                          {article.title}
+                {data?.sets.length ? (
+                  <ResultGroup
+                    title="Sets"
+                    icon={<Layers3 className="h-4 w-4" />}
+                  >
+                    {data.sets.map(set => (
+                      <Link
+                        key={set.id}
+                        href={`/sets/${set.id}`}
+                        onClick={navigate}
+                        className="flex items-center gap-3 rounded-xl p-2 hover:bg-violet-50"
+                      >
+                        <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50 p-1">
+                          <ResultImage
+                            src={set.logo}
+                            alt={set.name}
+                            fallback={
+                              <Layers3 className="h-5 w-5 text-gray-300" />
+                            }
+                          />
                         </span>
-                        <span className="block text-xs capitalize text-gray-500">
-                          {article.category.replace("_", " ")}
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold text-gray-900">
+                            {set.name}
+                          </span>
+                          <span className="block truncate text-xs text-gray-500">
+                            {set.series} · {set.releaseDate}
+                          </span>
                         </span>
-                      </span>
-                    </Link>
-                  ))}
-                </ResultGroup>
-              ) : null}
-            </div>
+                      </Link>
+                    ))}
+                  </ResultGroup>
+                ) : null}
+
+                {data?.products.length ? (
+                  <ResultGroup
+                    title="Sealed products"
+                    icon={<Package className="h-4 w-4" />}
+                  >
+                    {data.products.map(product => (
+                      <Link
+                        key={product.id}
+                        href={`/shop/${product.slug}`}
+                        onClick={navigate}
+                        className="flex items-center gap-3 rounded-xl p-2 hover:bg-violet-50"
+                      >
+                        <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50 p-1">
+                          <ResultImage
+                            src={product.image}
+                            alt={product.name}
+                            fallback={
+                              <Package className="h-5 w-5 text-gray-300" />
+                            }
+                          />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block line-clamp-2 text-sm font-bold text-gray-900">
+                            {product.name}
+                          </span>
+                          <span className="block truncate text-xs text-gray-500">
+                            {product.setName ?? "Official product"}
+                          </span>
+                          {product.price != null && (
+                            <span className="text-xs font-black text-emerald-700">
+                              ${Number(product.price).toFixed(2)}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                    ))}
+                  </ResultGroup>
+                ) : null}
+
+                {data?.articles.length ? (
+                  <ResultGroup
+                    title="Articles"
+                    icon={<BookOpen className="h-4 w-4" />}
+                  >
+                    {data.articles.map(article => (
+                      <Link
+                        key={article.id}
+                        href={`/articles/${article.slug}`}
+                        onClick={navigate}
+                        className="flex items-center gap-3 rounded-xl p-2 hover:bg-violet-50"
+                      >
+                        <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50">
+                          <ResultImage
+                            src={article.image}
+                            alt={article.title}
+                            fallback={
+                              <BookOpen className="h-5 w-5 text-gray-300" />
+                            }
+                          />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block line-clamp-2 text-sm font-bold text-gray-900">
+                            {article.title}
+                          </span>
+                          <span className="block text-xs capitalize text-gray-500">
+                            {article.category.replace("_", " ")}
+                          </span>
+                        </span>
+                      </Link>
+                    ))}
+                  </ResultGroup>
+                ) : null}
+              </div>
+            </>
           )}
           <div className="mt-2 flex flex-wrap gap-2 border-t border-gray-100 p-2 text-xs font-bold text-violet-700">
             <Link
