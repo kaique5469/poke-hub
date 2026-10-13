@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
-import { Grid2X2, Grid3X3, Search } from "lucide-react";
+import { Download, Grid2X2, Grid3X3, Search } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -24,6 +24,8 @@ import { Money } from "../components/Money";
 import { ConditionPicker, Stepper } from "../components/pickers";
 import { EmptyState, SignInCard } from "../components/SignInCard";
 import { usePending } from "../pending";
+import { usePro } from "../pro";
+import { track } from "../analytics";
 
 type SortKey = "newest" | "value" | "name";
 
@@ -81,6 +83,25 @@ export default function AppCollection() {
   const [sort, setSort] = useState<SortKey>("newest");
   const [density, setDensity] = useState<"comfortable" | "compact">(readDensity);
   const [selected, setSelected] = useState<Row | null>(null);
+  const { isPro, openPaywall } = usePro();
+
+  function exportCsv() {
+    if (!isPro) return openPaywall("export_csv");
+    const header = ["card_id", "name", "set", "variant", "condition", "quantity", "market_usd", "paid_usd"];
+    const lines = rows.map(r =>
+      [r.cardId, r.cardName, r.setName ?? "", r.variant, r.condition, r.quantity, r.priceUsd ?? "", r.purchasePriceUsd ?? ""]
+        .map(v => `"${String(v).replace(/"/g, '""')}"`)
+        .join(",")
+    );
+    const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `raritygrid-collection-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    track("collection_exported", { rows: rows.length });
+  }
 
   const rows = useMemo<Row[]>(() => {
     const saved: Row[] = (list.data ?? []).map(r => ({
@@ -165,6 +186,17 @@ export default function AppCollection() {
         title={t("Collection")}
         subtitle={rows.length ? `${count(cardCount, "card", "cards")} · ${money(total)}` : undefined}
         right={
+          <>
+          {rows.length > 0 && (
+            <button
+              type="button"
+              onClick={exportCsv}
+              aria-label={t("Export CSV")}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-secondary text-secondary-foreground"
+            >
+              <Download className="h-4 w-4" aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             onClick={toggleDensity}
@@ -177,6 +209,7 @@ export default function AppCollection() {
               <Grid3X3 className="h-4 w-4" aria-hidden />
             )}
           </button>
+          </>
         }
       />
 

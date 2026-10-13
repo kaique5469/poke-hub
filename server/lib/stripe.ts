@@ -99,6 +99,9 @@ export interface StripeEvent {
       id: string;
       payment_status?: "paid" | "unpaid" | "no_payment_required";
       metadata?: Record<string, string>;
+      /** "payment" for marketplace orders, "subscription" for Pro. */
+      mode?: "payment" | "subscription" | "setup";
+      [key: string]: unknown;
     };
   };
 }

@@ -35,6 +35,11 @@ export const users = mysqlTable("users", {
   /** App preferences (self-bootstrapped by server/appSchema.ts). */
   locale: varchar("locale", { length: 8 }),
   currency: varchar("currency", { length: 3 }),
+  /** Pro subscription (self-bootstrapped by server/appSchema.ts). */
+  plan: varchar("plan", { length: 16 }).default("free").notNull(),
+  proUntil: timestamp("proUntil"),
+  stripeCustomerId: varchar("stripeCustomerId", { length: 64 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
