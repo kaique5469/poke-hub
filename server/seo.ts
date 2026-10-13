@@ -9,6 +9,7 @@ export const SITE_NAME = "RarityGrid";
 
 const PRIVATE_PATHS = [
   /^\/login\/?$/,
+  /^\/app(?:\/|$)/,
   /^\/account(?:\/|$)/,
   /^\/admin(?:\/|$)/,
   /^\/binder(?:\/|$)/,
@@ -23,6 +24,7 @@ const PRIVATE_PATHS = [
 
 const CLIENT_ROUTES = [
   /^\/$/,
+  /^\/app(?:\/.*)?$/,
   /^\/(?:login|cards|scanner|market|sets|game|weekly-rules|pokedex|metagame|decks|deck-builder|community|tournaments|binder|drops|shop|marketplace|cart|orders|auctions|bazaar|articles|sell|sell-card|open-store|dashboard|account|privacy|terms|contact|404)\/?$/,
   /^\/(?:cards|sets|pokedex|shop|articles|store|profile)\/[^/]+\/?$/,
   /^\/admin\/(?:escrow|game)\/?$/,

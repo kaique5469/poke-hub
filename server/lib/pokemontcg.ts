@@ -8,6 +8,7 @@ import {
   writeExternalApiCache,
 } from "../externalApiCacheDb";
 import { notifyOwner } from "../_core/notification";
+import type { CardVariant } from "@shared/app";
 
 const BASE_URL = "https://api.pokemontcg.io/v2";
 const API_KEY = process.env.POKEMONTCG_API_KEY || "";
@@ -273,6 +274,8 @@ export interface PtcgCard {
       holofoil?: PtcgPrice;
       reverseHolofoil?: PtcgPrice;
       "1stEditionHolofoil"?: PtcgPrice;
+      "1stEditionNormal"?: PtcgPrice;
+      unlimitedHolofoil?: PtcgPrice;
     };
   };
   cardmarket?: {
@@ -545,6 +548,54 @@ export function getPriceFromCard(card: PtcgCard): PtcgPrice | null {
     prices.reverseHolofoil ??
     null
   );
+}
+
+export type PtcgVariantKey = keyof NonNullable<
+  NonNullable<PtcgCard["tcgplayer"]>["prices"]
+>;
+
+/** Variants a card actually has a TCGplayer price bucket for. */
+export function getAvailableVariants(card: PtcgCard): PtcgVariantKey[] {
+  const prices = card.tcgplayer?.prices;
+  if (!prices) return [];
+  return (Object.keys(prices) as PtcgVariantKey[]).filter(
+    key => prices[key]?.market != null || prices[key]?.mid != null
+  );
+}
+
+/**
+ * Variant-aware price. A reverse holo and a holo of the same card can differ
+ * by 10× — the scanner review sheet and the binder must never collapse them
+ * into one number. Falls back to the best available bucket when the exact
+ * variant has no price (and `exact` reports that).
+ */
+export function getVariantPrice(
+  card: PtcgCard,
+  variant: CardVariant
+): { price: PtcgPrice | null; bucket: PtcgVariantKey | null; exact: boolean } {
+  const prices = card.tcgplayer?.prices;
+  if (!prices) return { price: null, bucket: null, exact: false };
+  const candidates: PtcgVariantKey[] =
+    variant === "promo"
+      ? ["holofoil", "normal", "reverseHolofoil"]
+      : variant === "1stEditionNormal"
+        ? ["1stEditionNormal", "1stEditionHolofoil", "normal"]
+        : variant === "1stEditionHolofoil"
+          ? ["1stEditionHolofoil", "holofoil"]
+          : variant === "reverseHolofoil"
+            ? ["reverseHolofoil", "holofoil", "normal"]
+            : variant === "holofoil"
+              ? ["holofoil", "unlimitedHolofoil", "normal"]
+              : ["normal", "holofoil", "reverseHolofoil"];
+  for (let i = 0; i < candidates.length; i++) {
+    const bucket = candidates[i];
+    const price = prices[bucket];
+    if (price && (price.market != null || price.mid != null)) {
+      return { price, bucket, exact: i === 0 || variant === "promo" };
+    }
+  }
+  const fallback = getPriceFromCard(card);
+  return { price: fallback, bucket: null, exact: false };
 }
 
 export function isSpecialRare(rarity?: string): boolean {

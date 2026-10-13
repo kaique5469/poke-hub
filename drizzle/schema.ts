@@ -32,6 +32,9 @@ export const users = mysqlTable("users", {
   isVerifiedSeller: boolean("isVerifiedSeller").default(false).notNull(),
   hasPhysicalStore: boolean("hasPhysicalStore").default(false).notNull(),
   loginMethod: varchar("loginMethod", { length: 64 }),
+  /** App preferences (self-bootstrapped by server/appSchema.ts). */
+  locale: varchar("locale", { length: 8 }),
+  currency: varchar("currency", { length: 3 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -76,6 +79,10 @@ export const binderCards = mysqlTable("binder_cards", {
     .default("NM")
     .notNull(),
   language: varchar("language", { length: 32 }).default("English"),
+  /** Printed variant (normal, holofoil, reverseHolofoil, 1stEdition…). */
+  variant: varchar("variant", { length: 24 }).default("normal").notNull(),
+  /** Client-generated id for items scanned before sign-in (idempotent merge). */
+  clientId: varchar("clientId", { length: 40 }),
   priceUsd: decimal("priceUsd", { precision: 10, scale: 2 }),
   purchasePriceUsd: decimal("purchasePriceUsd", { precision: 10, scale: 2 }),
   acquiredAt: timestamp("acquiredAt"),

@@ -2,6 +2,13 @@ import { TRPCError } from "@trpc/server";
 import { cached, TTL } from "./lib/cache.js";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
+import {
+  APP_CURRENCIES,
+  APP_LOCALES,
+  CARD_CONDITIONS,
+  CARD_VARIANTS,
+} from "@shared/app";
+import { getFxRates } from "./lib/fx";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import {
@@ -17,6 +24,9 @@ import {
 } from "./cardmarketApi.js";
 import {
   addBinderCard,
+  addBinderCards,
+  getBinderClientIds,
+  updateUserPreferences,
   createAlert,
   createAuction,
   createDeck,
@@ -55,6 +65,7 @@ import {
   getEbayUrl,
   getHighValueCards,
   getPriceFromCard,
+  getVariantPrice,
   getSetById,
   getSets,
   getTcgPlayerUrl,
@@ -162,6 +173,28 @@ import {
   searchCoreTerms,
 } from "./lib/searchRelevance";
 
+/**
+ * Market price stored on a binder row at add time. Uses the explicit value
+ * when the client already has it (scanner result), else looks the card up
+ * variant-aware. Never throws: a missing price is stored as NULL.
+ */
+async function resolveBinderPrice(
+  cardId: string,
+  variant: (typeof CARD_VARIANTS)[number],
+  explicit: number | null | undefined
+): Promise<string | null> {
+  if (explicit != null && Number.isFinite(explicit)) return explicit.toFixed(2);
+  try {
+    const card = await getCardById(cardId);
+    if (!card) return null;
+    const { price } = getVariantPrice(card, variant);
+    const value = price?.market ?? price?.mid ?? null;
+    return value == null ? null : Number(value).toFixed(2);
+  } catch {
+    return null;
+  }
+}
+
 export const appRouter = router({
   system: systemRouter,
   market: marketRouter,
@@ -171,11 +204,32 @@ export const appRouter = router({
       contactEmail: ENV.supportEmail || null,
       marketplaceName: "RarityGrid",
     })),
+    /** USD→BRL reference rate for dual-currency display (12 h cache). */
+    fx: publicProcedure.query(() => getFxRates()),
   }),
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => {
+      const user = opts.ctx.user;
+      if (!user) return null;
+      // Never ship the password hash to the browser.
+      const { passwordHash: _omit, ...safe } = user;
+      return safe;
+    }),
+    updatePreferences: protectedProcedure
+      .input(
+        z.object({
+          locale: z.enum(APP_LOCALES).optional(),
+          currency: z.enum(APP_CURRENCIES).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        await updateUserPreferences(user.id, input);
+        return { success: true } as const;
+      }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -486,7 +540,12 @@ export const appRouter = router({
           imageUrl: z.string().optional(),
           rarity: z.string().optional(),
           quantity: z.number().int().min(1).max(99).default(1),
-          condition: z.enum(["M", "NM", "SP", "MP", "HP", "D"]).default("NM"),
+          condition: z.enum(CARD_CONDITIONS).default("NM"),
+          variant: z.enum(CARD_VARIANTS).default("normal"),
+          language: z.string().trim().max(32).optional(),
+          clientId: z.string().trim().max(40).optional(),
+          /** Market price at add time; computed server-side when omitted. */
+          priceUsd: z.number().min(0).max(1_000_000).nullable().optional(),
           purchasePriceUsd: z.number().min(0).max(1_000_000).optional(),
           acquiredAt: z.coerce.date().optional(),
           acquisitionSource: z
@@ -502,8 +561,14 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const user = await getUserByOpenId(ctx.user.openId);
         if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const priceUsd = await resolveBinderPrice(
+          input.cardId,
+          input.variant,
+          input.priceUsd
+        );
         await addBinderCard({
           ...input,
+          priceUsd,
           purchasePriceUsd:
             input.purchasePriceUsd == null
               ? null
@@ -512,6 +577,69 @@ export const appRouter = router({
           userId: user.id,
         });
         return { success: true };
+      }),
+
+    /**
+     * Bulk add used by the app to merge items scanned before sign-in.
+     * Idempotent on `clientId`: rows already merged are skipped.
+     */
+    addMany: protectedProcedure
+      .input(
+        z.object({
+          items: z
+            .array(
+              z.object({
+                clientId: z.string().trim().min(1).max(40),
+                cardId: z.string().trim().min(1).max(64),
+                cardName: z.string().trim().min(1).max(256),
+                setName: z.string().max(256).optional(),
+                setId: z.string().max(64).optional(),
+                imageUrl: z.string().max(2048).optional(),
+                rarity: z.string().max(128).optional(),
+                quantity: z.number().int().min(1).max(99).default(1),
+                condition: z.enum(CARD_CONDITIONS).default("NM"),
+                variant: z.enum(CARD_VARIANTS).default("normal"),
+                language: z.string().trim().max(32).optional(),
+                priceUsd: z.number().min(0).max(1_000_000).nullable().optional(),
+                purchasePriceUsd: z.number().min(0).max(1_000_000).optional(),
+                acquisitionSource: z
+                  .enum(["purchase", "trade", "gift", "pull", "other"])
+                  .optional(),
+              })
+            )
+            .min(1)
+            .max(100),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const existing = await getBinderClientIds(
+          user.id,
+          input.items.map(i => i.clientId)
+        );
+        const fresh = input.items.filter(i => !existing.has(i.clientId));
+        const rows = await Promise.all(
+          fresh.map(async item => ({
+            ...item,
+            priceUsd: await resolveBinderPrice(
+              item.cardId,
+              item.variant,
+              item.priceUsd
+            ),
+            purchasePriceUsd:
+              item.purchasePriceUsd == null
+                ? null
+                : item.purchasePriceUsd.toFixed(2),
+            userId: user.id,
+          }))
+        );
+        await addBinderCards(rows);
+        return {
+          inserted: rows.length,
+          skipped: input.items.length - rows.length,
+          clientIds: input.items.map(i => i.clientId),
+        };
       }),
 
     update: protectedProcedure

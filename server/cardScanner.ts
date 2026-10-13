@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { ENV } from "./_core/env";
 import {
+  getAvailableVariants,
   getPriceFromCard,
+  getVariantPrice,
   searchCards,
   GRID_SELECT,
   type PtcgCard,
 } from "./lib/pokemontcg";
+import { normalizeVariant } from "@shared/app";
 
 export const scannerAnalysisSchema = z.object({
   isPokemonCard: z.boolean(),
@@ -231,9 +234,20 @@ async function catalogSearch(analysis: ScannerAnalysis) {
 export async function confirmScannerMatches(analysis: ScannerAnalysis) {
   if (!analysis.isPokemonCard || !analysis.name) return [];
   const cards = await catalogSearch(analysis);
+  const detectedVariant = normalizeVariant(analysis.variant);
   return cards
     .map(card => {
       const market = getPriceFromCard(card);
+      const variants = getAvailableVariants(card);
+      // Every printed variant with its own price: a reverse holo and a holo
+      // of the same card are different items with different values.
+      const variantPrices = Object.fromEntries(
+        variants.map(key => {
+          const p = card.tcgplayer?.prices?.[key];
+          return [key, p?.market ?? p?.mid ?? null];
+        })
+      ) as Record<string, number | null>;
+      const suggested = getVariantPrice(card, detectedVariant);
       return {
         id: card.id,
         name: card.name,
@@ -246,6 +260,9 @@ export async function confirmScannerMatches(analysis: ScannerAnalysis) {
         },
         images: card.images,
         marketPriceUsd: market?.market ?? null,
+        variantPrices,
+        suggestedVariant: suggested.bucket ?? detectedVariant,
+        suggestedPriceUsd: suggested.price?.market ?? suggested.price?.mid ?? null,
         matchScore: scoreCanonicalCard(card, analysis),
       };
     })

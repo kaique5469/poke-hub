@@ -1,7 +1,7 @@
 import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Navbar from "./components/Navbar";
@@ -49,6 +49,9 @@ const Login = lazy(() => import("./pages/Login"));
 const MarketPulse = lazy(() => import("./pages/MarketPulse"));
 const Legal = lazy(() => import("./pages/Legal"));
 const CardScanner = lazy(() => import("./pages/CardScanner"));
+// Mobile-first app shell (/app/*): its own dark theme and bottom tabs, no
+// website Navbar/Footer.
+const AppShell = lazy(() => import("./app/AppShell"));
 
 function PageLoader() {
   return (
@@ -76,6 +79,14 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 function Router() {
+  const [location] = useLocation();
+  if (location === "/app" || location.startsWith("/app/")) {
+    return (
+      <Suspense fallback={<div className="app-shell min-h-screen" />}>
+        <AppShell />
+      </Suspense>
+    );
+  }
   return (
     <Layout>
       <Suspense fallback={<PageLoader />}>

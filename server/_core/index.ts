@@ -17,6 +17,7 @@ import { weeklyGameHandler } from "../scheduledWeeklyGame";
 import { ensureMarketPulseSchema } from "../marketSchema";
 import { ensureMarketplaceSchema } from "../marketplaceSchema";
 import { ensureGrowthSchema } from "../growthSchema";
+import { ensureAppSchema } from "../appSchema";
 import { ensureGameCompetitionSchema } from "../gameCompetitionSchema";
 import { ensureExternalApiCacheSchema } from "../externalApiCacheSchema";
 import { ensureDropMonitorSchema } from "../dropMonitorSchema";
@@ -90,6 +91,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   await ensureMarketplaceSchema();
   await ensureGrowthSchema();
+  await ensureAppSchema();
   await ensureMarketPulseSchema();
   await ensureGameCompetitionSchema().catch(error => {
     console.error(
