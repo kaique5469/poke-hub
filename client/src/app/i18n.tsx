@@ -209,6 +209,32 @@ const ptBR: Dict = {
   "Daily scan limit reached. Pro has unlimited scans.":
     "Limite diário de scans atingido. O Pro tem scans ilimitados.",
 
+  // Community reports
+  "Found it in stock": "Achei estoque",
+  "Community sightings": "Avistamentos da comunidade",
+  "Report what you saw and everyone watching that product gets a push.":
+    "Conte o que você viu e quem monitora esse produto recebe um aviso.",
+  "Store or city (optional)": "Loja ou cidade (opcional)",
+  "Price (optional)": "Preço (opcional)",
+  "Link (optional)": "Link (opcional)",
+  "In stock": "Em estoque",
+  "Few left": "Poucas unidades",
+  "Sold out": "Esgotado",
+  "Send report": "Enviar reporte",
+  "Report sent": "Reporte enviado",
+  "{n} people notified": "{n} pessoas avisadas",
+  "Confirm": "Confirmar",
+  "Not there": "Não tinha",
+  "ago": "atrás",
+  "min": "min",
+  "h": "h",
+  "by": "por",
+  "No sightings yet. Be the first to report a restock.":
+    "Nenhum avistamento ainda. Seja o primeiro a reportar um reestoque.",
+  "Daily report limit reached.": "Limite diário de reportes atingido.",
+  "The link must be on the selected retailer's site.":
+    "O link precisa ser do site da loja escolhida.",
+
   // Settings
   "Language": "Idioma",
   "Currency": "Moeda",

@@ -8,7 +8,14 @@ import {
   type DropRetailer,
 } from "../shared/drops";
 import { ENV } from "./_core/env";
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import {
+  consumeReportQuota,
+  createDropReport,
+  listDropReports,
+  notifyMatchingMonitors,
+  voteDropReport,
+} from "./dropReports";
 import { getUserByOpenId } from "./db";
 import {
   createDropMonitor,
@@ -343,6 +350,93 @@ export const dropMonitorRouter = router({
         const user = await currentUser(ctx.user.openId);
         await deleteDropReleaseWindow(input.id, user.id);
         return { success: true };
+      }),
+  }),
+
+  /** Community "found it" reports — see server/dropReports.ts. */
+  reports: router({
+    list: publicProcedure
+      .input(
+        z
+          .object({
+            country: z.enum(["BR", "US"]).optional(),
+            retailer: retailerSchema.optional(),
+            limit: z.number().int().min(1).max(100).default(30),
+          })
+          .optional()
+      )
+      .query(({ input }) => listDropReports(input ?? {})),
+    create: protectedProcedure
+      .input(
+        z.object({
+          retailer: retailerSchema,
+          productName: z.string().trim().min(2).max(512),
+          storeName: z.string().trim().max(160).optional(),
+          city: z.string().trim().max(120).optional(),
+          productUrl: z.string().trim().url().max(2_048).optional(),
+          priceCents: z.number().int().min(1).max(100_000_000).optional(),
+          stockState: z.enum(["in_stock", "low", "out_of_stock"]).default("in_stock"),
+          note: z.string().trim().max(512).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const user = await currentUser(ctx.user.openId);
+        if (!consumeReportQuota(user.id)) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Daily report limit reached.",
+          });
+        }
+        const productUrl = input.productUrl
+          ? normalizeProductUrl(input.retailer, input.productUrl)
+          : null;
+        if (input.productUrl && !productUrl) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "The link must be on the selected retailer's site.",
+          });
+        }
+        const report = await createDropReport({
+          userId: user.id,
+          retailer: input.retailer,
+          productName: input.productName,
+          storeName: input.storeName,
+          city: input.city,
+          productUrl,
+          priceCents: input.priceCents,
+          stockState: input.stockState,
+          note: input.note,
+        });
+        const notified =
+          input.stockState === "out_of_stock"
+            ? 0
+            : await notifyMatchingMonitors({
+                ...report,
+                userId: user.id,
+                currency: report.currency ?? dropRetailerCurrency(input.retailer),
+              }).catch(() => 0);
+        return { id: report.id, notified };
+      }),
+    vote: protectedProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          vote: z.enum(["confirm", "dispute"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const user = await currentUser(ctx.user.openId);
+        const report = await voteDropReport({
+          reportId: input.id,
+          userId: user.id,
+          vote: input.vote,
+        });
+        if (!report) throw new TRPCError({ code: "NOT_FOUND" });
+        return {
+          confirmations: report.confirmations,
+          disputes: report.disputes,
+          status: report.status,
+        };
       }),
   }),
 });

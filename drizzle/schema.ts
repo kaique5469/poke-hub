@@ -1223,3 +1223,47 @@ export const sellerStores = mysqlTable("seller_stores", {
 
 export type SellerStore = typeof sellerStores.$inferSelect;
 export type InsertSellerStore = typeof sellerStores.$inferInsert;
+
+// ─── Community stock reports ("found it") ────────────────────────────────────
+// Self-bootstrapped by server/dropReportsSchema.ts.
+export const dropReports = mysqlTable(
+  "drop_reports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    retailer: varchar("retailer", { length: 32 }).notNull(),
+    country: varchar("country", { length: 2 }).notNull(),
+    productName: varchar("productName", { length: 512 }).notNull(),
+    storeName: varchar("storeName", { length: 160 }),
+    city: varchar("city", { length: 120 }),
+    productUrl: text("productUrl"),
+    priceCents: int("priceCents"),
+    currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+    stockState: varchar("stockState", { length: 24 }).default("in_stock").notNull(),
+    note: varchar("note", { length: 512 }),
+    confirmations: int("confirmations").default(0).notNull(),
+    disputes: int("disputes").default(0).notNull(),
+    status: varchar("status", { length: 16 }).default("active").notNull(),
+    notified: int("notified").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+  },
+  table => [
+    index("drop_reports_feed_idx").on(table.status, table.expiresAt, table.createdAt),
+    index("drop_reports_user_idx").on(table.userId, table.createdAt),
+  ]
+);
+export type DropReport = typeof dropReports.$inferSelect;
+export type InsertDropReport = typeof dropReports.$inferInsert;
+
+export const dropReportVotes = mysqlTable(
+  "drop_report_votes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    reportId: int("reportId").notNull(),
+    userId: int("userId").notNull(),
+    vote: varchar("vote", { length: 12 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [uniqueIndex("drop_report_votes_unique").on(table.reportId, table.userId)]
+);
