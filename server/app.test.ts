@@ -162,3 +162,12 @@ describe("app shell routing", () => {
     expect(safeNextPath("/a\r\nSet-Cookie: x")).toBe("/");
   });
 });
+
+describe("native auth", () => {
+  it("accepts the native deep-link scheme and rejects look-alikes", () => {
+    expect(safeNextPath("raritygrid://auth")).toBe("raritygrid://auth");
+    expect(safeNextPath("raritygrid://auth/callback")).toBe("raritygrid://auth/callback");
+    expect(safeNextPath("raritygrid://evil.example/x?y")).toBe("/");
+    expect(safeNextPath("raritygridx://auth")).toBe("/");
+  });
+});

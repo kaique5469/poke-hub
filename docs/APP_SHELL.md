@@ -67,8 +67,8 @@ CSV export, scanner daily limit. Display prices live in `PRO_PRICES`
 
 ## Not in this slice (next PRs)
 
-- Capacitor wrappers for App Store / Google Play (bearer-token auth for
-  the native WebView).
+- Native projects (`npx cap add ios|android`) need a Mac — see
+  `docs/NATIVE.md`; the server and client sides are done.
 - RevenueCat for in-app purchases once the native apps ship (web Pro is
   done).
 - Live stock provider for drop monitors (TinyFish / Nimble prototype,

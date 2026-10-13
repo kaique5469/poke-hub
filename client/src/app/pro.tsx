@@ -18,6 +18,7 @@ import { PRO_FEATURES, isPro, type ProInterval } from "@shared/app";
 import { useLocale, useT } from "./i18n";
 import { usePrefs } from "./prefs";
 import { track } from "./analytics";
+import { isNative } from "@/lib/native";
 
 type ProContext = {
   isPro: boolean;
@@ -148,7 +149,13 @@ function Paywall({
             </div>
           )}
 
-          {status.data && !status.data.available ? (
+          {isNative() ? (
+            // Store rules: no web checkout for digital goods inside the
+            // native app. RevenueCat replaces this block before store release.
+            <p className="mt-5 rounded-xl border border-border bg-card p-3 text-center text-sm text-muted-foreground">
+              {t("Pro is coming to the app.")}
+            </p>
+          ) : status.data && !status.data.available ? (
             <p className="mt-5 rounded-xl border border-border bg-card p-3 text-center text-sm text-muted-foreground">
               {t("Pro is almost ready. Everything free stays free.")}
             </p>

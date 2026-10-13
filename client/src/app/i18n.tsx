@@ -200,6 +200,7 @@ const ptBR: Dict = {
   "Cancel anytime. Prices in BRL are charged in BRL.":
     "Cancele quando quiser. Preços em BRL são cobrados em BRL.",
   "You are Pro": "Você é Pro",
+  "Pro is coming to the app.": "O Pro está chegando no app.",
   "Manage subscription": "Gerenciar assinatura",
   "Welcome to Pro!": "Bem-vindo ao Pro!",
   "Checkout cancelled": "Pagamento cancelado",

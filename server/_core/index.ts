@@ -36,6 +36,15 @@ import { registerSeoRoutes } from "../seo";
 import { CONTENT_SECURITY_POLICY } from "../securityHeaders";
 import { registerScannerRoutes } from "../scannerRoutes";
 
+/** Origins the Capacitor shell loads from (iOS, Android, local dev). */
+const NATIVE_ORIGINS = new Set(
+  (process.env.NATIVE_APP_ORIGINS ??
+    "capacitor://localhost,https://localhost,http://localhost")
+    .split(",")
+    .map(o => o.trim())
+    .filter(Boolean)
+);
+
 const apiBuckets = new Map<
   string,
   { startedAt: number; requests: number; marketEvents: number }
@@ -131,6 +140,23 @@ async function startServer() {
         "Strict-Transport-Security",
         "max-age=31536000; includeSubDomains"
       );
+    }
+    next();
+  });
+  // CORS for the native app only (Capacitor WebView origins). The website is
+  // same-origin and needs nothing; browsers never get credentials cross-site.
+  app.use("/api", (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && NATIVE_ORIGINS.has(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Authorization, Content-Type, X-RG-Client, trpc-accept"
+      );
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Max-Age", "86400");
+      if (req.method === "OPTIONS") return res.status(204).end();
     }
     next();
   });

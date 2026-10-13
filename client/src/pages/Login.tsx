@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { apiUrl, authHeaders, isNative, setAuthToken } from "@/lib/native";
 
 type Mode = "login" | "register";
 
@@ -41,9 +42,9 @@ export default function Login() {
     setError(null);
     setSubmitting(true);
     try {
-      const resp = await fetch(`/api/auth/${mode}`, {
+      const resp = await fetch(apiUrl(`/api/auth/${mode}`), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         credentials: "include",
         body: JSON.stringify(
           mode === "register" ? { name, email, password } : { email, password }
@@ -54,6 +55,7 @@ export default function Login() {
         setError(data?.error ?? "Something went wrong. Please try again.");
         return;
       }
+      if (isNative() && typeof data?.token === "string") setAuthToken(data.token);
       await utils.auth.me.invalidate();
       navigate(nextPath);
     } catch {
@@ -76,7 +78,13 @@ export default function Login() {
         </p>
 
         <a
-          href={`/api/auth/google?next=${encodeURIComponent(nextPath)}`}
+          href={apiUrl(
+            `/api/auth/google?next=${encodeURIComponent(
+              isNative() ? "raritygrid://auth" : nextPath
+            )}`
+          )}
+          target={isNative() ? "_blank" : undefined}
+          rel={isNative() ? "noopener" : undefined}
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium transition hover:bg-accent"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>

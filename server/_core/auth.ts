@@ -45,14 +45,30 @@ function getCookie(req: Request, name: string): string | null {
   return null;
 }
 
-/** Resolve the logged-in user from the session cookie. Returns null if not logged in. */
+/** Bearer token sent by the native app (Capacitor WebView has no first-party cookie). */
+function getBearer(req: Request): string | null {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith("Bearer ")) return null;
+  const token = header.slice(7).trim();
+  return token.length > 20 ? token : null;
+}
+
+/**
+ * Resolve the logged-in user from the session cookie or an Authorization
+ * bearer (same JWT). Returns null if not logged in.
+ */
 export async function authenticateRequest(req: Request): Promise<User | null> {
-  const token = getCookie(req, COOKIE_NAME);
+  const token = getCookie(req, COOKIE_NAME) ?? getBearer(req);
   if (!token) return null;
   const session = await verifySessionToken(token);
   if (!session) return null;
   const user = await db.getUserByOpenId(session.openId);
   return user ?? null;
+}
+
+/** The native app asks for the token explicitly; browsers never see it in a body. */
+function wantsBearer(req: Request) {
+  return req.headers["x-rg-client"] === "native";
 }
 
 async function setSessionCookie(req: Request, res: Response, userId: number, openId: string) {
@@ -95,13 +111,21 @@ function rateLimited(req: Request, route: string): boolean {
 const OAUTH_STATE_COOKIE = "g_oauth_state";
 const OAUTH_NEXT_COOKIE = "oauth_next";
 
-/** Only relative, same-origin paths are honoured; anything else goes home. */
+/** Deep link the native app registers; OAuth may land there with a token. */
+export const NATIVE_SCHEME = "raritygrid://";
+
+/**
+ * Only relative, same-origin paths — or the native app's own scheme — are
+ * honoured; anything else goes home.
+ */
 export function safeNextPath(value: unknown): string {
   if (typeof value !== "string") return "/";
-  if (!value.startsWith("/") || value.startsWith("//") || /[\r\n]/.test(value)) {
-    return "/";
+  if (/[\r\n]/.test(value) || value.length > 512) return "/";
+  if (value.startsWith(NATIVE_SCHEME) && /^raritygrid:\/\/[a-z0-9/_-]*$/i.test(value)) {
+    return value;
   }
-  return value.length > 512 ? "/" : value;
+  if (!value.startsWith("/") || value.startsWith("//")) return "/";
+  return value;
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -132,7 +156,11 @@ export function registerAuthRoutes(app: Express) {
       if (!user) return res.status(500).json({ error: "Falha ao criar conta" });
 
       await setSessionCookie(req, res, user.id, user.openId);
-      return res.json({ ok: true, user: { id: user.id, name: user.name, email: user.email } });
+      return res.json({
+        ok: true,
+        user: { id: user.id, name: user.name, email: user.email },
+        ...(wantsBearer(req) ? { token: await createSessionToken(user.id, user.openId) } : {}),
+      });
     } catch (err) {
       console.error("[auth] register failed:", err);
       return res.status(500).json({ error: "Erro interno ao registrar" });
@@ -153,7 +181,11 @@ export function registerAuthRoutes(app: Express) {
       if (!ok) return res.status(401).json({ error: "Incorrect email or password" });
 
       await setSessionCookie(req, res, user.id, user.openId);
-      return res.json({ ok: true, user: { id: user.id, name: user.name, email: user.email } });
+      return res.json({
+        ok: true,
+        user: { id: user.id, name: user.name, email: user.email },
+        ...(wantsBearer(req) ? { token: await createSessionToken(user.id, user.openId) } : {}),
+      });
     } catch (err) {
       console.error("[auth] login failed:", err);
       return res.status(500).json({ error: "Internal sign-in error" });
@@ -237,11 +269,25 @@ export function registerAuthRoutes(app: Express) {
       await setSessionCookie(req, res, user.id, user.openId);
       const next = safeNextPath(getCookie(req, OAUTH_NEXT_COOKIE));
       res.clearCookie(OAUTH_NEXT_COOKIE, getSessionCookieOptions(req));
+      if (next.startsWith(NATIVE_SCHEME)) {
+        // The native app opened the system browser; hand the session back
+        // through its deep link. The token is the same 365-day session JWT.
+        const token = await createSessionToken(user.id, user.openId);
+        return res.redirect(`${next}${next.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`);
+      }
       return res.redirect(next);
     } catch (err) {
       console.error("[auth] Google callback failed:", err);
       return res.redirect("/login?error=google");
     }
+  });
+
+  // Session → bearer token for the native app (requires a valid cookie session).
+  app.post("/api/auth/token", async (req: Request, res: Response) => {
+    const user = await authenticateRequest(req);
+    if (!user) return res.status(401).json({ error: "Not signed in" });
+    const token = await createSessionToken(user.id, user.openId);
+    return res.json({ token, expiresInDays: 365 });
   });
 
   // Logout (REST — the tRPC auth.logout also exists)
