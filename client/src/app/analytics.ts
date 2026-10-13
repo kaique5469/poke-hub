@@ -54,6 +54,12 @@ function load(): Promise<PostHogLike | null> {
         persistence: "localStorage+cookie",
         autocapture: false,
         disable_session_recording: true,
+        // Keep the CSP strict: never inject PostHog's remote scripts
+        // (recorder, surveys, web-vitals) — capture goes over fetch only.
+        disable_external_dependency_loading: true,
+        // Anonymous events are billed at the cheap rate; a person profile is
+        // created only once identify() runs after sign-in.
+        person_profiles: "identified_only",
       });
       client = ph;
       for (const [event, props] of queue.splice(0)) ph.capture(event, props);
