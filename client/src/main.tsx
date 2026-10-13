@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import { apiUrl, authHeaders } from "./lib/native";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -53,8 +54,9 @@ queryClient.getMutationCache().subscribe(event => {
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: apiUrl("/api/trpc"),
       transformer: superjson,
+      headers: () => authHeaders(),
       fetch(input, init) {
         return globalThis.fetch(input, {
           ...(init ?? {}),

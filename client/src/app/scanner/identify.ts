@@ -4,6 +4,7 @@
  * and lets the person correct it in the review sheet.
  */
 import type { CardVariant } from "@shared/app";
+import { apiUrl, authHeaders } from "@/lib/native";
 
 export type ScanMatch = {
   id: string;
@@ -66,10 +67,10 @@ export async function identifyCard(
 ): Promise<ScanResult> {
   let response: Response;
   try {
-    response = await fetch("/api/scanner/identify", {
+    response = await fetch(apiUrl("/api/scanner/identify"), {
       method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "image/jpeg" },
+      credentials: "include",
+      headers: { "Content-Type": "image/jpeg", ...authHeaders() },
       body: blob,
       signal,
     });

@@ -12,6 +12,8 @@ import { ProProvider } from "./pro";
 import { useT } from "./i18n";
 import { useMergePending } from "./useMergePending";
 import { track } from "./analytics";
+import { consumeAuthDeepLink, isNative } from "@/lib/native";
+import { trpc } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const AppHome = lazy(() => import("./pages/AppHome"));
@@ -97,6 +99,24 @@ function ShellBody() {
   useMergePending();
   const [location] = useLocation();
   const { currency } = usePrefs();
+  const utils = trpc.useUtils();
+
+  // Native: the OAuth deep link (raritygrid://auth?token=…) arrives through
+  // Capacitor's App plugin when installed; also accept it on first load.
+  useEffect(() => {
+    if (!isNative()) return;
+    if (consumeAuthDeepLink(window.location.href)) utils.auth.me.invalidate();
+    const cap = (window as unknown as {
+      Capacitor?: { Plugins?: { App?: { addListener: (e: string, cb: (d: { url: string }) => void) => Promise<{ remove: () => void }> } } };
+    }).Capacitor;
+    const app = cap?.Plugins?.App;
+    if (!app) return;
+    let handle: { remove: () => void } | null = null;
+    app.addListener("appUrlOpen", ({ url }) => {
+      if (consumeAuthDeepLink(url)) utils.auth.me.invalidate();
+    }).then(h => (handle = h));
+    return () => handle?.remove();
+  }, [utils]);
 
   useEffect(() => {
     track("app_open", { path: location, currency });
