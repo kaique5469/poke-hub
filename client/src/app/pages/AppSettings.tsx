@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
+import { usePro } from "../pro";
+import { track } from "../analytics";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { APP_CURRENCIES, APP_LOCALES } from "@shared/app";
-import { useT } from "../i18n";
+import { useLocale, useT } from "../i18n";
 import { usePrefs } from "../prefs";
 import { AppHeader } from "../components/AppHeader";
 import { SignInCard } from "../components/SignInCard";
@@ -42,9 +46,38 @@ function Segmented<T extends string>({
 
 export default function AppSettings() {
   const t = useT();
+  const uiLocale = useLocale();
   const { locale, currency, setLocale, setCurrency, fx } = usePrefs();
   const { user, isAuthenticated, logout } = useAuth();
+  const { isPro, openPaywall } = usePro();
+  const utils = trpc.useUtils();
+  const billing = trpc.billing.status.useQuery(undefined, { staleTime: 60_000 });
+  const portal = trpc.billing.portal.useMutation();
   const [install, setInstall] = useState<InstallPrompt | null>(null);
+
+  // Back from Stripe Checkout: refresh entitlement and say what happened.
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get("pro");
+    if (!result) return;
+    window.history.replaceState({}, "", "/app/settings");
+    if (result === "success") {
+      track("paywall_converted");
+      toast.success(t("Welcome to Pro!"));
+      utils.auth.me.invalidate();
+      utils.billing.status.invalidate();
+    } else if (result === "cancelled") {
+      toast(t("Checkout cancelled"));
+    } else if (result === "start") {
+      openPaywall("post_login");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dateFmt = new Intl.DateTimeFormat(uiLocale === "pt-BR" ? "pt-BR" : "en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
@@ -88,6 +121,56 @@ export default function AppSettings() {
             )}
           </p>
         </div>
+      </section>
+
+      <section className="mt-3 rounded-2xl border border-[var(--app-gold)]/60 bg-card p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold">RarityGrid Pro</h2>
+          {isPro && (
+            <span className="rounded-md bg-[var(--app-gold)] px-2 py-0.5 text-[11px] font-bold text-black">
+              {t("You are Pro")}
+            </span>
+          )}
+        </div>
+        {isPro ? (
+          <>
+            {billing.data?.proUntil && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t("Renews")} {dateFmt.format(new Date(billing.data.proUntil))}
+              </p>
+            )}
+            {billing.data?.canManage && (
+              <button
+                type="button"
+                disabled={portal.isPending}
+                onClick={async () => {
+                  try {
+                    const { url } = await portal.mutateAsync();
+                    window.location.href = url;
+                  } catch (error) {
+                    toast.error((error as Error).message);
+                  }
+                }}
+                className="mt-3 h-11 w-full rounded-xl border border-border bg-secondary text-sm font-bold disabled:opacity-60"
+              >
+                {t("Manage subscription")}
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("Everything for collectors who buy, sell and trade.")}
+            </p>
+            <button
+              type="button"
+              onClick={() => openPaywall("settings")}
+              className="mt-3 h-11 w-full rounded-xl bg-[var(--app-gold)] text-sm font-extrabold text-black"
+            >
+              {t("Get Pro")}
+            </button>
+          </>
+        )}
       </section>
 
       {install && (

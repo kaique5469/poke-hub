@@ -8,6 +8,7 @@ import {
   ScanLine,
 } from "lucide-react";
 import { PrefsProvider, usePrefs } from "./prefs";
+import { ProProvider } from "./pro";
 import { useT } from "./i18n";
 import { useMergePending } from "./useMergePending";
 import { track } from "./analytics";
@@ -128,7 +129,9 @@ function ShellBody() {
 export default function AppShell() {
   return (
     <PrefsProvider>
-      <ShellBody />
+      <ProProvider>
+        <ShellBody />
+      </ProProvider>
     </PrefsProvider>
   );
 }

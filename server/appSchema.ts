@@ -38,6 +38,17 @@ export function ensureAppSchema() {
     await addColumn(
       "ALTER TABLE users ADD COLUMN currency varchar(3) NULL"
     );
+    // Pro subscription (Stripe).
+    await addColumn(
+      "ALTER TABLE users ADD COLUMN plan varchar(16) NOT NULL DEFAULT 'free'"
+    );
+    await addColumn("ALTER TABLE users ADD COLUMN proUntil timestamp NULL");
+    await addColumn(
+      "ALTER TABLE users ADD COLUMN stripeCustomerId varchar(64) NULL"
+    );
+    await addColumn(
+      "ALTER TABLE users ADD COLUMN stripeSubscriptionId varchar(64) NULL"
+    );
     // Printed variant per collection row (holo vs reverse can differ 10×).
     await addColumn(
       "ALTER TABLE binder_cards ADD COLUMN variant varchar(24) NOT NULL DEFAULT 'normal'"

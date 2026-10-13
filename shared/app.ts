@@ -108,3 +108,47 @@ export type PendingCollectionItem = {
   priceUsd?: number | null;
   createdAt: string;
 };
+
+/* ─── Pro plan ─────────────────────────────────────────────────────────── */
+
+export const PLANS = ["free", "pro"] as const;
+export type Plan = (typeof PLANS)[number];
+
+export const PRO_INTERVALS = ["month", "year"] as const;
+export type ProInterval = (typeof PRO_INTERVALS)[number];
+
+/**
+ * Display prices per currency. The Stripe Price objects (env
+ * STRIPE_PRO_PRICE_*) must match these; they are repeated here so the
+ * paywall can render before Stripe is configured and in both currencies.
+ */
+export const PRO_PRICES: Record<AppCurrency, Record<ProInterval, number>> = {
+  USD: { month: 4.99, year: 39.99 },
+  BRL: { month: 14.9, year: 119 },
+};
+
+/** What Pro unlocks, in the order the paywall lists them. */
+export const PRO_FEATURES = [
+  "Unlimited scans",
+  "Full price history",
+  "Export your collection (CSV)",
+  "Instant restock push",
+  "Priority support",
+] as const;
+
+/** Free users see this many days of portfolio history. */
+export const FREE_HISTORY_DAYS = 30;
+
+export function isPro(user: {
+  plan?: string | null;
+  proUntil?: Date | string | null;
+  role?: string | null;
+} | null | undefined, now = new Date()) {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  if (user.plan !== "pro") return false;
+  if (!user.proUntil) return true;
+  const until = new Date(user.proUntil);
+  // A short grace window covers webhook delays around renewal.
+  return until.getTime() + 3 * 86_400_000 > now.getTime();
+}

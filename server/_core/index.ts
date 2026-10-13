@@ -18,6 +18,7 @@ import { ensureMarketPulseSchema } from "../marketSchema";
 import { ensureMarketplaceSchema } from "../marketplaceSchema";
 import { ensureGrowthSchema } from "../growthSchema";
 import { ensureAppSchema } from "../appSchema";
+import { handleSubscriptionEvent } from "../lib/subscription";
 import { ensureGameCompetitionSchema } from "../gameCompetitionSchema";
 import { ensureExternalApiCacheSchema } from "../externalApiCacheSchema";
 import { ensureDropMonitorSchema } from "../dropMonitorSchema";
@@ -148,6 +149,11 @@ async function startServer() {
         // Idempotency: Stripe redelivers events — never process the same one twice.
         if (await wasEventProcessed(event.id)) {
           return res.json({ received: true, duplicate: true });
+        }
+        // RarityGrid Pro subscriptions share the webhook with the marketplace.
+        if (await handleSubscriptionEvent(event)) {
+          await recordEvent(event.id, event.type);
+          return res.json({ received: true, subscription: true });
         }
         if (
           (event.type === "checkout.session.completed" &&

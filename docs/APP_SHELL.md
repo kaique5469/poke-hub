@@ -54,12 +54,23 @@ Mirrored in `drizzle/schema.ts`.
 It forwards to PostHog when `window.posthog` exists; add the snippet to
 `client/index.html` with the project key to turn it on.
 
+## Pro subscription
+
+`server/lib/subscription.ts` + the `billing` router. Stripe Checkout in
+subscription mode, one Price per currency × interval (env
+`STRIPE_PRO_PRICE_{MONTH,YEAR}_{USD,BRL}`), billing portal for self-serve
+cancellation, and lifecycle events handled on the existing
+`/api/stripe/webhook`. Entitlement = `isPro(user)` from `users.plan` +
+`users.proUntil` (3-day grace). Gates in the app: history beyond 30 days,
+CSV export, scanner daily limit. Display prices live in `PRO_PRICES`
+(`shared/app.ts`) and must match the Stripe Prices.
+
 ## Not in this slice (next PRs)
 
 - Capacitor wrappers for App Store / Google Play (bearer-token auth for
   the native WebView).
-- Pro subscription (Stripe on web, RevenueCat in stores) and the paywall
-  surfaces.
+- RevenueCat for in-app purchases once the native apps ship (web Pro is
+  done).
 - Live stock provider for drop monitors (TinyFish / Nimble prototype,
   then a licensed feed) and community "found it" reports.
 - Embedding-based recognition to replace per-scan AI cost.

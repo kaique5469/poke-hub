@@ -3,7 +3,7 @@ import express from "express";
 import { authenticateRequest } from "./_core/auth";
 import { ENV } from "./_core/env";
 import { analyzeCardImage, confirmScannerMatches } from "./cardScanner";
-import { SCANNER_QUOTAS, normalizeVariant } from "@shared/app";
+import { SCANNER_QUOTAS, isPro, normalizeVariant } from "@shared/app";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -113,7 +113,7 @@ async function resolveScannerSubject(
     if (user) {
       res.locals.scannerSubject = {
         key: `user:${user.id}`,
-        tier: "free" as ScannerTier,
+        tier: (isPro(user) ? "pro" : "free") as ScannerTier,
         userId: user.id,
       };
     } else {

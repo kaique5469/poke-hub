@@ -9,6 +9,13 @@ import {
   CARD_VARIANTS,
 } from "@shared/app";
 import { getFxRates } from "./lib/fx";
+import {
+  createBillingPortal,
+  createProCheckout,
+  proBillingAvailable,
+  proPriceId,
+} from "./lib/subscription";
+import { PRO_INTERVALS, PRO_PRICES, isPro } from "@shared/app";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import {
@@ -195,6 +202,18 @@ async function resolveBinderPrice(
   }
 }
 
+/** Public origin behind Railway's proxy (x-forwarded-proto aware). */
+function requestOrigin(req: {
+  headers: Record<string, string | string[] | undefined>;
+  protocol: string;
+  get: (name: string) => string | undefined;
+}) {
+  const proto =
+    (req.headers["x-forwarded-proto"] as string | undefined)?.split(",")[0] ??
+    req.protocol;
+  return `${proto}://${req.get("host")}`;
+}
+
 export const appRouter = router({
   system: systemRouter,
   market: marketRouter,
@@ -234,6 +253,68 @@ export const appRouter = router({
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
+    }),
+  }),
+
+  // ─── Billing (RarityGrid Pro) ──────────────────────────────────────────────
+  billing: router({
+    status: publicProcedure.query(({ ctx }) => {
+      const user = ctx.user;
+      return {
+        available: proBillingAvailable(),
+        isPro: isPro(user),
+        plan: user?.plan ?? "free",
+        proUntil: user?.proUntil ?? null,
+        canManage: Boolean(user?.stripeCustomerId),
+        prices: PRO_PRICES,
+        /** Which intervals have a Stripe price for each currency. */
+        intervals: {
+          USD: PRO_INTERVALS.filter(i => proPriceId(i, "USD")),
+          BRL: PRO_INTERVALS.filter(i => proPriceId(i, "BRL")),
+        },
+      };
+    }),
+    checkout: protectedProcedure
+      .input(
+        z.object({
+          interval: z.enum(PRO_INTERVALS),
+          currency: z.enum(APP_CURRENCIES).default("USD"),
+          locale: z.enum(APP_LOCALES).default("en"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (!proBillingAvailable()) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Pro is not available yet.",
+          });
+        }
+        const user = await getUserByOpenId(ctx.user.openId);
+        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const origin = requestOrigin(ctx.req);
+        return createProCheckout({
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            stripeCustomerId: user.stripeCustomerId,
+          },
+          interval: input.interval,
+          currency: input.currency,
+          origin,
+          locale: input.locale,
+        });
+      }),
+    portal: protectedProcedure.mutation(async ({ ctx }) => {
+      const user = await getUserByOpenId(ctx.user.openId);
+      if (!user?.stripeCustomerId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "No subscription to manage.",
+        });
+      }
+      const origin = requestOrigin(ctx.req);
+      return createBillingPortal(user.stripeCustomerId, `${origin}/app/settings`);
     }),
   }),
 

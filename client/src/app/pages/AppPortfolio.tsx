@@ -15,6 +15,8 @@ import { usePrefs } from "../prefs";
 import { AppHeader } from "../components/AppHeader";
 import { ChangePercent, Money } from "../components/Money";
 import { EmptyState, SignInCard } from "../components/SignInCard";
+import { ProLock, usePro } from "../pro";
+import { FREE_HISTORY_DAYS } from "@shared/app";
 
 type Range = 7 | 30 | 90 | 365;
 
@@ -28,6 +30,7 @@ export default function AppPortfolio() {
     staleTime: 5 * 60 * 1000,
   });
   const [range, setRange] = useState<Range>(30);
+  const { isPro, openPaywall } = usePro();
 
   const data = portfolio.data;
   const history = useMemo(() => {
@@ -138,21 +141,25 @@ export default function AppPortfolio() {
 
         <div className="mt-3 flex items-center justify-between">
           <div className="flex gap-1">
-            {([7, 30, 90, 365] as Range[]).map(r => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRange(r)}
-                aria-pressed={range === r}
-                className={`h-8 rounded-full px-3 text-xs font-bold ${
-                  range === r
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-secondary-foreground"
-                }`}
-              >
-                {r === 365 ? "1A" : `${r}D`}
-              </button>
-            ))}
+            {([7, 30, 90, 365] as Range[]).map(r => {
+              const locked = r > FREE_HISTORY_DAYS && !isPro;
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => (locked ? openPaywall("history") : setRange(r))}
+                  aria-pressed={range === r}
+                  className={`inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-bold ${
+                    range === r
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground"
+                  }`}
+                >
+                  {r === 365 ? "1A" : `${r}D`}
+                  {locked && <ProLock />}
+                </button>
+              );
+            })}
           </div>
           {changeInRange != null && <ChangePercent value={changeInRange} className="text-sm" />}
         </div>

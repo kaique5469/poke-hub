@@ -181,6 +181,33 @@ const ptBR: Dict = {
   "Live stock data is not connected yet; alerts arm and wait.":
     "Os dados de estoque ao vivo ainda não estão conectados; os alertas ficam armados aguardando.",
 
+  // Pro
+  "Everything for collectors who buy, sell and trade.":
+    "Tudo para quem coleciona, compra, vende e troca.",
+  "Unlimited scans": "Scans ilimitados",
+  "Full price history": "Histórico de preço completo",
+  "Export your collection (CSV)": "Exportar sua coleção (CSV)",
+  "Instant restock push": "Aviso de reestoque na hora",
+  "Priority support": "Suporte prioritário",
+  "Monthly": "Mensal",
+  "Yearly": "Anual",
+  "mo": "mês",
+  "yr": "ano",
+  "Save {pct}%": "Economize {pct}%",
+  "Get Pro": "Assinar o Pro",
+  "Pro is almost ready. Everything free stays free.":
+    "O Pro está quase pronto. Tudo que é grátis continua grátis.",
+  "Cancel anytime. Prices in BRL are charged in BRL.":
+    "Cancele quando quiser. Preços em BRL são cobrados em BRL.",
+  "You are Pro": "Você é Pro",
+  "Manage subscription": "Gerenciar assinatura",
+  "Welcome to Pro!": "Bem-vindo ao Pro!",
+  "Checkout cancelled": "Pagamento cancelado",
+  "Export CSV": "Exportar CSV",
+  "Renews": "Renova em",
+  "Daily scan limit reached. Pro has unlimited scans.":
+    "Limite diário de scans atingido. O Pro tem scans ilimitados.",
+
   // Settings
   "Language": "Idioma",
   "Currency": "Moeda",

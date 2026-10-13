@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useT } from "../i18n";
 import { track } from "../analytics";
 import { SignInCard } from "../components/SignInCard";
+import { usePro } from "../pro";
 import {
   StillnessMeter,
   captureViewfinder,
@@ -70,6 +71,7 @@ export default function AppScan() {
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [quota, setQuota] = useState<ScanResult["quota"] | null>(null);
   const [limitHit, setLimitHit] = useState<"anonymous" | "daily" | null>(null);
+  const { openPaywall } = usePro();
 
   const busy = queue.some(q => q.status === "identifying");
 
@@ -112,7 +114,10 @@ export default function AppScan() {
                   ? t("The scanner is unavailable right now.")
                   : t("Could not identify this card. Try better light or search by name.");
         if (scanError?.code === "anonymous_limit") setLimitHit("anonymous");
-        if (scanError?.code === "daily_limit") setLimitHit("daily");
+        if (scanError?.code === "daily_limit") {
+          setLimitHit("daily");
+          openPaywall("scan_limit");
+        }
         updateItem(id, { status: "failed", error: message });
         track("scan_failed", { reason: scanError?.code ?? "unknown" });
         toast.error(message);
@@ -120,7 +125,7 @@ export default function AppScan() {
         inFlight.current = false;
       }
     },
-    [auto, t, updateItem]
+    [auto, t, updateItem, openPaywall]
   );
 
   const enqueue = useCallback(
@@ -297,7 +302,7 @@ export default function AppScan() {
 
       {/* Bottom: queue + capture */}
       <div className="app-dark bg-background px-4 pb-[calc(var(--app-tabbar-h)+var(--app-safe-bottom)+12px)] pt-3">
-        {limitHit && (
+        {limitHit === "anonymous" && (
           <div className="mb-3">
             <SignInCard
               title={t("Daily scan limit reached. Create a free account for a bigger daily budget.")}
@@ -305,6 +310,16 @@ export default function AppScan() {
               next="/app/scan"
             />
           </div>
+        )}
+        {limitHit === "daily" && (
+          <button
+            type="button"
+            onClick={() => openPaywall("scan_limit")}
+            className="mb-3 w-full rounded-2xl border border-[var(--app-gold)] bg-card p-4 text-left"
+          >
+            <p className="font-bold">{t("Daily scan limit reached. Pro has unlimited scans.")}</p>
+            <p className="mt-1 text-sm text-[var(--app-gold)]">{t("Get Pro")} →</p>
+          </button>
         )}
 
         {queue.length > 0 && (
