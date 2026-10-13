@@ -4,6 +4,28 @@ Plataforma completa de Pokémon TCG: cartas com preços reais, marketplace estil
 
 Stack: React 19 + Vite + Tailwind 4 + tRPC 11 + Express + Drizzle ORM (MySQL).
 
+## App mobile (`/app`)
+
+A partir de outubro/2026 o produto principal é o **app** em `/app`: scanner
+com câmera contínua, coleção com variante e condição, portfólio em USD e BRL,
+alertas de reestoque com reportes da comunidade, PT-BR/EN e assinatura Pro.
+Mesmo servidor, mesmo build. Detalhes em `docs/APP_SHELL.md`; versões
+nativas (Capacitor) em `docs/NATIVE.md`.
+
+Variáveis que ligam cada parte (todas opcionais; sem elas o app roda em modo
+grátis e sem analytics):
+
+| Recurso | Variáveis |
+| --- | --- |
+| Scanner | `OPENAI_API_KEY` (`OPENAI_SCANNER_MODEL`, padrão `gpt-5-mini`) |
+| Pro (Stripe) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_{MONTH,YEAR}_{USD,BRL}` |
+| Push de alertas | `DROP_VAPID_PUBLIC_KEY`, `DROP_VAPID_PRIVATE_KEY`, `DROP_VAPID_SUBJECT` |
+| Analytics | `VITE_POSTHOG_KEY` (build) |
+| App nativo | `NATIVE_APP_ORIGINS`, `VITE_API_BASE` (build nativo) |
+
+Crons (GitHub Actions, secrets `APP_URL` + `CRON_SECRET`): `daily-market`,
+`daily-collection-prices`, `daily-catalog`, `daily-articles`, `weekly-game`.
+
 ## Rodando localmente
 
 ```bash
