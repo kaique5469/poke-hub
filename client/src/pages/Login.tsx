@@ -25,9 +25,14 @@ export default function Login() {
       : null
   );
   const [submitting, setSubmitting] = useState(false);
+  // Same-origin path to land on after sign-in (the app shell passes /app/...).
+  const nextPath = (() => {
+    const raw = new URLSearchParams(window.location.search).get("next") ?? "/";
+    return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+  })();
 
   if (!authLoading && isAuthenticated) {
-    navigate("/");
+    navigate(nextPath);
     return null;
   }
 
@@ -50,7 +55,7 @@ export default function Login() {
         return;
       }
       await utils.auth.me.invalidate();
-      navigate("/");
+      navigate(nextPath);
     } catch {
       setError("Connection error. Please try again.");
     } finally {
@@ -71,7 +76,7 @@ export default function Login() {
         </p>
 
         <a
-          href="/api/auth/google"
+          href={`/api/auth/google?next=${encodeURIComponent(nextPath)}`}
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium transition hover:bg-accent"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>

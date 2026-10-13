@@ -3,10 +3,16 @@ import express from "express";
 import { authenticateRequest } from "./_core/auth";
 import { ENV } from "./_core/env";
 import { analyzeCardImage, confirmScannerMatches } from "./cardScanner";
+import { SCANNER_QUOTAS, normalizeVariant } from "@shared/app";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const DAILY_LIMIT = 10;
-const dailyBuckets = new Map<number, { day: string; count: number }>();
+
+/**
+ * Quota buckets are in memory on purpose: they cap the per-scan AI cost on a
+ * single Railway instance and reset on deploy. Keys are `user:<id>` for
+ * signed-in users and `ip:<addr>` for anonymous scans.
+ */
+const dailyBuckets = new Map<string, { day: string; count: number }>();
 const minuteBuckets = new Map<string, { resetAt: number; count: number }>();
 
 function clientIp(req: Request) {
@@ -19,40 +25,63 @@ function clientIp(req: Request) {
   );
 }
 
+export type ScannerTier = "anonymous" | "free" | "pro";
+
+export function dailyLimitFor(tier: ScannerTier) {
+  if (tier === "pro") return SCANNER_QUOTAS.proPerDay;
+  if (tier === "free") return SCANNER_QUOTAS.freePerDay;
+  return SCANNER_QUOTAS.anonymousPerDay;
+}
+
+/**
+ * Legacy signature kept for existing tests: `(userId, ip)` behaves like a
+ * signed-in free user. The object form carries the tier.
+ */
 export function consumeScannerQuota(
-  userId: number,
+  subject: number | { key: string; tier: ScannerTier },
   ip: string,
   now = new Date()
 ) {
+  const key =
+    typeof subject === "number" ? `user:${subject}` : subject.key;
+  const tier: ScannerTier =
+    typeof subject === "number" ? "free" : subject.tier;
+  const dailyLimit = dailyLimitFor(tier);
+
   const timestamp = now.getTime();
   const minute = minuteBuckets.get(ip);
   if (!minute || minute.resetAt <= timestamp) {
     minuteBuckets.set(ip, { resetAt: timestamp + 60_000, count: 1 });
   } else {
     minute.count += 1;
-    if (minute.count > 3) return { allowed: false, retryAfter: 60 };
+    if (minute.count > SCANNER_QUOTAS.perMinutePerIp) {
+      return { allowed: false as const, retryAfter: 60, dailyLimit };
+    }
   }
 
   const day = now.toISOString().slice(0, 10);
-  let daily = dailyBuckets.get(userId);
+  let daily = dailyBuckets.get(key);
   if (!daily || daily.day !== day) {
     daily = { day, count: 1 };
-    dailyBuckets.set(userId, daily);
+    dailyBuckets.set(key, daily);
   } else {
     daily.count += 1;
-    if (daily.count > DAILY_LIMIT) {
-      return { allowed: false, retryAfter: 86_400 };
+    if (daily.count > dailyLimit) {
+      return { allowed: false as const, retryAfter: 86_400, dailyLimit };
     }
   }
 
-  if (dailyBuckets.size > 10_000) {
-    for (const [key, bucket] of dailyBuckets) {
-      if (bucket.day !== day) dailyBuckets.delete(key);
+  if (dailyBuckets.size > 20_000) {
+    for (const [bucketKey, bucket] of dailyBuckets) {
+      if (bucket.day !== day) dailyBuckets.delete(bucketKey);
     }
   }
   return {
-    allowed: true,
-    remaining: Math.max(0, DAILY_LIMIT - daily.count),
+    allowed: true as const,
+    remaining: Number.isFinite(dailyLimit)
+      ? Math.max(0, dailyLimit - daily.count)
+      : null,
+    dailyLimit,
   };
 }
 
@@ -69,19 +98,31 @@ function rawImage(req: Request, res: Response, next: NextFunction) {
   );
 }
 
-async function requireScannerUser(
+/**
+ * Anonymous scans are allowed: the first scan is the activation moment and
+ * must happen before any sign-up wall. A signed-in user gets a larger daily
+ * budget keyed by user id instead of IP (shared Wi-Fi, carrier NAT).
+ */
+async function resolveScannerSubject(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
   try {
     const user = await authenticateRequest(req);
-    if (!user) {
-      return res
-        .status(401)
-        .json({ error: "Sign in to use the card scanner." });
+    if (user) {
+      res.locals.scannerSubject = {
+        key: `user:${user.id}`,
+        tier: "free" as ScannerTier,
+        userId: user.id,
+      };
+    } else {
+      res.locals.scannerSubject = {
+        key: `ip:${clientIp(req)}`,
+        tier: "anonymous" as ScannerTier,
+        userId: null,
+      };
     }
-    res.locals.scannerUserId = user.id;
     return next();
   } catch (error) {
     console.error("[scanner] authentication failed", error);
@@ -92,7 +133,7 @@ async function requireScannerUser(
 export function registerScannerRoutes(app: Express) {
   app.post(
     "/api/scanner/identify",
-    requireScannerUser,
+    resolveScannerSubject,
     rawImage,
     async (req, res) => {
       if (!ENV.openaiApiKey) {
@@ -106,17 +147,28 @@ export function registerScannerRoutes(app: Express) {
           .json({ error: "The image is empty or too small." });
       }
 
-      const quota = consumeScannerQuota(
-        res.locals.scannerUserId,
-        clientIp(req)
-      );
+      const subject = res.locals.scannerSubject as {
+        key: string;
+        tier: ScannerTier;
+        userId: number | null;
+      };
+      const quota = consumeScannerQuota(subject, clientIp(req));
       if (!quota.allowed) {
         res.setHeader("Retry-After", String(quota.retryAfter));
         return res.status(429).json({
           error:
             quota.retryAfter === 60
               ? "Too many scans at once. Wait a minute and try again."
-              : "Daily scan limit reached. Try again tomorrow.",
+              : subject.tier === "anonymous"
+                ? "Daily scan limit reached. Create a free account for a bigger daily budget."
+                : "Daily scan limit reached. Try again tomorrow.",
+          code:
+            quota.retryAfter === 60
+              ? "rate_limited"
+              : subject.tier === "anonymous"
+                ? "anonymous_limit"
+                : "daily_limit",
+          tier: subject.tier,
         });
       }
 
@@ -128,9 +180,18 @@ export function registerScannerRoutes(app: Express) {
         );
         const matches = await confirmScannerMatches(analysis);
         return res.json({
-          analysis,
+          analysis: {
+            ...analysis,
+            normalizedVariant: normalizeVariant(analysis.variant),
+          },
           matches,
-          quota: { remaining: quota.remaining ?? 0, dailyLimit: DAILY_LIMIT },
+          quota: {
+            remaining: quota.remaining,
+            dailyLimit: Number.isFinite(quota.dailyLimit)
+              ? quota.dailyLimit
+              : null,
+            tier: subject.tier,
+          },
           privacy: "Image processed in memory and not stored by RarityGrid.",
         });
       } catch (error) {

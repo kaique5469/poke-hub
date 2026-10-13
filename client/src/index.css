@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ─── Design Tokens ────────────────────────────────────────────────────────── */
-@theme inline {
+@theme {
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -601,4 +601,124 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ─── App shell (/app) — dark, mobile-first ─────────────────────────────────
+   Scoped tokens: every `bg-background`, `text-foreground`, `border-border`
+   etc. inside `.app-shell` resolves to these values. The brand violet stays;
+   gold is reserved for money. */
+.app-dark,
+.app-shell {
+  --color-background: oklch(0.17 0.025 300);
+  --color-foreground: oklch(0.96 0.01 300);
+  --color-card: oklch(0.215 0.028 300);
+  --color-card-foreground: oklch(0.96 0.01 300);
+  --color-popover: oklch(0.215 0.028 300);
+  --color-popover-foreground: oklch(0.96 0.01 300);
+  --color-primary: oklch(0.66 0.21 293);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-secondary: oklch(0.26 0.03 300);
+  --color-secondary-foreground: oklch(0.9 0.01 300);
+  --color-accent: oklch(0.86 0.16 85);
+  --color-accent-foreground: oklch(0.2 0.03 85);
+  --color-muted: oklch(0.25 0.025 300);
+  --color-muted-foreground: oklch(0.7 0.02 300);
+  --color-destructive: oklch(0.66 0.2 25);
+  --color-destructive-foreground: oklch(0.99 0 0);
+  --color-border: oklch(0.3 0.03 300);
+  --color-input: oklch(0.3 0.03 300);
+  --color-ring: oklch(0.66 0.21 293);
+
+  --app-up: oklch(0.78 0.17 155);
+  --app-down: oklch(0.72 0.19 25);
+  --app-gold: oklch(0.86 0.16 85);
+  --app-tabbar-h: 64px;
+  --app-safe-top: env(safe-area-inset-top, 0px);
+  --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  color-scheme: dark;
+  color: var(--color-foreground);
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+}
+.app-shell {
+  background: var(--color-background);
+  min-height: 100dvh;
+  overscroll-behavior-y: contain;
+}
+.app-dark h1, .app-dark h2, .app-dark h3, .app-dark h4 {
+  color: var(--color-foreground);
+}
+.app-shell h1,
+.app-shell h2,
+.app-shell h3,
+.app-shell h4 {
+  color: var(--color-foreground);
+}
+.app-shell ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.app-shell ::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.03 300);
+}
+
+.app-up { color: var(--app-up); }
+.app-down { color: var(--app-down); }
+.app-gold { color: var(--app-gold); }
+
+/* Numbers that are the point of the screen. */
+.app-figure {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* Content area leaves room for the tab bar + home indicator. */
+.app-page {
+  padding-top: calc(var(--app-safe-top) + 12px);
+  padding-bottom: calc(var(--app-tabbar-h) + var(--app-safe-bottom) + 16px);
+  padding-left: 16px;
+  padding-right: 16px;
+  min-height: 100dvh;
+}
+
+.app-tabbar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  height: calc(var(--app-tabbar-h) + var(--app-safe-bottom));
+  padding-bottom: var(--app-safe-bottom);
+  background: oklch(0.17 0.025 300 / 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--color-border);
+  z-index: 40;
+}
+
+/* Scanner viewfinder frame: a card is 63 × 88 mm (ratio 0.716). */
+.app-viewfinder {
+  aspect-ratio: 63 / 88;
+  width: min(78vw, 360px);
+  border-radius: 14px;
+  outline: 2px solid oklch(1 0 0 / 0.85);
+  outline-offset: 0;
+  box-shadow: 0 0 0 9999px oklch(0.1 0.02 300 / 0.55);
+  transition: outline-color 180ms ease;
+}
+.app-viewfinder[data-state="steady"] {
+  outline-color: var(--app-up);
+}
+.app-viewfinder[data-state="busy"] {
+  outline-color: var(--app-gold);
+}
+
+.app-card-shine {
+  background:
+    linear-gradient(135deg, oklch(1 0 0 / 0.08), transparent 45%),
+    var(--color-card);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-viewfinder { transition: none; }
 }

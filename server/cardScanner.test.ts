@@ -6,6 +6,7 @@ import {
   type ScannerAnalysis,
 } from "./cardScanner";
 import { consumeScannerQuota } from "./scannerRoutes";
+import { SCANNER_QUOTAS } from "@shared/app";
 
 const analysis: ScannerAnalysis = {
   isPokemonCard: true,
@@ -65,14 +66,15 @@ describe("card scanner canonical confirmation", () => {
 });
 
 describe("scanner launch quota", () => {
-  it("allows ten daily scans and blocks the eleventh", () => {
-    const userId = 987_654;
-    for (let index = 0; index < 10; index += 1) {
+  it("allows the free daily budget and blocks the next scan", () => {
+    const userId = 990_001;
+    for (let index = 0; index < SCANNER_QUOTAS.freePerDay; index += 1) {
+      // One IP per call keeps the per-minute cap out of this test.
       expect(
         consumeScannerQuota(
           userId,
           `quota-test-${index}`,
-          new Date(`2026-07-18T${String(index).padStart(2, "0")}:00:00.000Z`)
+          new Date("2026-07-18T12:00:00.000Z")
         ).allowed
       ).toBe(true);
     }
@@ -85,14 +87,14 @@ describe("scanner launch quota", () => {
     ).toMatchObject({ allowed: false, retryAfter: 86_400 });
   });
 
-  it("blocks a fourth scan from the same IP within a minute", () => {
+  it("blocks a burst from the same IP within a minute", () => {
     const now = new Date("2026-07-18T11:00:00.000Z");
-    for (let index = 0; index < 3; index += 1) {
+    for (let index = 0; index < SCANNER_QUOTAS.perMinutePerIp; index += 1) {
       expect(
         consumeScannerQuota(880_000 + index, "burst-test", now).allowed
       ).toBe(true);
     }
-    expect(consumeScannerQuota(880_004, "burst-test", now)).toMatchObject({
+    expect(consumeScannerQuota(880_999, "burst-test", now)).toMatchObject({
       allowed: false,
       retryAfter: 60,
     });
@@ -111,6 +113,6 @@ describe("scanner launch quota", () => {
         "day-reset-after",
         new Date("2026-07-19T00:01:00.000Z")
       )
-    ).toMatchObject({ allowed: true, remaining: 9 });
+    ).toMatchObject({ allowed: true, remaining: SCANNER_QUOTAS.freePerDay - 1 });
   });
 });

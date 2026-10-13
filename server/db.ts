@@ -181,6 +181,35 @@ export async function removeBinderCard(id: number, userId: number) {
     .where(and(eq(binderCards.id, id), eq(binderCards.userId, userId)));
 }
 
+/** Client ids already merged for this user — makes offline merges idempotent. */
+export async function getBinderClientIds(userId: number, clientIds: string[]) {
+  const db = await getDb();
+  if (!db || clientIds.length === 0) return new Set<string>();
+  const rows = await db
+    .select({ clientId: binderCards.clientId })
+    .from(binderCards)
+    .where(
+      and(eq(binderCards.userId, userId), inArray(binderCards.clientId, clientIds))
+    );
+  return new Set(rows.map(r => r.clientId).filter((v): v is string => !!v));
+}
+
+export async function addBinderCards(rows: InsertBinderCard[]) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  if (rows.length === 0) return;
+  await db.insert(binderCards).values(rows);
+}
+
+export async function updateUserPreferences(
+  userId: number,
+  data: { locale?: string | null; currency?: string | null }
+) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set(data).where(eq(users.id, userId));
+}
+
 export async function getBinderStats(userId: number) {
   const db = await getDb();
   if (!db) return { totalCards: 0, totalValue: 0 };

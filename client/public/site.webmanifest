@@ -1,17 +1,33 @@
 {
   "name": "RarityGrid",
   "short_name": "RarityGrid",
-  "description": "Pokémon card prices, collector tools and fast product drop alerts.",
-  "start_url": "/",
+  "description": "Scan Pokémon cards, track your collection in USD and BRL, and get restock alerts.",
+  "start_url": "/app?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f6f7fb",
-  "theme_color": "#6d28d9",
+  "orientation": "portrait",
+  "background_color": "#0b0d14",
+  "theme_color": "#0b0d14",
   "shortcuts": [
     {
-      "name": "Drop Monitor",
-      "short_name": "Drops",
-      "description": "Open live Pokémon product alerts",
-      "url": "/drops",
+      "name": "Scan a card",
+      "short_name": "Scan",
+      "description": "Identify a card with the camera",
+      "url": "/app/scan?source=shortcut",
+      "icons": [{ "src": "/pwa-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Portfolio",
+      "short_name": "Portfolio",
+      "description": "Collection value in USD and BRL",
+      "url": "/app/portfolio?source=shortcut",
+      "icons": [{ "src": "/pwa-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Drop alerts",
+      "short_name": "Alerts",
+      "description": "Live Pokémon product restock alerts",
+      "url": "/app/alerts?source=shortcut",
       "icons": [{ "src": "/pwa-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ],

@@ -93,6 +93,16 @@ function rateLimited(req: Request, route: string): boolean {
 }
 
 const OAUTH_STATE_COOKIE = "g_oauth_state";
+const OAUTH_NEXT_COOKIE = "oauth_next";
+
+/** Only relative, same-origin paths are honoured; anything else goes home. */
+export function safeNextPath(value: unknown): string {
+  if (typeof value !== "string") return "/";
+  if (!value.startsWith("/") || value.startsWith("//") || /[\r\n]/.test(value)) {
+    return "/";
+  }
+  return value.length > 512 ? "/" : value;
+}
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 export function registerAuthRoutes(app: Express) {
@@ -157,6 +167,9 @@ export function registerAuthRoutes(app: Express) {
     // Anti-CSRF: random state stored in an httpOnly cookie, validated on callback
     const state = randomUUID();
     res.cookie(OAUTH_STATE_COOKIE, state, { ...getSessionCookieOptions(req), maxAge: 10 * 60_000 });
+    // Where to land after login (same-origin paths only, e.g. /app/scan).
+    const next = safeNextPath(req.query.next);
+    res.cookie(OAUTH_NEXT_COOKIE, next, { ...getSessionCookieOptions(req), maxAge: 10 * 60_000 });
     const params = new URLSearchParams({
       client_id: ENV.googleClientId,
       redirect_uri: redirectUri,
@@ -222,7 +235,9 @@ export function registerAuthRoutes(app: Express) {
       if (!user) return res.redirect("/login?error=google");
 
       await setSessionCookie(req, res, user.id, user.openId);
-      return res.redirect("/");
+      const next = safeNextPath(getCookie(req, OAUTH_NEXT_COOKIE));
+      res.clearCookie(OAUTH_NEXT_COOKIE, getSessionCookieOptions(req));
+      return res.redirect(next);
     } catch (err) {
       console.error("[auth] Google callback failed:", err);
       return res.redirect("/login?error=google");
