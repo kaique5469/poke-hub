@@ -51,8 +51,17 @@ Mirrored in `drizzle/schema.ts`.
 `client/src/app/analytics.ts` emits the activation funnel
 (`app_open`, `scan_started`, `scan_success`, `scan_failed`, `card_collected`,
 `signup_prompt_clicked`, `pending_merged`, `alert_created`, `push_enabled`).
-It forwards to PostHog when `window.posthog` exists; add the snippet to
-`client/index.html` with the project key to turn it on.
+It forwards to PostHog when `VITE_POSTHOG_KEY` is set at build time
+(`posthog-js` is loaded lazily, autocapture and recordings off, account id
+only — never email or name). CSP already allows the PostHog hosts.
+
+## Daily price refresh
+
+`POST /api/scheduled/binder-prices` (`server/binderPrices.ts`, workflow
+`daily-collection-prices.yml`) re-prices every (card, variant) pair held in
+any collection via the catalog, writes a market snapshot per card so the
+portfolio's 7-day change and history cover untracked cards, and appends to
+`price_history`.
 
 ## Pro subscription
 

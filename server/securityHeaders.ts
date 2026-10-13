@@ -19,13 +19,21 @@ const ADSENSE_FRAME_HOSTS = [
   "https://www.google.com",
 ];
 
+/** Product analytics (PostHog Cloud US/EU) — only reached when a key is set. */
+const ANALYTICS_CONNECTION_HOSTS = [
+  "https://us.i.posthog.com",
+  "https://eu.i.posthog.com",
+  "https://us-assets.i.posthog.com",
+  "https://eu-assets.i.posthog.com",
+];
+
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   `script-src 'self' ${ADSENSE_SCRIPT_HOSTS.join(" ")}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
-  `connect-src 'self' ${ADSENSE_CONNECTION_HOSTS.join(" ")}`,
+  `connect-src 'self' ${ADSENSE_CONNECTION_HOSTS.join(" ")} ${ANALYTICS_CONNECTION_HOSTS.join(" ")}`,
   `frame-src https://js.stripe.com https://hooks.stripe.com ${ADSENSE_FRAME_HOSTS.join(" ")}`,
   "worker-src 'self' blob:",
   "object-src 'none'",

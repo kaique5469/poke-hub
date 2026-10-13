@@ -11,7 +11,8 @@ import { PrefsProvider, usePrefs } from "./prefs";
 import { ProProvider } from "./pro";
 import { useT } from "./i18n";
 import { useMergePending } from "./useMergePending";
-import { track } from "./analytics";
+import { identify, track } from "./analytics";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { consumeAuthDeepLink, isNative } from "@/lib/native";
 import { trpc } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -117,6 +118,11 @@ function ShellBody() {
     }).then(h => (handle = h));
     return () => handle?.remove();
   }, [utils]);
+
+  const { user } = useAuth();
+  useEffect(() => {
+    identify(user?.id ?? null);
+  }, [user?.id]);
 
   useEffect(() => {
     track("app_open", { path: location, currency });
