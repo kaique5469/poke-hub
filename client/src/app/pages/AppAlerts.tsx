@@ -20,6 +20,7 @@ import { usePrefs } from "../prefs";
 import { AppHeader } from "../components/AppHeader";
 import { EmptyState, SignInCard } from "../components/SignInCard";
 import { track } from "../analytics";
+import { CommunityReports } from "../components/CommunityReports";
 
 function urlBase64ToUint8Array(base64: string) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -117,6 +118,7 @@ export default function AppAlerts() {
           body={t("Alerts need an account so we can reach you.")}
           next="/app/alerts"
         />
+        <CommunityReports country={locale === "pt-BR" ? "BR" : "US"} />
       </div>
     );
   }
@@ -126,7 +128,7 @@ export default function AppAlerts() {
   return (
     <div className="app-page">
       <AppHeader
-        title={t("Restock alerts")}
+        title={t("Alerts")}
         right={
           <button
             type="button"
@@ -248,6 +250,8 @@ export default function AppAlerts() {
           </ul>
         </section>
       )}
+
+      <CommunityReports country={locale === "pt-BR" ? "BR" : "US"} />
 
       <Link href="/drops" className="mt-5 block text-center text-xs text-muted-foreground underline-offset-4 hover:underline">
         {t("Manage all alerts on the website")}

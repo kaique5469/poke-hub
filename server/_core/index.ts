@@ -19,6 +19,7 @@ import { ensureMarketplaceSchema } from "../marketplaceSchema";
 import { ensureGrowthSchema } from "../growthSchema";
 import { ensureAppSchema } from "../appSchema";
 import { handleSubscriptionEvent } from "../lib/subscription";
+import { ensureDropReportsSchema } from "../dropReports";
 import { ensureGameCompetitionSchema } from "../gameCompetitionSchema";
 import { ensureExternalApiCacheSchema } from "../externalApiCacheSchema";
 import { ensureDropMonitorSchema } from "../dropMonitorSchema";
@@ -114,6 +115,9 @@ async function startServer() {
       "[startup] External API cache schema is temporarily unavailable; continuing with in-memory resilience",
       error
     );
+  });
+  await ensureDropReportsSchema().catch(error => {
+    console.error("[boot] drop reports schema failed", error);
   });
   await ensureDropMonitorSchema().catch(error => {
     console.error(
