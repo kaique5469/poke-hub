@@ -130,9 +130,20 @@ function ShellBody() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const t = useT();
   useEffect(() => {
     window.scrollTo({ top: 0 });
-  }, [location]);
+    const names: Record<string, string> = {
+      "/app": t("Home"),
+      "/app/scan": t("Scan a card"),
+      "/app/collection": t("Collection"),
+      "/app/portfolio": t("Portfolio"),
+      "/app/alerts": t("Alerts"),
+      "/app/settings": t("Settings"),
+    };
+    const name = names[location.replace(/\/$/, "")] ?? names["/app"];
+    document.title = `${name} · RarityGrid`;
+  }, [location, t]);
 
   return (
     <div className="app-shell mx-auto w-full max-w-lg">
