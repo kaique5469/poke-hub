@@ -20,6 +20,7 @@ import { ensureGrowthSchema } from "../growthSchema";
 import { ensureAppSchema } from "../appSchema";
 import { handleSubscriptionEvent } from "../lib/subscription";
 import { ensureDropReportsSchema } from "../dropReports";
+import { binderPricesHandler } from "../binderPrices";
 import { ensureGameCompetitionSchema } from "../gameCompetitionSchema";
 import { ensureExternalApiCacheSchema } from "../externalApiCacheSchema";
 import { ensureDropMonitorSchema } from "../dropMonitorSchema";
@@ -243,6 +244,7 @@ async function startServer() {
   app.post("/api/scheduled/auto-release", autoReleaseHandler);
   app.post("/api/scheduled/scrydex-sync", scrydexSyncHandler);
   app.post("/api/scheduled/market-snapshot", marketSnapshotHandler);
+  app.post("/api/scheduled/binder-prices", binderPricesHandler);
   app.post("/api/scheduled/weekly-game", weeklyGameHandler);
   // tRPC API
   app.use("/api/trpc", apiRateLimit);
