@@ -1,0 +1,84 @@
+# Builds the Android app (debug APK, installable for testing) from the same
+# Vite bundle the website ships. No Android Studio needed: download the
+# artifact from the workflow run and sideload it.
+#
+# Release builds (signed .aab for Google Play) need the upload keystore —
+# see docs/NATIVE.md.
+
+name: Android app
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - "android/**"
+      - "capacitor.config.ts"
+      - "client/**"
+      - "shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/android-build.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "capacitor.config.ts"
+      - "client/**"
+      - "shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/android-build.yml"
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.4.1 --activate
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build web bundle for the native shell
+        run: VITE_API_BASE=https://raritygrid.com pnpm exec vite build
+        env:
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
+
+      - name: Sync Capacitor
+        run: pnpm exec cap sync android
+
+      - name: Assemble debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raritygrid-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

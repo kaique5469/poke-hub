@@ -6,8 +6,14 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
-import { apiUrl, authHeaders } from "./lib/native";
+import { apiUrl, authHeaders, isNative } from "./lib/native";
 import "./index.css";
+
+// Native shell: the bundle opens at "/", which is the website's home. The
+// app lives under /app, so land there before the router mounts.
+if (isNative() && /^\/(index\.html)?$/.test(window.location.pathname)) {
+  window.history.replaceState(null, "", "/app");
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
