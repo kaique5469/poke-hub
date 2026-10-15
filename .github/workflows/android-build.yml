@@ -1,0 +1,102 @@
+# Builds the Android app (debug APK, installable for testing) from the same
+# Vite bundle the website ships. No Android Studio needed: download the
+# artifact from the workflow run and sideload it.
+#
+# Release builds (signed .aab for Google Play) need the upload keystore —
+# see docs/NATIVE.md.
+
+name: Android app
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - "android/**"
+      - "capacitor.config.ts"
+      - "client/**"
+      - "shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/android-build.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "capacitor.config.ts"
+      - "client/**"
+      - "shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/android-build.yml"
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The hosted runner ships the Android SDK (platforms + build-tools) and
+      # Temurin JDKs; no extra setup actions needed.
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v5
+
+      # pnpm first: setup-node@v5 caches the package manager it finds in the
+      # lockfile and fails if the binary isn't on PATH yet.
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.4.1 --activate
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Toolchain
+        run: |
+          java -version
+          ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" || echo "::warning::Android SDK not at $ANDROID_HOME"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+
+      - name: Build web bundle for the native shell
+        run: |
+          VITE_API_BASE=https://raritygrid.com pnpm exec vite build > vite.log 2>&1 \
+            || { tail -n 30 vite.log | sed 's/^/::error::vite: /'; exit 1; }
+          tail -n 3 vite.log
+        env:
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
+
+      - name: Sync Capacitor
+        run: |
+          pnpm exec cap sync android > cap.log 2>&1 \
+            || { tail -n 30 cap.log | sed 's/^/::error::cap sync: /'; exit 1; }
+          tail -n 8 cap.log
+
+      - name: Assemble debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --console=plain > gradle.log 2>&1 \
+            || { grep -n "error:\|FAILED\|What went wrong\|Exception\|Could not" gradle.log | head -n 40 | sed 's/^/::error::gradle: /'; tail -n 40 gradle.log; exit 1; }
+          tail -n 15 gradle.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raritygrid-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

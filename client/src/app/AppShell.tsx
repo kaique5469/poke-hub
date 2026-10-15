@@ -103,20 +103,34 @@ function ShellBody() {
   const utils = trpc.useUtils();
 
   // Native: the OAuth deep link (raritygrid://auth?token=…) arrives through
-  // Capacitor's App plugin when installed; also accept it on first load.
+  // Capacitor's App plugin (also accept it on first load), and the status
+  // bar takes the dark style. Both plugins are loaded lazily so the web
+  // bundle never pays for them.
   useEffect(() => {
     if (!isNative()) return;
     if (consumeAuthDeepLink(window.location.href)) utils.auth.me.invalidate();
-    const cap = (window as unknown as {
-      Capacitor?: { Plugins?: { App?: { addListener: (e: string, cb: (d: { url: string }) => void) => Promise<{ remove: () => void }> } } };
-    }).Capacitor;
-    const app = cap?.Plugins?.App;
-    if (!app) return;
-    let handle: { remove: () => void } | null = null;
-    app.addListener("appUrlOpen", ({ url }) => {
-      if (consumeAuthDeepLink(url)) utils.auth.me.invalidate();
-    }).then(h => (handle = h));
-    return () => handle?.remove();
+    let cancelled = false;
+    let handle: { remove: () => Promise<void> | void } | null = null;
+    void (async () => {
+      try {
+        const [{ App }, { StatusBar, Style }] = await Promise.all([
+          import("@capacitor/app"),
+          import("@capacitor/status-bar"),
+        ]);
+        StatusBar.setStyle({ style: Style.Dark }).catch(() => undefined);
+        if (cancelled) return;
+        handle = await App.addListener("appUrlOpen", ({ url }) => {
+          if (consumeAuthDeepLink(url)) utils.auth.me.invalidate();
+        });
+        if (cancelled) void handle.remove();
+      } catch {
+        // Plugins missing (e.g. a plain browser with VITE_API_BASE set): no-op.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      void handle?.remove();
+    };
   }, [utils]);
 
   const { user } = useAuth();

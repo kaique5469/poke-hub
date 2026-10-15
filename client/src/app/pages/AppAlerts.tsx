@@ -9,6 +9,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { trpc } from "@/lib/trpc";
+import { isNative } from "@/lib/native";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
   DROP_RETAILER_GROUPS,
@@ -147,23 +148,31 @@ export default function AppAlerts() {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={enablePush}
-        disabled={pushState !== "idle"}
-        className={`mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border text-sm font-bold ${
-          pushState === "on"
-            ? "border-[var(--app-up)] text-[var(--app-up)]"
-            : "border-border bg-secondary text-secondary-foreground"
-        }`}
-      >
-        {pushState === "on" ? (
-          <BellRing className="h-4 w-4" aria-hidden />
-        ) : (
-          <Bell className="h-4 w-4" aria-hidden />
-        )}
-        {pushState === "on" ? t("Notifications on") : t("Enable notifications")}
-      </button>
+      {isNative() ? (
+        // WKWebView / Android WebView have no Web Push; native push comes
+        // with the store build. Alerts still show in the app.
+        <p className="mb-4 rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+          {t("Push notifications arrive with the store release; alerts show here in the meantime.")}
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={enablePush}
+          disabled={pushState !== "idle"}
+          className={`mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border text-sm font-bold ${
+            pushState === "on"
+              ? "border-[var(--app-up)] text-[var(--app-up)]"
+              : "border-border bg-secondary text-secondary-foreground"
+          }`}
+        >
+          {pushState === "on" ? (
+            <BellRing className="h-4 w-4" aria-hidden />
+          ) : (
+            <Bell className="h-4 w-4" aria-hidden />
+          )}
+          {pushState === "on" ? t("Notifications on") : t("Enable notifications")}
+        </button>
+      )}
 
       {list.length === 0 && !monitors.isLoading ? (
         <EmptyState

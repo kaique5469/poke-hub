@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- RarityGrid app palette (mirrors .app-dark tokens in client/src/index.css) -->
+    <color name="colorPrimary">#8B5CF6</color>
+    <color name="colorPrimaryDark">#0F0C1A</color>
+    <color name="colorAccent">#F5C542</color>
+    <color name="appBackground">#0F0C1A</color>
+</resources>

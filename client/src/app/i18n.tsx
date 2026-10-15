@@ -168,6 +168,8 @@ const ptBR: Dict = {
   "Retailer": "Loja",
   "Enable notifications": "Ativar notificações",
   "Notifications on": "Notificações ativas",
+  "Push notifications arrive with the store release; alerts show here in the meantime.":
+    "As notificações push chegam na versão da loja; por enquanto os alertas aparecem aqui.",
   "No alerts yet": "Nenhum alerta ainda",
   "Add a product you want and we tell you when it is back.":
     "Adicione um produto que você quer e avisamos quando voltar.",

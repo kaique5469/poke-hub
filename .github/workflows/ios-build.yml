@@ -1,0 +1,64 @@
+# Compiles the iOS app for the Simulator on a macOS runner — no signing, no
+# device, no App Store. It proves the Xcode project + Swift packages build
+# from a clean clone, so the only steps left on a Mac are signing and
+# archiving (docs/NATIVE.md). Runs only when the iOS project itself changes
+# (plus manual dispatch): macOS minutes are expensive.
+
+name: iOS app (simulator build)
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - "ios/**"
+      - "capacitor.config.ts"
+      - ".github/workflows/ios-build.yml"
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      # pnpm first: setup-node@v5 caches the package manager it finds in the
+      # lockfile and fails if the binary isn't on PATH yet.
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.4.1 --activate
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web bundle for the native shell
+        run: VITE_API_BASE=https://raritygrid.com pnpm exec vite build
+
+      - name: Sync Capacitor (SPM)
+        run: pnpm exec cap sync ios
+
+      - name: Resolve Swift packages
+        working-directory: ios/App
+        run: xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
+
+      - name: Build for iOS Simulator
+        working-directory: ios/App
+        run: |
+          xcodebuild build \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            | tail -n 60
+          test ${PIPESTATUS[0]} -eq 0
