@@ -19,14 +19,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
+      # pnpm first: setup-node@v5 caches the package manager it finds in the
+      # lockfile and fails if the binary isn't on PATH yet.
       - name: Enable pinned pnpm
         run: |
           corepack enable
           corepack prepare pnpm@10.4.1 --activate
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
 
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
